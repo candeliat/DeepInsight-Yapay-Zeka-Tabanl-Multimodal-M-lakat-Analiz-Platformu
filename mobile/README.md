@@ -1,50 +1,61 @@
-# Welcome to your Expo app 👋
+# DeepInsight Mobile (Mobil Uygulama)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Bu dizin, adayların mülakatları gerçekleştirmesi ve sonuçlarını görüntülemesi amacıyla tasarlanmış **Expo** (React Native) mobil uygulamasını içerir. Adaylar bu uygulama üzerinden kendilerine atanan mülakat odasına bağlanarak video ve ses kaydı yaparlar.
 
-## Get started
+---
 
-1. Install dependencies
+## 🚀 Başlangıç
 
+Uygulamayı yerel geliştirme ortamınızda çalıştırmak için aşağıdaki adımları uygulayın:
+
+1. Bağımlılıkları yükleyin:
    ```bash
    npm install
    ```
 
-2. Start the app
-
+2. Uygulamayı başlatın:
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+Çıkan terminal ekranında/arayüzünde aşağıdaki yöntemlerden biriyle uygulamayı test edebilirsiniz:
+*   Fiziksel cihazınızda **Expo Go** uygulamasını (iOS veya Android) indirip karekodu taratarak.
+*   **a** tuşuna basarak bir Android Emülatöründe çalıştırarak.
+*   **i** tuşuna basarak bir iOS Simülatöründe çalıştırarak (macOS gereklidir).
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+---
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## 🛠️ Kullanılan Teknolojiler ve Yapı
 
-## Get a fresh project
+*   **Platform**: [Expo](https://expo.dev) & React Native (TypeScript)
+*   **Yönlendirme (Routing)**: Expo Router (Dosya tabanlı yönlendirme - File-based routing)
+*   **Durum Yönetimi (State)**: [Zustand](https://github.com/pmndrs/zustand) (`userStore.ts`, `interviewStore.ts`)
+*   **Kamera & Ses**: `expo-camera` / `expo-av`
+*   **Kalıcı Depolama (Storage)**: AsyncStorage / SecureStore (`storage.ts`)
+*   **HTTP İstemci**: Axios (`src/config/api.ts`)
 
-When you're ready, run:
+---
 
-```bash
-npm run reset-project
-```
+## 📂 Klasör Yapısı
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+*   `app/index.tsx`: Uygulamanın giriş kapısı (oturum durumuna göre yönlendirme yapar).
+*   `app/(auth)`: Giriş (`login.tsx`) ve Kayıt Olma (`register.tsx`) ekranları.
+*   `app/(tabs)`: Uygulamanın ana sekmeleri:
+    *   `home.tsx`: Adayın yaklaşan mülakatları ve geçmiş mülakat özetleri.
+    *   `prepare.tsx`: Mülakat öncesi ipuçları, sistem kontrolleri (kamera ve mikrofon yetkileri).
+    *   `profile.tsx`: Kullanıcı profili ayarları ve çıkış yapma.
+    *   `reports.tsx`: Adayın geçmiş mülakatlarına ait detaylı performans raporları.
+*   `app/interview-room.tsx`: **Mülakat Odası**. Adayın karşısına gelen soruları okuyup video kaydı başlattığı, süre takibi yaptığı ve kaydı sisteme yüklediği ana ekran.
+*   `app/interview-result.tsx`: Mülakat bittiğinde adaya gösterilen özet ekran.
+*   `src/components`: Ortak buton, girdi alanları ve kart bileşenleri (`CustomButton.tsx`, `CustomInput.tsx`, `CategoryCard.tsx`).
+*   `src/config`: Backend API URL ve bağlantı ayarları (`api.ts`).
+*   `src/store`: Kullanıcı ve mülakat bilgilerini tutan global state'ler.
 
-## Learn more
+---
 
-To learn more about developing your project with Expo, look at the following resources:
+## 🔧 Kullanılabilir Komutlar
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+*   `npx expo start` - Expo geliştirme sunucusunu ve Metro bundler'ı başlatır.
+*   `npx expo start --android` - Uygulamayı doğrudan Android emülatöründe açar.
+*   `npx expo start --ios` - Uygulamayı doğrudan iOS simülatöründe açar.
+*   `npm run reset-project` - Örnek şablon kodlarını temizleyerek sıfır bir projeden başlamanızı sağlar (opsiyonel).

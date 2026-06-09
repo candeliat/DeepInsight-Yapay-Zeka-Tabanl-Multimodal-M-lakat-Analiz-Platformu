@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+backend/venv/
+.venv/
+
+# Python caching
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+ENV/
+
+# Next.js & React Dashboard build outputs
+dashboard/.next/
+dashboard/out/
+dashboard/build/
+
+# Expo / Mobile build outputs & native directories
+mobile/.expo/
+mobile/dist/
+mobile/web-build/
+mobile/ios/
+mobile/android/
+
+# Environment files and credentials
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.jks
+*.p12
+*.p8
+*.mobileprovision
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS Files
+.DS_Store
+Thumbs.db

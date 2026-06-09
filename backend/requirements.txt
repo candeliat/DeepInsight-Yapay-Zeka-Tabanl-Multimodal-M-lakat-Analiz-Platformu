@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+google-genai
+supabase
+python-dotenv
+pydantic
+email-validator
+python-multipart
+deepface
+mediapipe
+openai-whisper
+librosa
+numpy
+opencv-python-headless
+soundfile
+imageio-ffmpeg

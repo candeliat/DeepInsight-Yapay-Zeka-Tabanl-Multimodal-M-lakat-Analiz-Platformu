@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { Colors } from '../../src/constants/Colors';
+import { FontFamilies } from '../../src/constants/Fonts';
 import { useInterviewStore } from '../../src/store/interviewStore';
 import { useUserStore } from '../../src/store/userStore';
 import { CustomInput } from '../../src/components/CustomInput';
@@ -300,15 +301,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoText: { fontSize: 18, fontWeight: '700', color: Colors.onSurface, letterSpacing: -0.3 },
+  logoText: { fontSize: 18, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, letterSpacing: -0.3 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  topBarLabel: { fontSize: 13, fontWeight: '600', color: Colors.secondary },
+  topBarLabel: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.secondary },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 20 },
 
   header: { marginBottom: 20 },
-  title: { fontSize: 26, fontWeight: '700', color: Colors.onSurface, letterSpacing: -0.3, marginBottom: 6 },
-  subtitle: { fontSize: 14, color: Colors.onSurfaceVariant, lineHeight: 21 },
+  title: { fontSize: 26, fontFamily: FontFamilies.displaySemiboldItalic, color: Colors.onSurface, letterSpacing: -0.3, marginBottom: 6 },
+  subtitle: { fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 21 },
 
   // Kamera
   cameraContainer: {
@@ -327,7 +328,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1F2937',
     gap: 12,
   },
-  cameraPlaceholderText: { color: Colors.outline, fontSize: 13 },
+  cameraPlaceholderText: { color: Colors.outline, fontSize: 13, fontFamily: FontFamilies.sansRegular },
   lightBadge: {
     position: 'absolute',
     top: 12,
@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(0,104,122,0.2)',
   },
-  lightBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.secondary, letterSpacing: 0.5 },
+  lightBadgeText: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.secondary, letterSpacing: 0.5 },
   cameraControls: {
     position: 'absolute',
     bottom: 14,
@@ -389,8 +390,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statusInfo: { flex: 1 },
-  statusLabel: { fontSize: 9, fontWeight: '700', color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
-  statusValue: { fontSize: 12, fontWeight: '600', color: Colors.onSurface, marginTop: 2 },
+  statusLabel: { fontSize: 9, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
+  statusValue: { fontSize: 12, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface, marginTop: 2 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
 
   // Kurulum Kartı
@@ -405,10 +406,10 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: Colors.onSurface, marginBottom: 16 },
+  cardTitle: { fontSize: 18, fontFamily: FontFamilies.sansBold, color: Colors.onSurface, marginBottom: 16 },
   fieldLabel: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     color: Colors.onSurfaceVariant,
     letterSpacing: 0.8,
     marginBottom: 10,
@@ -426,8 +427,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.secondary,
     borderColor: Colors.secondary,
   },
-  topicChipText: { fontSize: 13, fontWeight: '500', color: Colors.onSurfaceVariant },
-  topicChipTextActive: { color: '#fff', fontWeight: '600' },
+  topicChipText: { fontSize: 13, fontFamily: FontFamilies.sansMedium, color: Colors.onSurfaceVariant },
+  topicChipTextActive: { color: '#fff', fontFamily: FontFamilies.sansSemibold },
   diffRow: { flexDirection: 'row', gap: 8 },
   diffBtn: {
     flex: 1,
@@ -442,7 +443,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceContainerLowest,
     borderColor: Colors.secondary,
   },
-  diffBtnText: { fontSize: 11, fontWeight: '700', color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
+  diffBtnText: { fontSize: 11, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
   diffBtnTextActive: { color: Colors.secondary },
   aiInfoBox: {
     flexDirection: 'row',
@@ -453,7 +454,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,104,122,0.07)',
     borderRadius: 10,
   },
-  aiInfoText: { flex: 1, fontSize: 13, color: Colors.secondary, lineHeight: 19 },
+  aiInfoText: { flex: 1, fontSize: 13, fontFamily: FontFamilies.sansRegular, color: Colors.secondary, lineHeight: 19 },
 
   // İpuçları
   tipsCard: {
@@ -464,10 +465,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.outlineVariant,
   },
   tipsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  tipsTitle: { fontSize: 15, fontWeight: '700', color: Colors.onSurface },
+  tipsTitle: { fontSize: 15, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
   tipRow: { flexDirection: 'row', gap: 8, marginBottom: 8 },
-  tipBullet: { color: Colors.secondary, fontWeight: '700', fontSize: 14 },
-  tipText: { flex: 1, fontSize: 14, color: Colors.onSurfaceVariant, lineHeight: 21 },
+  tipBullet: { color: Colors.secondary, fontFamily: FontFamilies.sansBold, fontSize: 14 },
+  tipText: { flex: 1, fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 21 },
 
   // Alt Bar
   actionBar: {
@@ -485,8 +486,8 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingBottom: 28,
   },
-  actionBarLabel: { fontSize: 10, fontWeight: '700', color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
-  actionBarSub: { fontSize: 14, fontWeight: '600', color: Colors.onSurface, marginTop: 2 },
+  actionBarLabel: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
+  actionBarSub: { fontSize: 14, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface, marginTop: 2 },
   startButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -501,5 +502,5 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 5,
   },
-  startButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  startButtonText: { color: '#fff', fontSize: 15, fontFamily: FontFamilies.sansBold },
 });

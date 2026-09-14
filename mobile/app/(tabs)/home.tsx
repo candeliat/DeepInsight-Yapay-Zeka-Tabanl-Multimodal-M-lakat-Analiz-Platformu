@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
+import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
 
@@ -46,8 +47,8 @@ function SkillBar({ label, value }: { label: string; value: number }) {
 const skillBarStyles = StyleSheet.create({
   container: { marginBottom: 16 },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  label: { fontSize: 13, fontWeight: '500', color: Colors.onSurface },
-  value: { fontSize: 13, fontWeight: '600', color: Colors.secondary },
+  label: { fontSize: 13, fontFamily: FontFamilies.sansMedium, color: Colors.onSurface },
+  value: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.secondary },
   track: {
     height: 6,
     backgroundColor: Colors.surfaceContainerHigh,
@@ -67,7 +68,7 @@ function ScoreChip({ score }: { score: number }) {
     <Text
       style={{
         fontSize: 10,
-        fontWeight: '700',
+        fontFamily: FontFamilies.sansBold,
         letterSpacing: 0.5,
         color: passed ? '#059669' : '#d97706',
       }}
@@ -342,7 +343,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoText: { fontSize: 18, fontWeight: '700', color: Colors.onSurface, letterSpacing: -0.3 },
+  logoText: { fontSize: 18, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, letterSpacing: -0.3 },
   avatarBtn: {},
   avatar: {
     width: 36,
@@ -359,19 +360,19 @@ const styles = StyleSheet.create({
   greetSection: { marginBottom: 24 },
   greetLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     color: Colors.secondary,
     letterSpacing: 1,
     marginBottom: 4,
   },
   greetTitle: {
     fontSize: 30,
-    fontWeight: '700',
+    fontFamily: FontFamilies.displaySemiboldItalic,
     color: Colors.onSurface,
     letterSpacing: -0.4,
     marginBottom: 8,
   },
-  greetSub: { fontSize: 14, color: Colors.onSurfaceVariant, lineHeight: 21 },
+  greetSub: { fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 21 },
   aiBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -383,7 +384,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginTop: 12,
   },
-  aiBadgeText: { fontSize: 12, fontWeight: '600', color: Colors.secondary },
+  aiBadgeText: { fontSize: 12, fontFamily: FontFamilies.sansSemibold, color: Colors.secondary },
 
   // Ana Aksiyon Kartı
   actionCard: {
@@ -409,13 +410,14 @@ const styles = StyleSheet.create({
   },
   actionCardTitle: {
     fontSize: 24,
-    fontWeight: '700',
+    fontFamily: FontFamilies.displaySemiboldItalic,
     color: '#fff',
     letterSpacing: -0.3,
     marginBottom: 10,
   },
   actionCardSub: {
     fontSize: 14,
+    fontFamily: FontFamilies.sansRegular,
     color: 'rgba(255,255,255,0.6)',
     lineHeight: 21,
     marginBottom: 20,
@@ -432,7 +434,7 @@ const styles = StyleSheet.create({
   },
   actionCardBtnText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     color: Colors.onSurface,
   },
   actionCardDecor: {
@@ -459,7 +461,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     color: Colors.onSurface,
     marginBottom: 16,
   },
@@ -475,6 +477,7 @@ const styles = StyleSheet.create({
   insightText: {
     flex: 1,
     fontSize: 12,
+    fontFamily: FontFamilies.sansRegular,
     color: Colors.onSurfaceVariant,
     lineHeight: 18,
     fontStyle: 'italic',
@@ -488,10 +491,10 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 2,
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700', color: Colors.onSurface },
+  sectionTitle: { fontSize: 18, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
   sectionLink: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     color: Colors.secondary,
     letterSpacing: 0.5,
   },
@@ -514,12 +517,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   resultInfo: { flex: 1 },
-  resultRole: { fontSize: 14, fontWeight: '600', color: Colors.onSurface, marginBottom: 3 },
-  resultMeta: { fontSize: 12, color: Colors.onSurfaceVariant },
+  resultRole: { fontSize: 14, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface, marginBottom: 3 },
+  resultMeta: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant },
   resultScore: { alignItems: 'flex-end', gap: 2 },
-  resultScoreNum: { fontSize: 18, fontWeight: '700', color: Colors.onSurface },
-  resultScoreOf: { fontSize: 11, color: Colors.onSurfaceVariant, fontWeight: '400' },
-  resultScorePending: { fontSize: 12, color: Colors.outline },
+  resultScoreNum: { fontSize: 18, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
+  resultScoreOf: { fontSize: 11, color: Colors.onSurfaceVariant, fontFamily: FontFamilies.sansRegular },
+  resultScorePending: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: Colors.outline },
 
   // Boş durum
   emptyCard: {
@@ -536,13 +539,14 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: FontFamilies.sansSemibold,
     color: Colors.onSurfaceVariant,
     marginTop: 12,
     marginBottom: 6,
   },
   emptySubText: {
     fontSize: 13,
+    fontFamily: FontFamilies.sansRegular,
     color: Colors.outline,
     textAlign: 'center',
     lineHeight: 19,

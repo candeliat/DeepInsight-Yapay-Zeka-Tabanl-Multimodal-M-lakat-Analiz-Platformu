@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
+import { FontFamilies } from '../../src/constants/Fonts';
 import { CustomInput } from '../../src/components/CustomInput';
 import { api } from '../../src/config/api';
 
@@ -217,20 +218,21 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansExtrabold,
     color: Colors.onSurface,
     letterSpacing: -0.3,
   },
   header: { marginBottom: 32 },
   title: {
     fontSize: 34,
-    fontWeight: '700',
+    fontFamily: FontFamilies.displaySemiboldItalic,
     color: Colors.onSurface,
     letterSpacing: -0.5,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
+    fontFamily: FontFamilies.sansRegular,
     color: Colors.onSurfaceVariant,
     lineHeight: 22,
   },
@@ -249,7 +251,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: Colors.error,
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FontFamilies.sansMedium,
   },
   successBox: {
     flexDirection: 'row',
@@ -266,7 +268,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: Colors.success,
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FontFamilies.sansMedium,
   },
   form: { marginBottom: 24 },
   registerButton: {
@@ -287,7 +289,7 @@ const styles = StyleSheet.create({
   registerButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     letterSpacing: 0.3,
   },
   footer: {
@@ -296,6 +298,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 8,
   },
-  footerText: { fontSize: 15, color: Colors.onSurfaceVariant },
-  linkText: { fontSize: 15, color: Colors.secondary, fontWeight: '700' },
+  footerText: { fontSize: 15, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant },
+  linkText: { fontSize: 15, color: Colors.secondary, fontFamily: FontFamilies.sansBold },
 });

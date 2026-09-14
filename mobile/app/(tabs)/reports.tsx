@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
+import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
 
@@ -51,16 +52,16 @@ const circleStyles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.surfaceContainerLowest,
   },
-  value: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
-  label: { fontSize: 10, fontWeight: '700', color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
+  value: { fontSize: 24, fontFamily: FontFamilies.sansExtrabold, letterSpacing: -0.5 },
+  label: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
 });
 
 function ScoreBar({ label, value, color = Colors.secondary }: { label: string; value: number; color?: string }) {
   return (
     <View style={{ marginBottom: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-        <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.onSurface, letterSpacing: 0.3 }}>{label}</Text>
-        <Text style={{ fontSize: 12, fontWeight: '700', color }}>{value}%</Text>
+        <Text style={{ fontSize: 12, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface, letterSpacing: 0.3 }}>{label}</Text>
+        <Text style={{ fontSize: 12, fontFamily: FontFamilies.sansBold, color }}>{value}%</Text>
       </View>
       <View style={{ height: 8, backgroundColor: Colors.surfaceContainerHigh, borderRadius: 4, overflow: 'hidden' }}>
         <View style={{ height: 8, width: `${value}%`, backgroundColor: color, borderRadius: 4 }} />
@@ -271,7 +272,7 @@ export default function ReportsScreen() {
                   activeOpacity={0.85}
                 >
                   <Ionicons name="pie-chart" size={20} color={Colors.secondary} />
-                  <Text style={{ color: Colors.secondary, fontWeight: '700', fontSize: 15 }}>Detaylı Analiz Grafikleri</Text>
+                  <Text style={{ color: Colors.secondary, fontFamily: FontFamilies.sansBold, fontSize: 15 }}>Detaylı Analiz Grafikleri</Text>
                   <Ionicons name="arrow-forward" size={16} color={Colors.secondary} style={{ marginLeft: 'auto', marginRight: 4 }} />
                 </TouchableOpacity>
 
@@ -367,28 +368,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoText: { fontSize: 18, fontWeight: '700', color: Colors.onSurface, letterSpacing: -0.3 },
+  logoText: { fontSize: 18, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, letterSpacing: -0.3 },
   topBarRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  topBarLabel: { fontSize: 13, fontWeight: '600', color: Colors.secondary },
+  topBarLabel: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.secondary },
   scroll: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 20 },
 
   pageHeader: { marginBottom: 20 },
   pageLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     color: Colors.secondary,
     letterSpacing: 1,
     marginBottom: 4,
   },
   pageTitle: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: FontFamilies.displaySemiboldItalic,
     color: Colors.onSurface,
     letterSpacing: -0.4,
     marginBottom: 6,
   },
-  pageSubtitle: { fontSize: 14, color: Colors.onSurfaceVariant, lineHeight: 21 },
+  pageSubtitle: { fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 21 },
 
   // Boş Durum
   emptyState: {
@@ -405,9 +406,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.onSurface, marginBottom: 10 },
+  emptyTitle: { fontSize: 18, fontFamily: FontFamilies.sansBold, color: Colors.onSurface, marginBottom: 10 },
   emptyText: {
     fontSize: 14,
+    fontFamily: FontFamilies.sansRegular,
     color: Colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 21,
@@ -422,7 +424,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
   },
-  emptyBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  emptyBtnText: { color: '#fff', fontSize: 15, fontFamily: FontFamilies.sansBold },
 
   // Ana Skor Kartı
   mainScoreCard: {
@@ -449,12 +451,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     marginBottom: 16,
   },
-  aiInsightText: { fontSize: 10, fontWeight: '700', color: Colors.secondary, letterSpacing: 0.5 },
+  aiInsightText: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.secondary, letterSpacing: 0.5 },
   mainScoreContent: { flexDirection: 'row', alignItems: 'center', gap: 20 },
   mainScoreInfo: { flex: 1 },
-  mainScoreTitle: { fontSize: 20, fontWeight: '700', color: Colors.onSurface, marginBottom: 4 },
-  mainScoreRole: { fontSize: 13, color: Colors.onSurfaceVariant, lineHeight: 19, marginBottom: 6 },
-  mainScoreDate: { fontSize: 12, color: Colors.outline },
+  mainScoreTitle: { fontSize: 20, fontFamily: FontFamilies.sansBold, color: Colors.onSurface, marginBottom: 4 },
+  mainScoreRole: { fontSize: 13, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 19, marginBottom: 6 },
+  mainScoreDate: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: Colors.outline },
 
   // Kart
   card: {
@@ -469,7 +471,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.onSurface },
+  cardTitle: { fontSize: 16, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
 
   // Geri Bildirim Kartı (Koyu)
   feedbackCard: {
@@ -484,7 +486,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   feedbackHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  feedbackTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  feedbackTitle: { fontSize: 16, fontFamily: FontFamilies.sansBold, color: '#fff' },
   feedbackBody: {
     backgroundColor: 'rgba(255,255,255,0.06)',
     borderRadius: 12,
@@ -493,14 +495,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.1)',
     marginBottom: 16,
   },
-  feedbackText: { color: '#cbd5e1', fontSize: 13, lineHeight: 20 },
+  feedbackText: { color: '#cbd5e1', fontSize: 13, fontFamily: FontFamilies.sansRegular, lineHeight: 20 },
   feedbackConfidence: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  feedbackConfidenceLabel: { fontSize: 10, fontWeight: '700', color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 },
-  feedbackConfidenceValue: { fontSize: 12, fontWeight: '700', color: '#57dffe' },
+  feedbackConfidenceLabel: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: 'rgba(255,255,255,0.4)', letterSpacing: 0.5 },
+  feedbackConfidenceValue: { fontSize: 12, fontFamily: FontFamilies.sansBold, color: '#57dffe' },
   feedbackBar: {
     height: 4,
     backgroundColor: 'rgba(255,255,255,0.1)',
@@ -534,8 +536,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   ctaInfo: { flex: 1 },
-  ctaTitle: { fontSize: 14, fontWeight: '700', color: Colors.onSurface, marginBottom: 3 },
-  ctaSub: { fontSize: 12, color: Colors.onSurfaceVariant, lineHeight: 17 },
+  ctaTitle: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: Colors.onSurface, marginBottom: 3 },
+  ctaSub: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 17 },
   ctaBtn: {
     width: 40,
     height: 40,
@@ -553,8 +555,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     paddingHorizontal: 2,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.onSurface },
-  sectionCount: { fontSize: 12, color: Colors.outline },
+  sectionTitle: { fontSize: 16, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
+  sectionCount: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: Colors.outline },
   historyCard: {
     backgroundColor: Colors.surfaceContainerLowest,
     borderRadius: 16,
@@ -591,9 +593,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,104,122,0.1)',
   },
   historyInfo: { flex: 1 },
-  historyRole: { fontSize: 13, fontWeight: '600', color: Colors.onSurface, marginBottom: 2 },
-  historyMeta: { fontSize: 11, color: Colors.onSurfaceVariant },
+  historyRole: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface, marginBottom: 2 },
+  historyMeta: { fontSize: 11, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant },
   historyRight: { minWidth: 36, alignItems: 'flex-end' },
-  historyScore: { fontSize: 14, fontWeight: '700' },
-  historyPending: { fontSize: 14, color: Colors.outline },
+  historyScore: { fontSize: 14, fontFamily: FontFamilies.sansBold },
+  historyPending: { fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.outline },
 });

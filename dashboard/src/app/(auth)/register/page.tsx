@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -48,7 +49,7 @@ export default function RegisterPage() {
         last_name,
         target
       });
-      
+
       router.push("/login");
     } catch (err: any) {
       setErrorStr(err.response?.data?.detail || "Kayıt olurken bir hata oluştu.");
@@ -59,122 +60,113 @@ export default function RegisterPage() {
 
   return (
     <div className="w-full max-w-md p-4">
-      <Card className="w-full bg-white shadow-lg border-slate-200">
+      <Card className="w-full">
         <CardHeader className="space-y-2 text-center pb-6">
-          <CardTitle className="text-3xl font-bold tracking-tight text-slate-900">
-            Kayıt Ol
+          <CardTitle className="font-serif italic text-3xl font-medium text-foreground">
+            Kariyerinize bir adım atın
           </CardTitle>
-          <CardDescription className="text-slate-500">
+          <CardDescription>
             DeepInsight platformuna katılmak için hesap oluşturun
           </CardDescription>
         </CardHeader>
         <CardContent>
           {errorStr && (
-            <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-md border border-red-200">
+            <div className="mb-4 p-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20">
               {errorStr}
             </div>
           )}
           <form onSubmit={handleRegister} className="space-y-5">
             <div className="space-y-2">
               <label
-                className="text-sm font-semibold leading-none text-slate-700"
+                className="text-sm font-semibold leading-none text-foreground"
                 htmlFor="name"
               >
                 Ad Soyad
               </label>
-              <input
+              <Input
                 id="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Örn: John Doe"
                 required
-                className="flex h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ring-offset-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent transition-all"
               />
             </div>
             <div className="space-y-2">
               <label
-                className="text-sm font-semibold leading-none text-slate-700"
+                className="text-sm font-semibold leading-none text-foreground"
                 htmlFor="email"
               >
                 E-posta
               </label>
-              <input
+              <Input
                 id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="ornek@sirket.com"
                 required
-                className="flex h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ring-offset-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent transition-all"
               />
             </div>
             <div className="space-y-2">
               <label
-                className="text-sm font-semibold leading-none text-slate-700"
+                className="text-sm font-semibold leading-none text-foreground"
                 htmlFor="target"
               >
                 Hedef Pozisyon
               </label>
-              <input
+              <Input
                 id="target"
                 type="text"
                 value={target}
                 onChange={(e) => setTarget(e.target.value)}
                 placeholder="Örn: Frontend Developer"
                 required
-                className="flex h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ring-offset-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent transition-all"
               />
             </div>
             <div className="space-y-2">
               <label
-                className="text-sm font-semibold leading-none text-slate-700"
+                className="text-sm font-semibold leading-none text-foreground"
                 htmlFor="password"
               >
                 Şifre
               </label>
-              <input
+              <Input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="flex h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ring-offset-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent transition-all"
               />
             </div>
             <div className="space-y-2">
               <label
-                className="text-sm font-semibold leading-none text-slate-700"
+                className="text-sm font-semibold leading-none text-foreground"
                 htmlFor="confirmPassword"
               >
                 Şifre Tekrarı
               </label>
-              <input
+              <Input
                 id="confirmPassword"
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="flex h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ring-offset-white placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-transparent transition-all"
               />
             </div>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="w-full h-11 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
-            >
+            <Button type="submit" size="lg" disabled={isLoading} className="w-full">
               {isLoading ? "Hesap Oluşturuluyor..." : "Kayıt Ol"}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex flex-col space-y-4 text-center text-sm text-slate-600 pt-2">
+        <CardFooter className="flex flex-col space-y-4 text-center text-sm text-muted-foreground pt-2">
           <div>
             Zaten hesabın var mı?{" "}
             <Link
               href="/login"
-              className="font-bold text-blue-600 hover:text-blue-500 transition-colors"
+              className="font-bold text-primary hover:text-primary-hover transition-colors"
             >
               Giriş Yap
             </Link>

@@ -12,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
+import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
 
@@ -240,10 +241,10 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 12, color: Colors.onSurfaceVariant, fontSize: 14 },
+  loadingText: { marginTop: 12, color: Colors.onSurfaceVariant, fontSize: 14, fontFamily: FontFamilies.sansRegular },
   scrollContent: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 50 },
   header: { marginBottom: 24 },
-  title: { fontSize: 32, fontWeight: '800', color: Colors.onSurface, letterSpacing: -0.5 },
+  title: { fontSize: 32, fontFamily: FontFamilies.displaySemiboldItalic, color: Colors.onSurface, letterSpacing: -0.5 },
   
   profileCard: {
     backgroundColor: Colors.surfaceContainerLowest,
@@ -268,19 +269,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  avatarText: { fontSize: 28, fontWeight: '800', color: Colors.secondary },
-  nameText: { fontSize: 22, fontWeight: '800', color: Colors.onSurface, marginBottom: 4 },
-  emailText: { fontSize: 14, color: Colors.onSurfaceVariant, marginBottom: 12 },
+  avatarText: { fontSize: 28, fontFamily: FontFamilies.displaySemibold, color: Colors.secondary },
+  nameText: { fontSize: 22, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, marginBottom: 4 },
+  emailText: { fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, marginBottom: 12 },
   roleBadge: {
     paddingHorizontal: 12,
     paddingVertical: 4,
     backgroundColor: 'rgba(0,104,122,0.08)',
     borderRadius: 12,
   },
-  roleText: { fontSize: 12, fontWeight: '700', color: Colors.secondary, textTransform: 'uppercase' },
+  roleText: { fontSize: 12, fontFamily: FontFamilies.sansBold, color: Colors.secondary, textTransform: 'uppercase' },
 
   section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.onSurface, marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontFamily: FontFamilies.sansBold, color: Colors.onSurface, marginBottom: 12 },
   
   statsLoader: {
     height: 80,
@@ -321,20 +322,20 @@ const styles = StyleSheet.create({
   },
   statVal: {
     fontSize: 15,
-    fontWeight: '800',
+    fontFamily: FontFamilies.sansExtrabold,
     color: Colors.onSurface,
     marginBottom: 2,
     textAlign: 'center',
   },
   statLbl: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: FontFamilies.sansSemibold,
     color: Colors.onSurfaceVariant,
     textAlign: 'center',
   },
 
   inputGroup: { marginBottom: 16 },
-  label: { fontSize: 13, fontWeight: '600', color: Colors.onSurfaceVariant, marginBottom: 8, marginLeft: 4 },
+  label: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurfaceVariant, marginBottom: 8, marginLeft: 4 },
   inputBox: {
     backgroundColor: Colors.surfaceContainerLow,
     borderWidth: 1,
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
-  inputText: { fontSize: 15, color: Colors.onSurface, fontWeight: '500' },
+  inputText: { fontSize: 15, color: Colors.onSurface, fontFamily: FontFamilies.sansMedium },
 
   logoutButton: {
     flexDirection: 'row',
@@ -355,5 +356,5 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(186,26,26,0.1)',
     marginTop: 8,
   },
-  logoutText: { fontSize: 16, fontWeight: '700', color: Colors.error },
+  logoutText: { fontSize: 16, fontFamily: FontFamilies.sansBold, color: Colors.error },
 });

@@ -11,6 +11,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../src/constants/Colors';
+import { FontFamilies } from '../src/constants/Fonts';
 import { useUserStore } from '../src/store/userStore';
 
 export default function WelcomeScreen() {
@@ -151,7 +152,7 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansExtrabold,
     color: Colors.onSurface,
     letterSpacing: -0.3,
   },
@@ -166,7 +167,7 @@ const styles = StyleSheet.create({
   },
   aiBadgeText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     color: Colors.secondary,
     letterSpacing: 0.5,
   },
@@ -200,16 +201,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 36,
-    fontWeight: '700',
+    fontSize: 38,
+    fontFamily: FontFamilies.displaySemibold,
     color: Colors.onSurface,
     textAlign: 'center',
-    lineHeight: 44,
-    letterSpacing: -0.5,
+    lineHeight: 46,
+    letterSpacing: -0.3,
     marginBottom: 16,
   },
   subtitle: {
     fontSize: 16,
+    fontFamily: FontFamilies.sansRegular,
     color: Colors.onSurfaceVariant,
     textAlign: 'center',
     lineHeight: 24,
@@ -236,7 +238,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     color: '#fff',
     fontSize: 17,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     letterSpacing: 0.3,
   },
   secondaryButton: {
@@ -245,11 +247,12 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 15,
+    fontFamily: FontFamilies.sansRegular,
     color: Colors.onSurfaceVariant,
   },
   linkText: {
     color: Colors.secondary,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
   },
   footerLinks: {
     flexDirection: 'row',
@@ -260,6 +263,7 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     fontSize: 11,
+    fontFamily: FontFamilies.sansRegular,
     color: Colors.outline,
     letterSpacing: 0.2,
   },

@@ -41,8 +41,8 @@ export default function InterviewsPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">
-            Mülakat Geçmişim
+          <h1 className="font-serif italic text-3xl text-foreground">
+            Mülakat geçmişiniz
           </h1>
           <p className="text-muted-foreground mt-1">
             Daha önce girdiğin tüm AI destekli mülakatların detaylı sonuçları.
@@ -78,43 +78,45 @@ export default function InterviewsPage() {
             const formattedDate = new Date(interview.created_at).toLocaleDateString("tr-TR", { day: 'numeric', month: 'short', year: 'numeric' });
 
             return (
-              <Link key={interview.id} href={`/interviews/${interview.id}`}>
-                <CardHeader className="pb-3 border-b border-border/50">
-                  <div className="flex items-start justify-between">
-                    <Badge variant={statusInfo.variant} className="mb-2">
-                      {statusInfo.label}
-                    </Badge>
-                    {interview.status === "completed" && (
-                      <div className="flex items-center gap-1 text-primary font-bold bg-primary/10 px-2 py-1 rounded-md text-sm">
-                        <BarChart className="w-4 h-4" />
-                        %{avgScore}
-                      </div>
-                    )}
-                  </div>
-                  <CardTitle className="text-lg line-clamp-1 mt-1 text-foreground">
-                    {interview.role}
-                  </CardTitle>
-                </CardHeader>
+              <Link key={interview.id} href={`/interviews/${interview.id}`} className="group block h-full">
+                <Card className="h-full flex flex-col">
+                  <CardHeader className="pb-3 border-b border-border/50">
+                    <div className="flex items-start justify-between">
+                      <Badge variant={statusInfo.variant} className="mb-2">
+                        {statusInfo.label}
+                      </Badge>
+                      {interview.status === "completed" && (
+                        <div className="flex items-center gap-1 text-primary font-bold bg-primary/10 px-2 py-1 rounded-md text-sm">
+                          <BarChart className="w-4 h-4" />
+                          %{avgScore}
+                        </div>
+                      )}
+                    </div>
+                    <CardTitle className="text-lg line-clamp-1 mt-1 text-foreground">
+                      {interview.role}
+                    </CardTitle>
+                  </CardHeader>
 
-                <CardContent className="pt-4 flex flex-col flex-1">
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6 flex-wrap">
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4" />
-                      <span>{formattedDate}</span>
+                  <CardContent className="pt-4 flex flex-col flex-1">
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6 flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-4 h-4" />
+                        <span>{formattedDate}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Briefcase className="w-4 h-4" />
+                        <span className="truncate max-w-[120px]">{interview.topic}</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                      <Briefcase className="w-4 h-4" />
-                      <span className="truncate max-w-[120px]">{interview.topic}</span>
+
+                    <div className="mt-auto">
+                      <Button variant="secondary" className="w-full justify-between group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                        {interview.status === "completed" ? "Detaylı Analizi Gör" : "Devam Et"}
+                        <ChevronRight className="w-4 h-4" />
+                      </Button>
                     </div>
-                  </div>
-                  
-                  <div className="mt-auto">
-                    <Button variant="secondary" className="w-full justify-between group-hover:bg-primary group-hover:text-primary-foreground transition-all">
-                      {interview.status === "completed" ? "Detaylı Analizi Gör" : "Devam Et"}
-                      <ChevronRight className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </CardContent>
+                  </CardContent>
+                </Card>
               </Link>
             );
           })}

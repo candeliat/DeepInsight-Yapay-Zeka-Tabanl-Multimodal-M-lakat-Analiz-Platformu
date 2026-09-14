@@ -15,6 +15,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../src/constants/Colors';
+import { FontFamilies } from '../src/constants/Fonts';
 import { api } from '../src/config/api';
 import { useInterviewStore } from '../src/store/interviewStore';
 import { analyticsService } from '../src/services/analyticsService';
@@ -111,13 +112,13 @@ function VerticalBarChart({ data }: { data: { name: string, count: number }[] })
 }
 
 const EMOTION_COLORS: Record<string, string> = {
-  "Mutlu": "#10b981",    // Emerald
-  "Üzgün": "#3b82f6",    // Blue
-  "Öfkeli": "#ef4444",   // Red
-  "Şaşkın": "#f59e0b",   // Amber
-  "Korku": "#8b5cf6",    // Purple
-  "Tiksinti": "#6b7280", // Gray
-  "Nötr": "#64748b"      // Slate
+  "Mutlu": "#10b981",
+  "Üzgün": "#4a90a4",
+  "Öfkeli": "#ba1a1a",
+  "Şaşkın": "#f59e0b",
+  "Korku": "#7c6a9c",
+  "Tiksinti": "#76777d",
+  "Nötr": "#8a8b93"
 };
 
 // Özel Stacked Bar Grafiği (Duygu Durumu için)
@@ -410,9 +411,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(251,191,36,0.12)',
     justifyContent: 'center', alignItems: 'center', marginBottom: 16,
   },
-  resultsTitle: { fontSize: 32, fontWeight: '800', color: Colors.onSurface, letterSpacing: -0.5, marginBottom: 8 },
-  resultsDesc: { fontSize: 14, color: Colors.onSurfaceVariant, textAlign: 'center', lineHeight: 22, marginBottom: 24, paddingHorizontal: 16 },
-  
+  resultsTitle: { fontSize: 32, fontFamily: FontFamilies.displaySemiboldItalic, color: Colors.onSurface, letterSpacing: -0.5, marginBottom: 8 },
+  resultsDesc: { fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, textAlign: 'center', lineHeight: 22, marginBottom: 24, paddingHorizontal: 16 },
+
   avgScoreRing: {
     width: 130, height: 130, borderRadius: 65,
     borderWidth: 10, borderColor: Colors.secondary,
@@ -422,17 +423,17 @@ const styles = StyleSheet.create({
     shadowColor: Colors.secondary, shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25, shadowRadius: 16, elevation: 10,
   },
-  avgScoreNum: { fontSize: 34, fontWeight: '900', color: Colors.secondary, letterSpacing: -1 },
-  avgScoreLabel: { fontSize: 10, fontWeight: '700', color: Colors.onSurfaceVariant, letterSpacing: 1, marginTop: 2 },
-  
+  avgScoreNum: { fontSize: 34, fontFamily: FontFamilies.sansExtrabold, color: Colors.secondary, letterSpacing: -1 },
+  avgScoreLabel: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 1, marginTop: 2 },
+
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24, width: '100%' },
   gridCard: {
     width: '48%', backgroundColor: Colors.surfaceContainerLowest, borderRadius: 16, padding: 16,
     borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)', alignItems: 'center'
   },
   gridIconCircle: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  gridVal: { fontSize: 20, fontWeight: '800', color: Colors.onSurface, marginBottom: 2 },
-  gridLabel: { fontSize: 11, fontWeight: '600', color: Colors.onSurfaceVariant },
+  gridVal: { fontSize: 20, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, marginBottom: 2 },
+  gridLabel: { fontSize: 11, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurfaceVariant },
 
   cardBox: {
     width: '100%', backgroundColor: Colors.surfaceContainerLowest, borderRadius: 20, padding: 20,
@@ -440,47 +441,47 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2,
   },
   cardHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16, borderBottomWidth: 1, borderBottomColor: Colors.outlineVariant, paddingBottom: 10 },
-  cardTitle: { fontSize: 16, fontWeight: '800', color: Colors.onSurface },
-  
+  cardTitle: { fontSize: 16, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface },
+
   // Progress Barlar
   progressRow: { marginBottom: 16 },
   progressLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progressLabel: { fontSize: 13, fontWeight: '600', color: Colors.onSurfaceVariant },
-  progressVal: { fontSize: 13, fontWeight: '800' },
+  progressLabel: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurfaceVariant },
+  progressVal: { fontSize: 13, fontFamily: FontFamilies.sansExtrabold },
   progressTrack: { height: 8, backgroundColor: Colors.surfaceContainerHighest, borderRadius: 4, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 4 },
 
   // Stacked Bar (Pie yerine)
-  dominantText: { fontSize: 13, color: Colors.onSurfaceVariant, marginBottom: 12, fontWeight: '500' },
-  dominantTextHighlight: { fontWeight: '800', color: Colors.onSurface, textTransform: 'uppercase' },
+  dominantText: { fontSize: 13, color: Colors.onSurfaceVariant, marginBottom: 12, fontFamily: FontFamilies.sansMedium },
+  dominantTextHighlight: { fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, textTransform: 'uppercase' },
   stackedContainer: { marginTop: 8 },
   stackedBar: { height: 24, flexDirection: 'row', width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 16 },
   stackedSegment: { height: '100%' },
   legendContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: 12, fontWeight: '600', color: Colors.onSurfaceVariant },
+  legendText: { fontSize: 12, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurfaceVariant },
 
   // Vertical Bar Chart
   vChartContainer: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: 160, paddingTop: 20 },
   vBarColumn: { alignItems: 'center', width: 40 },
-  vBarCount: { fontSize: 12, fontWeight: '800', color: Colors.onSurface, marginBottom: 4 },
+  vBarCount: { fontSize: 12, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, marginBottom: 4 },
   vBarTrack: { width: 24, height: 100, backgroundColor: Colors.surfaceContainerHighest, borderRadius: 6, justifyContent: 'flex-end', overflow: 'hidden', marginBottom: 8 },
   vBarFill: { width: '100%', backgroundColor: '#F59E0B', borderRadius: 6 },
-  vBarLabel: { fontSize: 10, fontWeight: '700', color: Colors.onSurfaceVariant, textTransform: 'uppercase' },
+  vBarLabel: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, textTransform: 'uppercase' },
 
   // Transcript
   transcriptBox: { backgroundColor: Colors.surfaceContainerLow, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.outlineVariant },
-  transcriptText: { fontSize: 14, color: Colors.onSurface, lineHeight: 22, fontStyle: 'italic' },
-  emptyText: { fontSize: 13, color: Colors.onSurfaceVariant, fontStyle: 'italic', textAlign: 'center', padding: 10 },
+  transcriptText: { fontSize: 14, fontFamily: FontFamilies.displaySemiboldItalic, color: Colors.onSurface, lineHeight: 22 },
+  emptyText: { fontSize: 13, fontFamily: FontFamilies.displaySemiboldItalic, color: Colors.onSurfaceVariant, textAlign: 'center', padding: 10 },
 
-  feedbackText: { fontSize: 15, color: Colors.onSurfaceVariant, lineHeight: 24 },
+  feedbackText: { fontSize: 15, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 24 },
 
   buttonContainer: { width: '100%', marginTop: 10 },
   homeButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, width: '100%', paddingVertical: 18, borderRadius: 16 },
-  homeButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  homeButtonText: { color: '#fff', fontSize: 17, fontFamily: FontFamilies.sansBold },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, gap: 16 },
-  errorText: { fontSize: 16, color: Colors.onSurfaceVariant, textAlign: 'center', marginBottom: 20 },
+  errorText: { fontSize: 16, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, textAlign: 'center', marginBottom: 20 },
   
   skeletonContainer: { flex: 1, alignItems: 'center', paddingTop: 60, paddingHorizontal: 20 },
   skeletonCircle: { width: 110, height: 110, borderRadius: 55, backgroundColor: '#E2E8F0', marginBottom: 30 },

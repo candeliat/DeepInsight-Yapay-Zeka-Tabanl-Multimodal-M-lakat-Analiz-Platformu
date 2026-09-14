@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, TextInputProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../constants/Colors';
+import { FontFamilies } from '../constants/Fonts';
 
 interface CustomInputProps extends TextInputProps {
   label: string;
@@ -45,7 +46,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
 
 const styles = StyleSheet.create({
   wrapper: { marginBottom: 16 },
-  label: { fontSize: 10, fontWeight: '700', color: Colors.onSurfaceVariant, letterSpacing: 0.8, marginBottom: 8 },
+  label: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.8, marginBottom: 8 },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -58,6 +59,6 @@ const styles = StyleSheet.create({
   },
   inputRowFocused: { borderColor: Colors.secondary, backgroundColor: Colors.surfaceContainerLowest },
   icon: { marginRight: 10 },
-  input: { flex: 1, fontSize: 15, color: Colors.onSurface, paddingVertical: 12 },
+  input: { flex: 1, fontSize: 15, fontFamily: FontFamilies.sansMedium, color: Colors.onSurface, paddingVertical: 12 },
   eyeBtn: { padding: 4 },
 });

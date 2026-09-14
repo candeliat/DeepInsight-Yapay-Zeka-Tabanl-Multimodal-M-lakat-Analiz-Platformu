@@ -35,22 +35,24 @@ export default function DashboardOverview() {
 
   const completedInterviews = interviews.filter(i => i.status === "completed");
   const totalInterviews = interviews.length;
-  
-  const avgScore = completedInterviews.length > 0 
+
+  const avgScore = completedInterviews.length > 0
     ? Math.round(completedInterviews.reduce((acc, curr) => acc + (curr.average_score || 0), 0) / completedInterviews.length)
     : 0;
 
-  const lastInterviewDate = interviews.length > 0 
+  const lastInterviewDate = interviews.length > 0
     ? new Date(interviews[0].created_at).toLocaleDateString("tr-TR", { day: 'numeric', month: 'long', year: 'numeric' })
     : "-";
+
+  const firstName = user?.user_metadata?.first_name;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Gösterge Paneli
+        <h1 className="font-serif italic text-3xl text-foreground">
+          {firstName ? `Merhaba, ${firstName}` : "Gösterge Paneli"}
         </h1>
-        <p className="text-slate-500 mt-2 text-base">
+        <p className="text-muted-foreground mt-2 text-base">
           Mülakat performansınızın genel özeti.
         </p>
       </div>
@@ -62,61 +64,61 @@ export default function DashboardOverview() {
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-white shadow-sm border-slate-200">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                   Tamamlanan Mülakatlar
                 </CardTitle>
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <ClipboardList className="h-5 w-5 text-blue-600" />
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <ClipboardList className="h-5 w-5 text-primary" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-slate-900">{completedInterviews.length} <span className="text-sm text-slate-500 font-normal">/ {totalInterviews} Toplam</span></div>
+                <div className="font-serif text-3xl text-foreground">{completedInterviews.length} <span className="font-sans text-sm text-muted-foreground font-normal">/ {totalInterviews} Toplam</span></div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border-slate-200">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                   Ortalama Başarı Puanı
                 </CardTitle>
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Target className="h-5 w-5 text-blue-600" />
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <Target className="h-5 w-5 text-primary" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-slate-900">%{avgScore}</div>
+                <div className="font-serif text-3xl text-foreground">%{avgScore}</div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border-slate-200">
+            <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-                <CardTitle className="text-sm font-semibold text-slate-600 uppercase tracking-wider">
+                <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                   Son Mülakat Tarihi
                 </CardTitle>
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Calendar className="h-5 w-5 text-blue-600" />
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <Calendar className="h-5 w-5 text-primary" />
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-slate-900 text-lg">
+                <div className="font-serif text-lg text-foreground">
                   {lastInterviewDate}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="bg-white shadow-sm border-slate-200">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg font-bold text-slate-800">
+          <Card>
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="text-lg font-bold text-foreground">
                 Son Mülakatlar
               </CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
-                  <thead className="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                  <thead className="text-xs text-muted-foreground uppercase bg-muted border-b border-border">
                     <tr>
                       <th scope="col" className="px-6 py-4 font-semibold tracking-wider">Pozisyon</th>
                       <th scope="col" className="px-6 py-4 font-semibold tracking-wider">Tarih</th>
@@ -129,23 +131,23 @@ export default function DashboardOverview() {
                       const score = Math.round(interview.average_score || 0);
                       const date = new Date(interview.created_at).toLocaleDateString("tr-TR");
                       let statusText = "Devam Ediyor";
-                      let statusClass = "bg-blue-100 text-blue-700";
-                      
+                      let statusClass = "bg-primary/10 text-primary";
+
                       if (interview.status === "completed") {
-                        if (score >= 80) { statusText = "Başarılı"; statusClass = "bg-green-100 text-green-700"; }
-                        else if (score >= 60) { statusText = "Geliştirilmeli"; statusClass = "bg-warning/20 text-warning-foreground"; }
-                        else { statusText = "Zayıf"; statusClass = "bg-red-100 text-red-700"; }
+                        if (score >= 80) { statusText = "Başarılı"; statusClass = "bg-success/15 text-success"; }
+                        else if (score >= 60) { statusText = "Geliştirilmeli"; statusClass = "bg-warning/15 text-warning"; }
+                        else { statusText = "Zayıf"; statusClass = "bg-destructive/15 text-destructive"; }
                       }
 
                       return (
-                        <tr 
-                          key={interview.id} 
+                        <tr
+                          key={interview.id}
                           onClick={() => router.push(`/interviews/${interview.id}`)}
-                          className={`bg-white hover:bg-slate-50 transition-colors cursor-pointer ${index !== Math.min(interviews.length, 5) - 1 ? "border-b border-slate-100" : ""}`}
+                          className={`bg-card hover:bg-muted transition-colors cursor-pointer ${index !== Math.min(interviews.length, 5) - 1 ? "border-b border-border" : ""}`}
                         >
-                          <td className="px-6 py-4 font-medium text-slate-900">{interview.role}</td>
-                          <td className="px-6 py-4 text-slate-600">{date}</td>
-                          <td className="px-6 py-4 font-semibold text-slate-700">{interview.status === "completed" ? `%${score}` : "-"}</td>
+                          <td className="px-6 py-4 font-medium text-foreground">{interview.role}</td>
+                          <td className="px-6 py-4 text-muted-foreground">{date}</td>
+                          <td className="px-6 py-4 font-semibold text-foreground">{interview.status === "completed" ? `%${score}` : "-"}</td>
                           <td className="px-6 py-4">
                             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusClass}`}>
                               {statusText}
@@ -156,7 +158,7 @@ export default function DashboardOverview() {
                     })}
                     {interviews.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                        <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">
                           Henüz mülakat bulunmuyor.
                         </td>
                       </tr>

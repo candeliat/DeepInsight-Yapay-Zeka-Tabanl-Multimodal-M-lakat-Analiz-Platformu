@@ -14,6 +14,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
+import { FontFamilies } from '../../src/constants/Fonts';
 import { CustomInput } from '../../src/components/CustomInput';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
@@ -187,20 +188,20 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansExtrabold,
     color: Colors.onSurface,
     letterSpacing: -0.3,
   },
   header: { marginBottom: 32 },
   title: {
-    fontSize: 34,
-    fontWeight: '700',
+    fontSize: 32,
+    fontFamily: FontFamilies.displaySemiboldItalic,
     color: Colors.onSurface,
-    letterSpacing: -0.5,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 15,
+    fontFamily: FontFamilies.sansRegular,
     color: Colors.onSurfaceVariant,
     lineHeight: 22,
   },
@@ -219,14 +220,14 @@ const styles = StyleSheet.create({
     flex: 1,
     color: Colors.error,
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: FontFamilies.sansMedium,
   },
   form: { marginBottom: 24 },
   forgotRow: { alignSelf: 'flex-end', marginBottom: 24, marginTop: -4 },
   forgotText: {
     color: Colors.secondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: FontFamilies.sansSemibold,
     letterSpacing: 0.3,
   },
   loginButton: {
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '700',
+    fontFamily: FontFamilies.sansBold,
     letterSpacing: 0.3,
   },
   divider: {
@@ -262,7 +263,7 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: FontFamilies.sansSemibold,
     color: Colors.onSurfaceVariant,
     letterSpacing: 0.8,
   },
@@ -281,7 +282,7 @@ const styles = StyleSheet.create({
   },
   oauthButtonText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: FontFamilies.sansSemibold,
     color: Colors.onSurface,
   },
   footer: {
@@ -290,6 +291,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  footerText: { fontSize: 15, color: Colors.onSurfaceVariant },
-  linkText: { fontSize: 15, color: Colors.secondary, fontWeight: '700' },
+  footerText: { fontSize: 15, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant },
+  linkText: { fontSize: 15, color: Colors.secondary, fontFamily: FontFamilies.sansBold },
 });

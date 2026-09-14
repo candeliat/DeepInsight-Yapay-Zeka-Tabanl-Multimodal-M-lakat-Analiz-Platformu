@@ -31,11 +31,11 @@ export default function Topbar() {
         <button className="p-2 text-muted-foreground hover:bg-muted rounded-full transition-colors">
           <Bell className="w-5 h-5" />
         </button>
-        <div className="flex items-center gap-2 cursor-pointer hover:bg-muted p-2 rounded-md transition-colors">
+        <div className="flex items-center gap-2 cursor-pointer hover:bg-muted p-2 rounded-xl transition-colors">
           <UserCircle className="w-6 h-6 text-foreground" />
           <span className="text-sm font-medium text-foreground">{displayName}</span>
         </div>
-        <button onClick={handleLogout} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors ml-2" title="Çıkış Yap">
+        <button onClick={handleLogout} className="p-2 text-destructive hover:bg-destructive/10 rounded-full transition-colors ml-2" title="Çıkış Yap">
           <LogOut className="w-5 h-5" />
         </button>
       </div>

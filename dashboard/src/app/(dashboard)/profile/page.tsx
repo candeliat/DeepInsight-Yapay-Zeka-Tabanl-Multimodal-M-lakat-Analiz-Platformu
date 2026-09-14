@@ -6,16 +6,16 @@ import { chatService } from "@/services/chatService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { 
-  User, 
-  Mail, 
-  Briefcase, 
-  Calendar, 
-  Trophy, 
-  ClipboardList, 
-  LogOut, 
-  Shield, 
-  Loader2 
+import {
+  User,
+  Mail,
+  Briefcase,
+  Calendar,
+  Trophy,
+  ClipboardList,
+  LogOut,
+  Shield,
+  Loader2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -65,12 +65,12 @@ export default function ProfilePage() {
 
   const completedInterviews = interviews.filter((i) => i.status === "completed");
   const totalInterviews = interviews.length;
-  
-  const avgScore = completedInterviews.length > 0 
+
+  const avgScore = completedInterviews.length > 0
     ? Math.round(completedInterviews.reduce((acc, curr) => acc + (curr.average_score || 0), 0) / completedInterviews.length)
     : 0;
 
-  const lastInterviewDate = interviews.length > 0 
+  const lastInterviewDate = interviews.length > 0
     ? formatDate(interviews[0].created_at)
     : "Henüz Yok";
 
@@ -86,13 +86,16 @@ export default function ProfilePage() {
   const lastName = user?.user_metadata?.last_name || "";
   const targetPosition = user?.user_metadata?.target || "Belirtilmemiş";
 
+  const fieldClass = "mt-1.5 text-base font-semibold text-foreground border border-border bg-muted rounded-xl px-3 py-2";
+  const labelClass = "text-xs font-semibold text-muted-foreground uppercase tracking-wider";
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-          Profilim
+        <h1 className="font-serif italic text-3xl text-foreground">
+          Profiliniz
         </h1>
-        <p className="text-slate-500 mt-2 text-base">
+        <p className="text-muted-foreground mt-2 text-base">
           Kişisel bilgilerinizi ve mülakat istatistiklerinizi buradan yönetebilirsiniz.
         </p>
       </div>
@@ -100,20 +103,20 @@ export default function ProfilePage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Sol Kolon - Avatar & Özet */}
         <div className="space-y-6 lg:col-span-1">
-          <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
+          <Card className="overflow-hidden">
             <div className="h-2 bg-primary w-full" />
             <CardContent className="pt-8 pb-6 flex flex-col items-center text-center">
-              <div className="w-24 h-24 rounded-full bg-primary/10 text-primary flex items-center justify-center text-3xl font-extrabold mb-4 border border-primary/20">
+              <div className="w-24 h-24 rounded-full bg-primary/10 text-primary flex items-center justify-center text-3xl font-serif mb-4 border border-primary/20">
                 {getInitials(firstName, lastName)}
               </div>
-              <h2 className="text-xl font-bold text-slate-900">
+              <h2 className="text-xl font-bold text-foreground">
                 {firstName} {lastName}
               </h2>
-              <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
-                <Mail className="w-4 h-4 text-slate-400" />
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
+                <Mail className="w-4 h-4" />
                 {user.email}
               </p>
-              
+
               <div className="mt-4 flex flex-col gap-2 w-full justify-center items-center">
                 <Badge variant="default" className="w-fit">
                   {user.user_metadata.role === 'admin' ? 'Yönetici' : 'Aday'}
@@ -126,11 +129,11 @@ export default function ProfilePage() {
                 )}
               </div>
 
-              <div className="w-full border-t border-slate-100 my-6" />
+              <div className="w-full border-t border-border my-6" />
 
-              <Button 
-                variant="destructive" 
-                onClick={handleLogout} 
+              <Button
+                variant="destructive"
+                onClick={handleLogout}
                 className="w-full flex items-center justify-center gap-2"
               >
                 <LogOut className="w-4 h-4" />
@@ -144,54 +147,54 @@ export default function ProfilePage() {
         <div className="space-y-6 lg:col-span-2">
           {/* İstatistik Kartları */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card className="bg-white border-slate-200 shadow-sm">
+            <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <p className={labelClass}>
                       Toplam Mülakat
                     </p>
-                    <p className="text-2xl font-bold text-slate-900">
+                    <p className="font-serif text-2xl text-foreground">
                       {loadingStats ? "-" : totalInterviews}
                     </p>
                   </div>
-                  <div className="p-2 bg-blue-50 rounded-lg text-primary">
+                  <div className="p-2 bg-primary/10 rounded-xl text-primary">
                     <ClipboardList className="w-5 h-5" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-slate-200 shadow-sm">
+            <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <p className={labelClass}>
                       Ort. Başarı Puanı
                     </p>
-                    <p className="text-2xl font-bold text-slate-900">
+                    <p className="font-serif text-2xl text-foreground">
                       {loadingStats ? "-" : `%${avgScore}`}
                     </p>
                   </div>
-                  <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
+                  <div className="p-2 bg-success/10 rounded-xl text-success">
                     <Trophy className="w-5 h-5" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white border-slate-200 shadow-sm">
+            <Card>
               <CardContent className="pt-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                    <p className={labelClass}>
                       Son Katılım
                     </p>
-                    <p className="text-lg font-bold text-slate-900 truncate max-w-[120px]">
+                    <p className="font-serif text-lg text-foreground truncate max-w-[120px]">
                       {loadingStats ? "-" : lastInterviewDate}
                     </p>
                   </div>
-                  <div className="p-2 bg-amber-50 rounded-lg text-amber-600">
+                  <div className="p-2 bg-warning/10 rounded-xl text-warning">
                     <Calendar className="w-5 h-5" />
                   </div>
                 </div>
@@ -200,9 +203,9 @@ export default function ProfilePage() {
           </div>
 
           {/* Kişisel Bilgiler Detay */}
-          <Card className="bg-white border-slate-200 shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <Card>
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
                 <User className="w-5 h-5 text-primary" />
                 Kişisel Bilgiler
               </CardTitle>
@@ -210,37 +213,29 @@ export default function ProfilePage() {
             <CardContent className="pt-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Ad</label>
-                  <p className="mt-1.5 text-base font-semibold text-slate-800 border border-slate-200 bg-slate-50 rounded-md px-3 py-2">
-                    {firstName || "-"}
-                  </p>
+                  <label className={labelClass}>Ad</label>
+                  <p className={fieldClass}>{firstName || "-"}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Soyad</label>
-                  <p className="mt-1.5 text-base font-semibold text-slate-800 border border-slate-200 bg-slate-50 rounded-md px-3 py-2">
-                    {lastName || "-"}
-                  </p>
+                  <label className={labelClass}>Soyad</label>
+                  <p className={fieldClass}>{lastName || "-"}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hedef Pozisyon</label>
-                  <p className="mt-1.5 text-base font-semibold text-slate-800 border border-slate-200 bg-slate-50 rounded-md px-3 py-2">
-                    {targetPosition}
-                  </p>
+                  <label className={labelClass}>Hedef Pozisyon</label>
+                  <p className={fieldClass}>{targetPosition}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">E-posta Adresi</label>
-                  <p className="mt-1.5 text-base font-semibold text-slate-800 border border-slate-200 bg-slate-50 rounded-md px-3 py-2">
-                    {user.email || "-"}
-                  </p>
+                  <label className={labelClass}>E-posta Adresi</label>
+                  <p className={fieldClass}>{user.email || "-"}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Hesap Bilgileri Detay */}
-          <Card className="bg-white border-slate-200 shadow-sm">
-            <CardHeader className="border-b border-slate-100 pb-4">
-              <CardTitle className="text-lg font-bold text-slate-800 flex items-center gap-2">
+          <Card>
+            <CardHeader className="border-b border-border pb-4">
+              <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
                 <Shield className="w-5 h-5 text-primary" />
                 Hesap Bilgileri
               </CardTitle>
@@ -248,14 +243,12 @@ export default function ProfilePage() {
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kayıt Tarihi</label>
-                  <p className="mt-1.5 text-base font-semibold text-slate-800 border border-slate-200 bg-slate-50 rounded-md px-3 py-2">
-                    {formatDate(user.created_at)}
-                  </p>
+                  <label className={labelClass}>Kayıt Tarihi</label>
+                  <p className={fieldClass}>{formatDate(user.created_at)}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Hesap Kimliği (UUID)</label>
-                  <p className="mt-1.5 text-sm font-mono text-slate-800 border border-slate-200 bg-slate-50 rounded-md px-3 py-2 truncate" title={user.id}>
+                  <label className={labelClass}>Hesap Kimliği (UUID)</label>
+                  <p className={`${fieldClass} text-sm font-mono truncate`} title={user.id}>
                     {user.id}
                   </p>
                 </div>

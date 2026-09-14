@@ -2,6 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
+import { FontFamilies } from '../../src/constants/Fonts';
 
 export default function TabLayout() {
   return (
@@ -20,7 +21,7 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '500',
+          fontFamily: FontFamilies.sansMedium,
           marginTop: 2,
         },
       }}

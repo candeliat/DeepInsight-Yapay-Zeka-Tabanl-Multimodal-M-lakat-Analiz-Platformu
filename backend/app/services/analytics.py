@@ -27,20 +27,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Lazy imports — ağır kütüphaneler yalnızca ihtiyaç duyulduğunda yüklenir
 # ---------------------------------------------------------------------------
-_whisper_model = None
 _face_mesh = None
-
-
-def _get_whisper_model():
-    """Whisper modelini singleton olarak yükler (ilk çağrıda indirilir)."""
-    global _whisper_model
-    if _whisper_model is None:
-        import whisper
-        from app.core.config import settings
-        logger.info("Whisper '%s' modeli yükleniyor...", settings.WHISPER_MODEL)
-        _whisper_model = whisper.load_model(settings.WHISPER_MODEL)
-        logger.info("Whisper modeli yüklendi.")
-    return _whisper_model
 
 
 def _get_face_mesh():
@@ -405,7 +392,8 @@ class AudioAnalyzer:
                 "duration": 120.5
             }
         """
-        model = _get_whisper_model()
+        from app.services.whisper_service import get_whisper_model
+        model = get_whisper_model()
 
         result = model.transcribe(
             audio_path,

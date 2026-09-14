@@ -63,7 +63,7 @@ Adayın genel özgüven performansı, aşağıdaki ağırlıklarla hesaplanan **
    ```bash
    pip install -r requirements.txt
    ```
-4. `.env` dosyasını oluşturun ve gerekli Supabase URL, API Key ve Gemini API Key bilgilerinizi ekleyin.
+4. `.env` dosyasını oluşturun ve gerekli Supabase URL/API Key ile OpenRouter API Key bilgilerinizi ekleyin (bkz. `backend/README.md`).
 5. Sunucuyu başlatın:
    ```bash
    uvicorn app.main:app --reload

@@ -39,6 +39,8 @@ mobile/android/
 # IDEs and Editors
 .vscode/
 .idea/
+.claude/
+.pytest_cache/
 *.suo
 *.ntvs*
 *.njsproj

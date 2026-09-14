@@ -1,0 +1,3 @@
+# Geliştirme/test bağımlılıkları — production imajına dahil edilmesi gerekmez.
+-r requirements.txt
+pytest

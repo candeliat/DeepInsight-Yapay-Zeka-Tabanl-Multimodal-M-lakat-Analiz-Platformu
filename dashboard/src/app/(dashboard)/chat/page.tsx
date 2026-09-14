@@ -22,6 +22,9 @@ import {
 import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 
 // Tarayıcı uyumluluğu için SpeechRecognition türleri
 declare global {
@@ -431,39 +434,37 @@ export default function InterviewRoomPage() {
             <div className="w-16 h-16 bg-primary/10 text-primary rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
               <Brain className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight">AI Mülakat Odası</h1>
+            <h1 className="font-serif text-[28px] italic text-foreground tracking-tight">Mülakata hazır mısınız?</h1>
             <p className="text-sm text-muted-foreground mt-2">
-              Rolünüzü ve mülakat konusunu seçerek yapay zeka deneyimini hemen başlatın.
+              Rolünüzü ve mülakat konusunu seçin, yapay zeka mülakatçınız sizi dinlemeye hazır.
             </p>
           </div>
 
           <form onSubmit={handleStartInterview} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
-              <input
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
+              <Input
                 type="text"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="Örn: Yazılım Mühendisi"
-                className="w-full bg-background border border-input rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-foreground"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Mülakat Konusu</label>
-              <input
-                type="text"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                placeholder="Örn: React ve Modern Web"
-                className="w-full bg-background border border-input rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-foreground"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider ml-1">Zorluk Seviyesi</label>
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Mülakat Konusu</label>
+              <Input
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="Örn: React ve Modern Web"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Zorluk Seviyesi</label>
               <div className="flex gap-2">
                 {["JUNIOR", "ORTA", "UZMAN"].map((level) => (
                   <button
@@ -482,22 +483,18 @@ export default function InterviewRoomPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-100 p-4 rounded-xl text-xs text-slate-500 font-semibold mb-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+            <div className="flex items-center gap-2 bg-muted border border-border p-4 rounded-xl text-xs text-muted-foreground font-semibold mb-2">
+              <ShieldCheck className="w-5 h-5 text-success shrink-0" />
               <span>Görüntü ve ses analizi tamamen cihazınız üzerinden güvenli şekilde yürütülecektir.</span>
             </div>
 
-            <button
-              type="submit"
-              disabled={isThinking}
-              className="w-full bg-primary text-primary-foreground hover:bg-primary/90 py-3.5 rounded-xl font-semibold flex items-center justify-center transition-all disabled:opacity-70 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-            >
+            <Button type="submit" size="lg" disabled={isThinking} className="w-full">
               {isThinking ? (
-                <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Hazırlanıyor...</>
+                <><Loader2 className="w-5 h-5 animate-spin" /> Hazırlanıyor...</>
               ) : (
-                <><Play className="w-5 h-5 mr-2 fill-current" /> Mülakata Başla</>
+                <><Play className="w-5 h-5 fill-current" /> Mülakata Başla</>
               )}
-            </button>
+            </Button>
           </form>
         </div>
       </div>
@@ -511,8 +508,8 @@ export default function InterviewRoomPage() {
         {/* Üst Kısım: Kamera ve Durum */}
         <div className="p-6 flex items-start justify-between z-10">
           <div className="flex items-center gap-3 bg-background/80 backdrop-blur-md px-4 py-2.5 rounded-full border border-border shadow-sm">
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></div>
-            <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Canlı Mülakat Kaydı</span>
+            <div className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse"></div>
+            <span className="text-xs font-extrabold uppercase tracking-wider text-foreground">Canlı Mülakat Kaydı</span>
             <span className="text-xs text-muted-foreground ml-2 border-l border-border pl-2 font-medium">
               {role}
             </span>
@@ -535,7 +532,7 @@ export default function InterviewRoomPage() {
           <button
             onClick={handleEndInterviewManual}
             disabled={isThinking}
-            className="ml-4 px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-semibold text-xs border border-red-200 transition-colors shadow-sm disabled:opacity-50"
+            className="ml-4 px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50"
           >
             Mülakatı Bitir
           </button>
@@ -543,24 +540,24 @@ export default function InterviewRoomPage() {
 
         {/* Orta Kısım: Soru ve AI Durumu */}
         <div className="flex-1 flex flex-col items-center justify-start pt-12 pb-8 px-6 md:px-12 text-center max-w-5xl mx-auto w-full relative z-10 overflow-y-auto min-h-0 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:bg-border [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-track]:bg-transparent">
-          
+
           <div className="relative mb-10 shrink-0">
             {isThinking && (
               <div className="absolute inset-0 -m-8 border-[3px] border-primary/30 rounded-full animate-ping opacity-75"></div>
             )}
-            <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-blue-500 to-primary flex items-center justify-center shadow-xl relative z-10 transition-transform duration-700 ${isThinking ? 'scale-110' : 'scale-100'}`}>
+            <div className={`w-20 h-20 md:w-24 md:h-24 rounded-full bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-xl relative z-10 transition-transform duration-700 ${isThinking ? 'scale-110' : 'scale-100'}`}>
               <Brain className="w-8 h-8 md:w-10 md:h-10 text-white" />
             </div>
           </div>
 
-          <div className="w-full text-xl md:text-2xl lg:text-3xl font-medium text-slate-800 leading-relaxed tracking-tight animate-in slide-in-from-bottom-4 duration-700">
+          <div className="w-full font-serif italic text-2xl md:text-3xl lg:text-[2.5rem] font-medium text-foreground leading-[1.35] tracking-tight animate-in slide-in-from-bottom-4 duration-700">
             {isThinking ? (
-              <span className="text-muted-foreground flex items-center justify-center gap-3 h-full">
+              <span className="font-sans not-italic text-base text-muted-foreground flex items-center justify-center gap-3 h-full">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" /> Yanıtınız analiz ediliyor...
               </span>
             ) : (
               <div className="break-words pb-10">
-                "{renderHighlightedText(currentQuestion, spokenWordIndex)}"
+                {renderHighlightedText(currentQuestion, spokenWordIndex)}
               </div>
             )}
           </div>
@@ -576,8 +573,8 @@ export default function InterviewRoomPage() {
               onClick={toggleListening}
               disabled={isThinking}
               className={`w-14 h-[56px] rounded-xl flex items-center justify-center transition-all shrink-0 border shadow-sm ${
-                isListening 
-                  ? "bg-red-500 text-white border-red-600 animate-pulse" 
+                isListening
+                  ? "bg-destructive text-white border-destructive animate-pulse"
                   : "bg-background hover:bg-muted border-border text-foreground"
               }`}
               title="Sesle Yanıtla"
@@ -587,11 +584,11 @@ export default function InterviewRoomPage() {
 
             {/* Metin Girişi */}
             <div className="relative flex-1">
-              <textarea
+              <Textarea
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
                 placeholder={isListening ? "Dinleniyor..." : "Cevabınızı buraya yazın veya sesli yanıtlayın..."}
-                className={`w-full bg-background border border-input rounded-xl px-4 py-3 min-h-[56px] max-h-32 resize-none focus:outline-none focus:ring-2 focus:ring-primary/50 text-[15px] transition-all font-medium ${isListening ? 'ring-2 ring-red-500/50 border-red-500/50' : ''}`}
+                className={`min-h-[56px] max-h-32 text-[15px] ${isListening ? 'ring-2 ring-destructive/50 border-destructive/50' : ''}`}
                 rows={1}
                 disabled={isThinking}
                 onKeyDown={(e) => {
@@ -620,7 +617,7 @@ export default function InterviewRoomPage() {
 
         {/* Süslemeler */}
         <div className="absolute top-1/4 left-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl -z-10"></div>
-        <div className="absolute bottom-1/4 right-10 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl -z-10"></div>
+        <div className="absolute bottom-1/4 right-10 w-96 h-96 bg-secondary/40 rounded-full blur-3xl -z-10"></div>
       </div>
     );
   }
@@ -632,21 +629,21 @@ export default function InterviewRoomPage() {
         <div className="max-w-lg w-full bg-card border border-border rounded-3xl shadow-2xl p-10 text-center relative overflow-hidden">
           {/* Glassmorphic arkaplan süslemeleri */}
           <div className="absolute top-[-20%] left-[-20%] w-60 h-60 bg-primary/10 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-[-20%] right-[-20%] w-60 h-60 bg-blue-500/10 rounded-full blur-3xl"></div>
-          
+          <div className="absolute bottom-[-20%] right-[-20%] w-60 h-60 bg-secondary/60 rounded-full blur-3xl"></div>
+
           <div className="relative z-10 space-y-8">
             {/* Animasyonlu Pulsing Yükleyici */}
             <div className="relative w-24 h-24 mx-auto">
               <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-pulse"></div>
               <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
-              <div className="absolute inset-2 bg-gradient-to-br from-primary to-blue-500 rounded-full flex items-center justify-center shadow-lg">
+              <div className="absolute inset-2 bg-gradient-to-br from-primary to-primary-hover rounded-full flex items-center justify-center shadow-lg">
                 <Brain className="w-8 h-8 text-white animate-pulse" />
               </div>
             </div>
 
             <div className="space-y-3">
-              <h2 className="text-xl font-extrabold text-slate-800 tracking-tight flex items-center justify-center gap-2">
-                <Sparkles className="w-5 h-5 text-amber-500 animate-bounce" /> Yapay Zeka Analizi Başladı
+              <h2 className="font-serif italic text-2xl text-foreground tracking-tight flex items-center justify-center gap-2">
+                <Sparkles className="w-5 h-5 text-warning animate-bounce" /> Analiz sürüyor
               </h2>
               <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
                 {analyzingStatusText}
@@ -685,85 +682,79 @@ export default function InterviewRoomPage() {
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center p-6 overflow-y-auto animate-in fade-in slide-in-from-bottom-8 duration-700 scrollbar-thin">
         <div className="max-w-3xl w-full bg-card border border-border rounded-3xl shadow-2xl p-8 relative overflow-hidden my-auto">
           
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-green-400 via-primary to-blue-500"></div>
-          
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-success via-primary to-warning"></div>
+
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-full mb-4 ring-8 ring-green-50/50">
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-success/10 text-success rounded-full mb-4 ring-8 ring-success/5">
               <Award className="w-8 h-8" />
             </div>
-            <h1 className="text-2xl font-extrabold text-slate-800 tracking-tight">Mülakat Değerlendirmesi Hazır!</h1>
-            <p className="text-sm text-slate-500 font-semibold mt-1">
+            <h1 className="font-serif italic text-3xl text-foreground tracking-tight">Değerlendirmeniz hazır</h1>
+            <p className="text-sm text-muted-foreground font-semibold mt-1">
               Temel AI skorlarınız hesaplandı. Video/Ses analiz raporunuz başarıyla entegre edildi.
             </p>
           </div>
 
           {/* Skor Kartları */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-            <ScoreCard 
-              title="Teknik Bilgi" 
-              score={evaluation.technical_score} 
-              icon={<Brain className="w-4 h-4 text-blue-500" />}
-              colorClass="text-blue-600 bg-blue-50 border-blue-100"
+            <ScoreCard
+              title="Teknik Bilgi"
+              score={evaluation.technical_score}
+              icon={<Brain className="w-4 h-4 text-primary" />}
+              tone="primary"
             />
-            <ScoreCard 
-              title="Özgüven Skoru" 
-              score={analytics ? Math.round(analytics.confidence_pct) : evaluation.confidence_score} 
-              icon={<Target className="w-4 h-4 text-indigo-500" />}
-              colorClass="text-indigo-600 bg-indigo-50 border-indigo-100"
+            <ScoreCard
+              title="Özgüven Skoru"
+              score={analytics ? Math.round(analytics.confidence_pct) : evaluation.confidence_score}
+              icon={<Target className="w-4 h-4 text-success" />}
+              tone="success"
             />
-            <ScoreCard 
-              title="İletişim & Kelime" 
-              score={evaluation.vocabulary_score} 
-              icon={<MessageSquare className="w-4 h-4 text-green-500" />}
-              colorClass="text-green-600 bg-green-50 border-green-100"
+            <ScoreCard
+              title="İletişim & Kelime"
+              score={evaluation.vocabulary_score}
+              icon={<MessageSquare className="w-4 h-4 text-warning" />}
+              tone="warning"
             />
           </div>
 
           {/* AI Göz Teması ve Konuşma Ekstra Stats (Eğer analiz varsa) */}
           {analytics && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 bg-slate-50 dark:bg-slate-800/40 p-4 border border-slate-100 dark:border-slate-800 rounded-2xl">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 bg-muted p-4 border border-border rounded-2xl">
               <div className="text-center">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Göz Teması</span>
-                <p className="text-base font-black text-slate-700 dark:text-white">%{Math.round(analytics.eye_contact_pct)}</p>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Göz Teması</span>
+                <p className="text-base font-black text-foreground">%{Math.round(analytics.eye_contact_pct)}</p>
               </div>
               <div className="text-center">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Konuşma Hızı</span>
-                <p className="text-base font-black text-slate-700 dark:text-white">{Math.round(analytics.speech_rate_wpm)} WPM</p>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Konuşma Hızı</span>
+                <p className="text-base font-black text-foreground">{Math.round(analytics.speech_rate_wpm)} WPM</p>
               </div>
               <div className="text-center">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Duraksamalar</span>
-                <p className="text-base font-black text-slate-700 dark:text-white">{analytics.pause_count} adet</p>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Duraksamalar</span>
+                <p className="text-base font-black text-foreground">{analytics.pause_count} adet</p>
               </div>
               <div className="text-center">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide">Duygu</span>
-                <p className="text-base font-black text-slate-700 dark:text-white capitalize">{analytics.dominant_emotion === "neutral" ? "Nötr" : analytics.dominant_emotion}</p>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Duygu</span>
+                <p className="text-base font-black text-foreground capitalize">{analytics.dominant_emotion === "neutral" ? "Nötr" : analytics.dominant_emotion}</p>
               </div>
             </div>
           )}
 
           {/* Geri Bildirim */}
           <div className="bg-muted/50 rounded-2xl p-5 border border-border">
-            <h3 className="font-bold text-slate-800 dark:text-slate-200 text-sm mb-2 flex items-center gap-2">
+            <h3 className="font-bold text-foreground text-sm mb-2 flex items-center gap-2">
               <Brain className="w-4 h-4 text-primary" /> Değerlendirme Özeti
             </h3>
-            <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed font-semibold">
+            <p className="text-muted-foreground text-xs leading-relaxed font-semibold">
               {evaluation.feedback}
             </p>
           </div>
 
           <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
-            <button
-              onClick={() => setCurrentState("SETUP")}
-              className="w-full sm:w-auto bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 px-6 py-3 rounded-xl font-bold text-xs transition-all shadow-sm"
-            >
+            <Button variant="outline" onClick={() => setCurrentState("SETUP")} className="w-full sm:w-auto">
               Yeni Mülakat Başlat
-            </button>
-            <button
-              onClick={() => router.push(`/interviews/${interviewId}`)}
-              className="w-full sm:w-auto bg-gradient-to-r from-primary to-blue-600 hover:from-primary/95 hover:to-blue-500 text-white px-6 py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md"
-            >
+            </Button>
+            <Button onClick={() => router.push(`/interviews/${interviewId}`)} className="w-full sm:w-auto">
               Detaylı Sonuç Raporuna Git <ArrowRight className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
 
         </div>
@@ -775,18 +766,33 @@ export default function InterviewRoomPage() {
 }
 
 // Yardımcı Bileşenler
-function ScoreCard({ title, score, icon, colorClass }: { title: string; score: number; icon: React.ReactNode; colorClass: string }) {
-  const parts = colorClass.split(' ');
-  const borderBg = parts[1] + " " + parts[2];
-  
+const scoreToneClasses = {
+  primary: { text: "text-primary", bg: "bg-primary/5", border: "border-primary/15" },
+  success: { text: "text-success", bg: "bg-success/5", border: "border-success/15" },
+  warning: { text: "text-warning", bg: "bg-warning/5", border: "border-warning/15" },
+} as const;
+
+function ScoreCard({
+  title,
+  score,
+  icon,
+  tone,
+}: {
+  title: string;
+  score: number;
+  icon: React.ReactNode;
+  tone: keyof typeof scoreToneClasses;
+}) {
+  const { text, bg, border } = scoreToneClasses[tone];
+
   return (
-    <div className={`bg-background border rounded-2xl p-5 text-center shadow-sm hover:shadow transition-all relative overflow-hidden group ${borderBg}`}>
-      <div className="flex items-center justify-center w-8 h-8 bg-white/80 dark:bg-slate-900/80 rounded-full mx-auto mb-3 shadow-sm">
+    <div className={`border rounded-2xl p-5 text-center shadow-sm hover:shadow transition-all relative overflow-hidden group ${bg} ${border}`}>
+      <div className="flex items-center justify-center w-8 h-8 bg-background rounded-full mx-auto mb-3 shadow-sm">
         {icon}
       </div>
-      <h3 className="text-xs font-bold text-slate-500 mb-1">{title}</h3>
-      <div className={`text-2xl font-black ${parts[0]}`}>
-        {score}<span className="text-sm text-slate-400 font-normal">/100</span>
+      <h3 className="text-xs font-bold text-muted-foreground mb-1">{title}</h3>
+      <div className={`font-serif text-3xl ${text}`}>
+        {score}<span className="font-sans text-sm text-muted-foreground font-normal">/100</span>
       </div>
     </div>
   );

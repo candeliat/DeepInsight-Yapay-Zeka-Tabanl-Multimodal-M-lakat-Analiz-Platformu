@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import { Colors } from '../src/constants/Colors';
+import { FontFamilies } from '../src/constants/Fonts';
 import { useInterviewStore } from '../src/store/interviewStore';
 import * as FileSystem from 'expo-file-system';
 import { analyticsService } from '../src/services/analyticsService';
@@ -518,12 +519,12 @@ const styles = StyleSheet.create({
     width: 28, height: 28, borderRadius: 7,
     backgroundColor: 'rgba(0,104,122,0.2)', justifyContent: 'center', alignItems: 'center',
   },
-  topLogoText: { fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: -0.2 },
+  topLogoText: { fontSize: 16, fontFamily: FontFamilies.sansExtrabold, color: '#fff', letterSpacing: -0.2 },
   timerBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     backgroundColor: 'rgba(0,104,122,0.15)', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20,
   },
-  timerText: { fontSize: 13, fontWeight: '700', color: Colors.secondary },
+  timerText: { fontSize: 13, fontFamily: FontFamilies.sansBold, color: Colors.secondary },
   interviewContent: { flex: 1 },
 
   questionSection: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
@@ -536,12 +537,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,104,122,0.2)', alignSelf: 'flex-start',
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, marginBottom: 14,
   },
-  aiLabelText: { fontSize: 10, fontWeight: '700', color: Colors.secondary, letterSpacing: 0.8 },
-  questionScroll: { maxHeight: 120 },
-  questionText: { fontSize: 17, fontWeight: '500', color: '#f1f5f9', lineHeight: 26, textAlign: 'center' },
+  aiLabelText: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.secondary, letterSpacing: 0.8 },
+  questionScroll: { maxHeight: 140 },
+  // Dashboard'daki (/chat) YZ soru metniyle aynı sesi taşır: Fraunces italic —
+  // sistemin geri kalanı Manrope'ta kalıp bu tek anı "konuşma" olarak öne çıkarır.
+  questionText: {
+    fontSize: 20, fontFamily: FontFamilies.displaySemiboldItalic,
+    color: '#f1f5f9', lineHeight: 30, textAlign: 'center',
+  },
   thinkingContainer: { alignItems: 'center', paddingVertical: 20, gap: 12 },
-  thinkingText: { color: Colors.secondary, fontSize: 14, fontWeight: '600' },
-  listeningHint: { fontSize: 12, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 12 },
+  thinkingText: { color: Colors.secondary, fontSize: 14, fontFamily: FontFamilies.sansSemibold },
+  listeningHint: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 12 },
 
   cameraSection: {
     flex: 1, marginHorizontal: 16, marginVertical: 8,
@@ -556,12 +562,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20,
   },
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.error },
-  liveText: { fontSize: 10, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
+  liveText: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: '#fff', letterSpacing: 0.5 },
   mutedChip: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     backgroundColor: 'rgba(186,26,26,0.6)', paddingHorizontal: 8, paddingVertical: 5, borderRadius: 20,
   },
-  mutedText: { fontSize: 10, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+  mutedText: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: '#fff', letterSpacing: 0.3 },
   cameraOverlayBottom: {
     position: 'absolute', bottom: 14, left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16,
@@ -573,7 +579,7 @@ const styles = StyleSheet.create({
   },
   ctrlBtnOff: { backgroundColor: 'rgba(186,26,26,0.3)', borderColor: 'rgba(186,26,26,0.5)' },
   endButton: { backgroundColor: '#fff', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 24 },
-  endButtonText: { fontSize: 14, fontWeight: '700', color: Colors.onSurface },
+  endButtonText: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
 
   inputContainer: {
     flexDirection: 'row', alignItems: 'flex-end',
@@ -586,7 +592,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
     borderRadius: 16, color: '#f1f5f9',
     paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12,
-    fontSize: 14, minHeight: 46, maxHeight: 90,
+    fontSize: 14, fontFamily: FontFamilies.sansMedium, minHeight: 46, maxHeight: 90,
   },
   sendBtn: {
     width: 46, height: 46, borderRadius: 23,
@@ -600,11 +606,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 24, padding: 30, width: '100%',
     alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)'
   },
-  uploadingTitle: { fontSize: 20, fontWeight: '800', color: '#fff', marginTop: 20, marginBottom: 8 },
-  uploadingText: { fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 24, paddingHorizontal: 10 },
+  uploadingTitle: { fontSize: 22, fontFamily: FontFamilies.displaySemibold, color: '#fff', marginTop: 20, marginBottom: 8 },
+  uploadingText: { fontSize: 13, fontFamily: FontFamilies.sansRegular, color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 24, paddingHorizontal: 10 },
   progressTrack: {
     width: '100%', height: 8, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 4, overflow: 'hidden'
   },
   progressFill: { height: '100%', backgroundColor: Colors.primary },
-  progressText: { fontSize: 12, fontWeight: '700', color: Colors.primary, marginTop: 8 },
+  progressText: { fontSize: 12, fontFamily: FontFamilies.sansBold, color: Colors.primary, marginTop: 8 },
 });

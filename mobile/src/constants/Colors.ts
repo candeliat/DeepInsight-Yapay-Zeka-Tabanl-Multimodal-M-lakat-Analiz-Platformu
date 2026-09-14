@@ -2,11 +2,14 @@
 // IntervAI Tasarım Sistemi - Material Design 3 Renk Paleti
 
 export const Colors = {
-  // Ana Renkler
-  primary: '#000000',        // Siyah (Ana aksiyon butonu)
-  onPrimary: '#ffffff',      // Buton üzeri yazı
+  // Ana Renkler — dashboard'un --primary'siyle birebir aynı teal (#00687a).
+  // Önceden burası siyahtı ve dashboard'dan sapıyordu; iki platformun aynı
+  // marka rengini paylaşması için buraya hizalandı.
+  primary: '#00687a',
+  onPrimary: '#ffffff',
 
-  // İkincil Renkler (Teal/Cyan)
+  // İkincil Renkler (Teal/Cyan) — primary ile aynı değer, geriye dönük
+  // uyumluluk için ayrı isimle tutuluyor (85 yerde kullanılıyor).
   secondary: '#00687a',
   onSecondary: '#ffffff',
   secondaryContainer: '#57dffe',

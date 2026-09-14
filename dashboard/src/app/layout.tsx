@@ -1,14 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Fraunces, Manrope } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// İki sesli tipografi sistemi: Fraunces, YZ mülakatçının "konuştuğu" anlarda
+// (sorular, karşılama/empty-state metinleri) sıcak bir insan tonu taşır;
+// Manrope arayüz kromunda (butonlar, skorlar, nav) net ve ölçülü kalır.
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
   subsets: ["latin"],
+  style: ["normal", "italic"],
+  axes: ["opsz", "SOFT", "WONK"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const manrope = Manrope({
+  variable: "--font-manrope",
   subsets: ["latin"],
 });
 
@@ -26,7 +31,7 @@ export default function RootLayout({
     <html lang="tr" suppressHydrationWarning>
       <body
         suppressHydrationWarning
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}
+        className={`${fraunces.variable} ${manrope.variable} antialiased bg-background text-foreground`}
       >
         {children}
       </body>

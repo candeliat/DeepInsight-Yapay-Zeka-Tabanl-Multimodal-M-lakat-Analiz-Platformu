@@ -56,6 +56,7 @@ export default function InterviewRoomPage() {
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [spokenWordIndex, setSpokenWordIndex] = useState(-1);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const [analyzingStatusText, setAnalyzingStatusText] = useState(
     "Yapay Zekamız mülakat performansını, göz temasını ve konuşma tonunu inceliyor. Lütfen ayrılmayın..."
   );
@@ -66,6 +67,7 @@ export default function InterviewRoomPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Kamera stream'i ile video elementini eşleştirme (State değişimi sonrası render için)
   useEffect(() => {
@@ -82,6 +84,7 @@ export default function InterviewRoomPage() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       streamRef.current = stream;
+      setMediaError(null);
       // videoRef.current burada null olabilir (henüz render edilmediği için),
       // bu yüzden useEffect içinde de eşleştirme yapıyoruz.
       if (videoRef.current) {
@@ -90,6 +93,12 @@ export default function InterviewRoomPage() {
       }
     } catch (error) {
       console.warn("Kamera veya mikrofona erişilemedi:", error);
+      // Kullanıcı arayüzde hiçbir uyarı görmüyordu — mülakat yine de
+      // INTERVIEWING durumuna geçip kamera önizlemesi siyah kalıyordu,
+      // kullanıcı neden olduğunu anlamıyordu. Görünür bir banner göster.
+      setMediaError(
+        "Kamera/mikrofon erişimi verilmedi. Video/ses analizi olmadan devam edebilirsiniz; tarayıcı izin ayarlarından tekrar açabilirsiniz."
+      );
     }
   };
 
@@ -232,6 +241,9 @@ export default function InterviewRoomPage() {
       stopCamera();
       if ("speechSynthesis" in window) {
         window.speechSynthesis.cancel();
+      }
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
       }
     };
   }, []);
@@ -383,10 +395,16 @@ export default function InterviewRoomPage() {
     let attempts = 0;
     const maxAttempts = 120; // maks 5 dakika
 
-    const intervalId = setInterval(async () => {
+    // Interval id'sini bir ref'te tutuyoruz ki component unmount olursa
+    // (kullanıcı ANALYZING ekranındayken başka sayfaya geçerse) yukarıdaki
+    // temizleme useEffect'i bu interval'i durdurabilsin — aksi halde
+    // unmount olmuş component'te setState çağrılmaya devam eder ve
+    // kullanıcı ayrıldıktan sonra bile arka planda gereksiz istek atılır.
+    pollIntervalRef.current = setInterval(async () => {
       attempts++;
       if (attempts > maxAttempts) {
-        clearInterval(intervalId);
+        clearInterval(pollIntervalRef.current!);
+        pollIntervalRef.current = null;
         setEvaluation(initialEvaluation);
         setCurrentState("RESULTS");
         return;
@@ -397,7 +415,8 @@ export default function InterviewRoomPage() {
         const status = response.data.analysis_status;
 
         if (status === "completed") {
-          clearInterval(intervalId);
+          clearInterval(pollIntervalRef.current!);
+          pollIntervalRef.current = null;
           // Analiz bitti! Detayları alıp sonuçlar ekranına yansıt
           try {
             const results = await chatService.getInterviewAnalytics(id);
@@ -409,7 +428,8 @@ export default function InterviewRoomPage() {
           setCurrentState("RESULTS");
           speakText("Mülakat analizi tamamlandı. Sonuçlarınızı inceleyebilirsiniz.");
         } else if (status === "failed") {
-          clearInterval(intervalId);
+          clearInterval(pollIntervalRef.current!);
+          pollIntervalRef.current = null;
           console.error("AI analizi başarısız oldu.");
           setEvaluation(initialEvaluation);
           setCurrentState("RESULTS");
@@ -506,7 +526,7 @@ export default function InterviewRoomPage() {
       <div className="flex flex-col h-[calc(100vh-8rem)] bg-card border border-border rounded-3xl shadow-sm overflow-hidden relative animate-in fade-in duration-700">
         
         {/* Üst Kısım: Kamera ve Durum */}
-        <div className="p-6 flex items-start justify-between z-10">
+        <div className="p-6 flex items-start justify-between flex-wrap gap-3 z-10">
           <div className="flex items-center gap-3 bg-background/80 backdrop-blur-md px-4 py-2.5 rounded-full border border-border shadow-sm">
             <div className="w-2.5 h-2.5 rounded-full bg-destructive animate-pulse"></div>
             <span className="text-xs font-extrabold uppercase tracking-wider text-foreground">Canlı Mülakat Kaydı</span>
@@ -514,7 +534,14 @@ export default function InterviewRoomPage() {
               {role}
             </span>
           </div>
-          
+
+          {mediaError && (
+            <div className="w-full order-3 flex items-center gap-2 bg-warning/10 border border-warning/25 text-warning text-xs font-semibold px-4 py-2.5 rounded-xl">
+              <ShieldCheck className="w-4 h-4 shrink-0" />
+              {mediaError}
+            </div>
+          )}
+
           {/* Ayna Kamera */}
           <div className="w-48 h-36 bg-black rounded-2xl overflow-hidden shadow-lg border border-border relative flex flex-col">
             <video
@@ -645,29 +672,29 @@ export default function InterviewRoomPage() {
               <h2 className="font-serif italic text-2xl text-foreground tracking-tight flex items-center justify-center gap-2">
                 <Sparkles className="w-5 h-5 text-warning animate-bounce" /> Analiz sürüyor
               </h2>
-              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 leading-relaxed max-w-md mx-auto">
+              <p className="text-sm font-semibold text-muted-foreground leading-relaxed max-w-md mx-auto">
                 {analyzingStatusText}
               </p>
             </div>
 
             {/* Metrikler Yükleniyor Göstergesi */}
-            <div className="bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 rounded-2xl p-6 text-left space-y-4 max-w-sm mx-auto">
+            <div className="bg-muted border border-border rounded-2xl p-6 text-left space-y-4 max-w-sm mx-auto">
               <div className="flex items-center gap-3">
                 <div className="w-2 h-2 rounded-full bg-primary animate-ping"></div>
-                <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">İncelenen Faktörler:</p>
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide">İncelenen Faktörler:</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  <Eye className="w-3.5 h-3.5 text-blue-500" /> Göz Teması Oranı
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground/80">
+                  <Eye className="w-3.5 h-3.5 text-primary" /> Göz Teması Oranı
                 </div>
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  <UserCheck className="w-3.5 h-3.5 text-indigo-500" /> Özgüven & Duruş
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground/80">
+                  <UserCheck className="w-3.5 h-3.5 text-primary" /> Özgüven & Duruş
                 </div>
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  <Volume2 className="w-3.5 h-3.5 text-emerald-500" /> Konuşma Tonu & Hız
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground/80">
+                  <Volume2 className="w-3.5 h-3.5 text-success" /> Konuşma Tonu & Hız
                 </div>
-                <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                  <Clock className="w-3.5 h-3.5 text-amber-500" /> Duraksama & Dolgular
+                <div className="flex items-center gap-2 text-xs font-semibold text-foreground/80">
+                  <Clock className="w-3.5 h-3.5 text-warning" /> Duraksama & Dolgular
                 </div>
               </div>
             </div>

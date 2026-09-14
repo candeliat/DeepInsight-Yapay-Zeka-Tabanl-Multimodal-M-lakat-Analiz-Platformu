@@ -13,7 +13,10 @@ from app.services.interview_service import (
     get_interview_history,
     finish_interview_and_evaluate,
     get_interview,
-    get_user_interviews
+    get_user_interviews,
+    try_claim_interview_finalization,
+    get_completed_confidence_map,
+    release_interview_finalization_claim,
 )
 from fastapi import Depends
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
@@ -196,11 +199,30 @@ async def chat_with_ai(
         if questions_asked >= max_questions:
             # Son soru da cevaplandı — modele yeni bir soru sordurmak yerine
             # doğrudan nihai değerlendirmeyi zorluyoruz.
-            evaluation_data = await llm_service.get_final_evaluation(
-                history=[{"role": m["role"], "content": m["content"]} for m in history_records],
-                role=role,
-                topic=topic,
-            )
+            #
+            # Pahalı LLM değerlendirme çağrısına girmeden ÖNCE, bu isteğin
+            # mülakatı atomik olarak "claim" edip etmediğini kontrol ediyoruz —
+            # aksi halde aynı anda gelen iki final istek (çift tıklama, ağ
+            # retry'ı) iki kez LLM'e sorup iki kez model mesajı kaydedebilirdi.
+            claimed = await try_claim_interview_finalization(request.interview_id, token=token)
+            if not claimed:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Bu mülakat şu anda başka bir istek tarafından sonlandırılıyor. Lütfen bekleyin.",
+                )
+
+            try:
+                evaluation_data = await llm_service.get_final_evaluation(
+                    history=[{"role": m["role"], "content": m["content"]} for m in history_records],
+                    role=role,
+                    topic=topic,
+                )
+            except Exception:
+                # Claim alındı ama değerlendirme başarısız oldu — mülakatı
+                # 'ongoing'e geri al ki kullanıcı tekrar deneyebilsin.
+                await release_interview_finalization_claim(request.interview_id, token=token)
+                raise
+
             interview_complete = True
 
             feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
@@ -228,11 +250,18 @@ async def chat_with_ai(
             )
 
         # AI cevabını anlık kaydet
-        await save_message(request.interview_id, role="model", content=ai_response_text, token=token)
+        try:
+            await save_message(request.interview_id, role="model", content=ai_response_text, token=token)
 
-        # Mülakat tamamlandıysa durumu güncelle ve puanları kaydet
-        if interview_complete and evaluation_data:
-            await finish_interview_and_evaluate(request.interview_id, evaluation_data, token=token)
+            # Mülakat tamamlandıysa durumu güncelle ve puanları kaydet
+            if interview_complete and evaluation_data:
+                await finish_interview_and_evaluate(request.interview_id, evaluation_data, token=token)
+        except Exception:
+            if interview_complete:
+                # Claim alınmıştı ama mesaj/skor kaydı başarısız oldu —
+                # 'completed' durumunda skorsuz takılı kalmasın diye geri al.
+                await release_interview_finalization_claim(request.interview_id, token=token)
+            raise
 
         return ChatResponse(
             response=ai_response_text,
@@ -297,24 +326,38 @@ async def chat_with_ai_stream(
     async def event_generator():
         try:
             if questions_asked >= max_questions:
-                evaluation_data = await llm_service.get_final_evaluation(
-                    history=[{"role": m["role"], "content": m["content"]} for m in history_records],
-                    role=role,
-                    topic=topic,
-                )
-                feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
-                tech_score = evaluation_data.get("technical_score", 0)
-                conf_score = evaluation_data.get("confidence_score", 0)
-                vocab_score = evaluation_data.get("vocabulary_score", 0)
-                full_text = (
-                    f"Mülakat tamamlandı.\nDeğerlendirme Raporunuz:\n"
-                    f"- Teknik Bilgi: {tech_score}/100\n- Özgüven: {conf_score}/100\n"
-                    f"- Kelime Kullanımı: {vocab_score}/100\n\nGeri Bildirim: {feedback}"
-                )
-                yield _sse("chunk", full_text)
+                claimed = await try_claim_interview_finalization(request.interview_id, token=token)
+                if not claimed:
+                    yield _sse("error", {
+                        "detail": "Bu mülakat şu anda başka bir istek tarafından sonlandırılıyor. Lütfen bekleyin.",
+                        "partial_saved": False,
+                    })
+                    return
 
-                await save_message(request.interview_id, role="model", content=full_text, token=token)
-                await finish_interview_and_evaluate(request.interview_id, evaluation_data, token=token)
+                try:
+                    evaluation_data = await llm_service.get_final_evaluation(
+                        history=[{"role": m["role"], "content": m["content"]} for m in history_records],
+                        role=role,
+                        topic=topic,
+                    )
+                    feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
+                    tech_score = evaluation_data.get("technical_score", 0)
+                    conf_score = evaluation_data.get("confidence_score", 0)
+                    vocab_score = evaluation_data.get("vocabulary_score", 0)
+                    full_text = (
+                        f"Mülakat tamamlandı.\nDeğerlendirme Raporunuz:\n"
+                        f"- Teknik Bilgi: {tech_score}/100\n- Özgüven: {conf_score}/100\n"
+                        f"- Kelime Kullanımı: {vocab_score}/100\n\nGeri Bildirim: {feedback}"
+                    )
+                    yield _sse("chunk", full_text)
+
+                    await save_message(request.interview_id, role="model", content=full_text, token=token)
+                    await finish_interview_and_evaluate(request.interview_id, evaluation_data, token=token)
+                except Exception:
+                    # Claim alındı ama değerlendirme/kayıt başarısız oldu —
+                    # mülakatı 'ongoing'e geri al ki kullanıcı tekrar deneyebilsin.
+                    await release_interview_finalization_claim(request.interview_id, token=token)
+                    raise
 
                 yield _sse("done", {"interview_complete": True, "evaluation": evaluation_data})
                 return
@@ -379,30 +422,46 @@ async def finish_interview_early(
     if interview.get("status") == "completed":
         raise HTTPException(status_code=400, detail="Bu mülakat zaten tamamlanmış.")
 
+    # /chat veya /chat/stream aynı mülakatı tam bu sırada zaten sonlandırıyor
+    # olabilir (soru sayacı tam bu anda max'a ulaşmış olabilir) — atomik claim
+    # ile bu yarış durumunu da /chat ile aynı şekilde kapatıyoruz.
+    claimed = await try_claim_interview_finalization(interview_id, token=token)
+    if not claimed:
+        raise HTTPException(
+            status_code=409,
+            detail="Bu mülakat şu anda başka bir istek tarafından sonlandırılıyor. Lütfen bekleyin.",
+        )
+
     role = interview.get("role", "Yazılım Mühendisi")
     topic = interview.get("topic", "Genel")
 
     try:
-        history_records = await get_interview_history(interview_id, token=token)
+        try:
+            history_records = await get_interview_history(interview_id, token=token)
 
-        evaluation_data = await llm_service.get_final_evaluation(
-            history=[{"role": m["role"], "content": m["content"]} for m in history_records],
-            role=role,
-            topic=topic,
-        )
+            evaluation_data = await llm_service.get_final_evaluation(
+                history=[{"role": m["role"], "content": m["content"]} for m in history_records],
+                role=role,
+                topic=topic,
+            )
 
-        feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
-        tech_score = evaluation_data.get("technical_score", 0)
-        conf_score = evaluation_data.get("confidence_score", 0)
-        vocab_score = evaluation_data.get("vocabulary_score", 0)
-        ai_response_text = (
-            f"Mülakat erken sonlandırıldı.\nDeğerlendirme Raporunuz:\n"
-            f"- Teknik Bilgi: {tech_score}/100\n- Özgüven: {conf_score}/100\n"
-            f"- Kelime Kullanımı: {vocab_score}/100\n\nGeri Bildirim: {feedback}"
-        )
+            feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
+            tech_score = evaluation_data.get("technical_score", 0)
+            conf_score = evaluation_data.get("confidence_score", 0)
+            vocab_score = evaluation_data.get("vocabulary_score", 0)
+            ai_response_text = (
+                f"Mülakat erken sonlandırıldı.\nDeğerlendirme Raporunuz:\n"
+                f"- Teknik Bilgi: {tech_score}/100\n- Özgüven: {conf_score}/100\n"
+                f"- Kelime Kullanımı: {vocab_score}/100\n\nGeri Bildirim: {feedback}"
+            )
 
-        await save_message(interview_id, role="model", content=ai_response_text, token=token)
-        await finish_interview_and_evaluate(interview_id, evaluation_data, token=token)
+            await save_message(interview_id, role="model", content=ai_response_text, token=token)
+            await finish_interview_and_evaluate(interview_id, evaluation_data, token=token)
+        except Exception:
+            # Claim alındı ama değerlendirme/kayıt başarısız oldu — mülakatı
+            # 'ongoing'e geri al ki kullanıcı tekrar deneyebilsin.
+            await release_interview_finalization_claim(interview_id, token=token)
+            raise
 
         return ChatResponse(
             response=ai_response_text,
@@ -477,10 +536,22 @@ async def get_my_interviews(
     """
     try:
         interviews = await get_user_interviews(current_user.id, token=token)
+
+        # Video/ses analizi tamamlanmış mülakatlar için OBJEKTİF özgüven
+        # skorunu tek seferde toplu çekiyoruz (N+1 sorgu yerine) — böylece
+        # liste ekranındaki ortalama, detay ekranındaki (chat sonuç ekranı,
+        # interviews/[id]) ile aynı kaynağı kullanır ve tutarsız görünmez.
+        interview_ids = [inv["id"] for inv in interviews]
+        confidence_map = await get_completed_confidence_map(interview_ids, token=token)
+
         for inv in interviews:
+            objective_conf = confidence_map.get(inv["id"])
+            inv["objective_confidence_pct"] = objective_conf
+            conf_value = objective_conf if objective_conf is not None else inv.get("confidence_score")
+
             scores = [
                 inv.get("technical_score"),
-                inv.get("confidence_score"),
+                conf_value,
                 inv.get("vocabulary_score")
             ]
             valid_scores = [s for s in scores if s is not None and isinstance(s, (int, float))]
@@ -514,10 +585,15 @@ async def get_interview_detail(
         
         detail = dict(interview)
         detail["messages"] = messages
-        
+
+        confidence_map = await get_completed_confidence_map([interview_id], token=token)
+        objective_conf = confidence_map.get(interview_id)
+        detail["objective_confidence_pct"] = objective_conf
+        conf_value = objective_conf if objective_conf is not None else detail.get("confidence_score")
+
         scores = [
             detail.get("technical_score"),
-            detail.get("confidence_score"),
+            conf_value,
             detail.get("vocabulary_score")
         ]
         valid_scores = [s for s in scores if s is not None and isinstance(s, (int, float))]
@@ -525,7 +601,7 @@ async def get_interview_detail(
             detail["average_score"] = round(sum(valid_scores) / len(valid_scores), 1)
         else:
             detail["average_score"] = None
-            
+
         return detail
     except HTTPException:
         raise

@@ -54,6 +54,8 @@ def _mock_interview_service(monkeypatch, history):
     monkeypatch.setattr(interview_route, "save_message", AsyncMock(return_value={}))
     monkeypatch.setattr(interview_route, "get_interview_history", AsyncMock(return_value=history))
     monkeypatch.setattr(interview_route, "finish_interview_and_evaluate", AsyncMock(return_value={}))
+    monkeypatch.setattr(interview_route, "try_claim_interview_finalization", AsyncMock(return_value=True))
+    monkeypatch.setattr(interview_route, "release_interview_finalization_claim", AsyncMock(return_value=None))
 
 
 def test_chat_asks_next_question_when_budget_not_exhausted(client, monkeypatch):
@@ -141,6 +143,49 @@ def test_chat_rejects_empty_message_with_422(client, monkeypatch):
     # (route fonksiyonu hiç çalışmaz); boş mesajın hiçbir şekilde LLM'e
     # ulaşmaması asıl kontrol edilen şey.
     assert resp.status_code == 422
+
+
+def test_chat_returns_409_when_finalization_claim_lost(client, monkeypatch):
+    """
+    Aynı mülakat için eş zamanlı iki final istek geldiğini simüle eder: bu
+    isteğin `try_claim_interview_finalization` çağrısı False döner (başka bir
+    istek zaten kazanmış). Route, pahalı LLM değerlendirme çağrısına HİÇ
+    girmeden 409 dönmeli.
+    """
+    _mock_interview_service(monkeypatch, _history_with_n_questions_asked(3))
+    monkeypatch.setattr(interview_route, "try_claim_interview_finalization", AsyncMock(return_value=False))
+
+    final_eval_mock = AsyncMock(return_value={"technical_score": 1, "confidence_score": 1, "vocabulary_score": 1, "feedback": "x"})
+    monkeypatch.setattr(llm_service, "get_final_evaluation", final_eval_mock)
+
+    resp = client.post(
+        "/api/v1/interview/chat",
+        json={"interview_id": "interview-1", "message": "Üçüncü soruya son cevabım."},
+    )
+
+    assert resp.status_code == 409
+    final_eval_mock.assert_not_awaited()
+
+
+def test_chat_releases_claim_when_final_evaluation_raises(client, monkeypatch):
+    """
+    Claim kazanıldıktan SONRA `get_final_evaluation` beklenmedik bir istisna
+    fırlatırsa (örn. ağ hatası), mülakat kalıcı olarak skorsuz 'completed'
+    durumunda takılı kalmamalı — claim geri alınmalı (`release_...` çağrılmalı)
+    ki kullanıcı tekrar deneyebilsin.
+    """
+    _mock_interview_service(monkeypatch, _history_with_n_questions_asked(3))
+
+    monkeypatch.setattr(llm_service, "get_final_evaluation", AsyncMock(side_effect=RuntimeError("LLM çöktü")))
+
+    resp = client.post(
+        "/api/v1/interview/chat",
+        json={"interview_id": "interview-1", "message": "Üçüncü soruya son cevabım."},
+    )
+
+    assert resp.status_code == 503
+    interview_route.release_interview_finalization_claim.assert_awaited_once()
+    interview_route.finish_interview_and_evaluate.assert_not_awaited()
 
 
 def test_chat_returns_400_when_interview_already_completed(client, monkeypatch):

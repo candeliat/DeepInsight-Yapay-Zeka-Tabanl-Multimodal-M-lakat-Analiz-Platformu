@@ -150,6 +150,33 @@ def test_stream_emits_error_without_saving_when_all_models_fail_immediately(clie
     assert len(model_saves) == 0
 
 
+def test_stream_emits_error_when_finalization_claim_lost(client, monkeypatch):
+    """
+    Eş zamanlı ikinci bir final istek (claim kaybedilir) durumunda, stream
+    hiç LLM'e sormadan bir `error` event'i yayıp bitmeli.
+    """
+    monkeypatch.setattr(interview_route.settings, "MAX_INTERVIEW_QUESTIONS", 3)
+    _mock_interview_service(monkeypatch, _history_with_n_questions_asked(3))
+    monkeypatch.setattr(interview_route, "try_claim_interview_finalization", AsyncMock(return_value=False))
+
+    eval_mock = AsyncMock(return_value={
+        "technical_score": 1, "confidence_score": 1, "vocabulary_score": 1, "feedback": "x",
+    })
+    monkeypatch.setattr(llm_service, "get_final_evaluation", eval_mock)
+
+    with client.stream(
+        "POST", "/api/v1/interview/chat/stream",
+        json={"interview_id": "interview-1", "message": "son cevabım"},
+    ) as resp:
+        assert resp.status_code == 200
+        raw = "".join(resp.iter_text())
+
+    events = _parse_sse_events(raw)
+    assert len(events) == 1
+    assert events[0][0] == "error"
+    eval_mock.assert_not_awaited()
+
+
 def test_stream_returns_404_before_streaming_when_interview_missing(client, monkeypatch):
     async def _raise_value_error(*args, **kwargs):
         raise ValueError("not found")

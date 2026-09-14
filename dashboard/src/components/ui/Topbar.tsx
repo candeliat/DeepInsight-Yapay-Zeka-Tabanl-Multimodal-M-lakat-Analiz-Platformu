@@ -28,7 +28,12 @@ export default function Topbar() {
         {/* Arama çubuğu vs. buraya eklenebilir */}
       </div>
       <div className="flex items-center gap-4">
-        <button className="p-2 text-muted-foreground hover:bg-muted rounded-full transition-colors">
+        <button
+          disabled
+          aria-label="Bildirimler (yakında)"
+          title="Bildirimler (yakında)"
+          className="p-2 text-muted-foreground/50 rounded-full cursor-not-allowed"
+        >
           <Bell className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2 cursor-pointer hover:bg-muted p-2 rounded-xl transition-colors">

@@ -11,6 +11,12 @@ class InterviewSummary(BaseModel):
     confidence_score: Optional[int] = None
     vocabulary_score: Optional[int] = None
     average_score: Optional[float] = None
+    # Video/ses analizinden gelen OBJEKTİF özgüven skoru (göz teması, stres,
+    # konuşma hızından hesaplanır) — analiz tamamlandıysa dolu, aksi halde
+    # None. Doluysa `average_score` hesaplamasında `confidence_score` (LLM'in
+    # SÜBJEKTİF, salt metne dayalı tahmini) yerine bu kullanılır; bkz.
+    # app/services/llm_service.py:InterviewEvaluation docstring'i.
+    objective_confidence_pct: Optional[float] = None
     created_at: str
 
 class InterviewMessage(BaseModel):

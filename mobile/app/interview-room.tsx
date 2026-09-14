@@ -141,7 +141,7 @@ export default function InterviewRoomScreen() {
 
   const {
     micOn, cameraOn, isThinking, currentQuestion,
-    sendMessage, toggleMic, toggleCamera, resetInterview, transcribeAudio,
+    sendMessageStream, finishInterviewEarly, toggleMic, toggleCamera, resetInterview, transcribeAudio,
   } = useInterviewStore();
 
   // AppState takibi — arka plana geçince kaydı durdur
@@ -191,19 +191,26 @@ export default function InterviewRoomScreen() {
     Speech.speak(text, { language: 'tr-TR', pitch: 1.0, rate: 0.95 });
   }, []);
 
+  // Sadece ekran ilk açıldığında (önceki ekrandan gelen ilk soru için) bir kez
+  // seslendir. `currentQuestion`'ı reaktif izleyen bir effect KULLANMIYORUZ —
+  // streaming sırasında currentQuestion her token'da değişir, bu da Speech.stop()
+  // + Speech.speak()'in onlarca kez art arda tetiklenip sesi kesmesine yol açardı.
   useEffect(() => {
-    if (currentQuestion) speakText(currentQuestion);
+    const initial = useInterviewStore.getState().currentQuestion;
+    if (initial) speakText(initial);
     return () => { Speech.stop(); };
-  }, [currentQuestion, speakText]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Cevap gönderme
+  // Cevap gönderme (soru token-token akar; currentQuestion ekranda büyürken
+  // görüntülenir, tam metin toplandıktan SONRA sesli okunur)
   const handleSendAnswer = useCallback(async () => {
     if (!userAnswer.trim() || isThinking) return;
     Speech.stop();
     const answer = userAnswer;
     setUserAnswer('');
     try {
-      const finished = await sendMessage(answer);
+      const finished = await sendMessageStream(answer);
       if (finished) {
         Speech.speak('Mülakat tamamlandı. Analiz süreci başlatılıyor.', { language: 'tr-TR' });
         if (cameraRef.current && isRecordingVideo) {
@@ -224,7 +231,7 @@ export default function InterviewRoomScreen() {
         [{ text: 'Tamam' }]
       );
     }
-  }, [userAnswer, isThinking, sendMessage, speakText, router, isRecordingVideo]);
+  }, [userAnswer, isThinking, sendMessageStream, speakText, router, isRecordingVideo]);
 
   // Mülakatı bitir
   const handleEndInterview = useCallback(() => {
@@ -239,16 +246,17 @@ export default function InterviewRoomScreen() {
           onPress: async () => {
             Speech.stop();
             try {
-              const finished = await sendMessage("Mülakatı burada bitirmek istiyorum. Lütfen değerlendirmeyi oluştur.");
-              if (finished || !finished) {
-                if (cameraRef.current && isRecordingVideo) {
-                  cameraRef.current.stopRecording();
-                } else {
-                  router.replace({
-                    pathname: '/interview-result',
-                    params: { id: useInterviewStore.getState().interviewId as string },
-                  });
-                }
+              // Soru sayısına bakmaksızın o ana kadarki cevaplarla nihai
+              // değerlendirmeyi zorlayan uç nokta (LLM'e "bitir" mesajı göndermek
+              // artık işe yaramıyor — bitiş sunucu taraflı soru sayacına bağlı).
+              await finishInterviewEarly();
+              if (cameraRef.current && isRecordingVideo) {
+                cameraRef.current.stopRecording();
+              } else {
+                router.replace({
+                  pathname: '/interview-result',
+                  params: { id: useInterviewStore.getState().interviewId as string },
+                });
               }
             } catch (err) {
               Alert.alert('Hata', 'Mülakat sonlandırılırken bir sorun oluştu.');
@@ -258,7 +266,7 @@ export default function InterviewRoomScreen() {
         },
       ]
     );
-  }, [router, isRecordingVideo, sendMessage]);
+  }, [router, isRecordingVideo, finishInterviewEarly]);
 
   // Video Yükleme ve Analiz Sorgulama
   const handleVideoUpload = async (uri: string) => {

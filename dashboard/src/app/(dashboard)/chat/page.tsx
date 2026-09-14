@@ -19,7 +19,7 @@ import {
   ArrowRight,
   ShieldCheck
 } from "lucide-react";
-import { chatService, EvaluationData } from "@/services/chatService";
+import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 
@@ -264,6 +264,41 @@ export default function InterviewRoomPage() {
     }
   };
 
+  // Mülakat bir değerlendirmeyle tamamlandığında ortak sonlandırma akışı:
+  // kamerayı durdur, arka planda kaydedilen videoyu yükle, AI video/ses
+  // analizinin bitmesini bekle (polling). Hem streaming hem (varsa) eski
+  // non-streaming akış tarafından paylaşılır.
+  const finalizeInterview = useCallback((evaluationData: EvaluationData | null) => {
+    stopCamera();
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      setCurrentState("ANALYZING");
+
+      mediaRecorderRef.current.onstop = async () => {
+        const mimeType = mediaRecorderRef.current?.mimeType || "video/webm";
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
+
+        try {
+          setAnalyzingStatusText("Mülakat kaydınız analiz sunucusuna aktarılıyor...");
+          await chatService.uploadRecording(interviewId, blob, "interview.webm");
+
+          setAnalyzingStatusText("Yapay Zekamız mülakat performansını, göz temasını ve konuşma tonunu inceliyor. Lütfen ayrılmayın...");
+          pollAnalysisStatus(interviewId, evaluationData);
+        } catch (uploadError) {
+          console.error("Kayıt yüklenemedi, düz değerlendirme ekranına geçiliyor:", uploadError);
+          setEvaluation(evaluationData);
+          setCurrentState("RESULTS");
+        }
+      };
+
+      mediaRecorderRef.current.stop();
+    } else {
+      setEvaluation(evaluationData);
+      setCurrentState("RESULTS");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interviewId]);
+
   const handleSendAnswer = async () => {
     if (!userAnswer.trim() || isThinking) return;
 
@@ -271,7 +306,7 @@ export default function InterviewRoomPage() {
       window.speechSynthesis.cancel();
       setSpokenWordIndex(-1);
     }
-    
+
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
@@ -280,48 +315,34 @@ export default function InterviewRoomPage() {
     const currentAnswer = userAnswer;
     setUserAnswer("");
     setIsThinking(true);
+    // Yeni cevap gönderilirken ekranı temizle — chunk'lar geldikçe burası
+    // token-token dolacak (typewriter efekti).
+    setCurrentQuestion("");
+
+    let streamedText = "";
 
     try {
-      const response = await chatService.sendMessage(interviewId, currentAnswer);
-      
-      if (response.interview_complete && response.evaluation) {
-        // --- MÜLAKAT BİTTİ — ANALİZ SÜRECİ ---
-        stopCamera();
-        
-        // 1. Kaydı durdur ve Blob dosyasını al
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          setCurrentState("ANALYZING");
-          
-          mediaRecorderRef.current.onstop = async () => {
-            const mimeType = mediaRecorderRef.current?.mimeType || "video/webm";
-            const blob = new Blob(recordedChunksRef.current, { type: mimeType });
-            
-            try {
-              setAnalyzingStatusText("Mülakat kaydınız analiz sunucusuna aktarılıyor...");
-              // 2. FormData ile Backend'e gönder (POST /api/v1/analytics/analyze/{id})
-              await chatService.uploadRecording(interviewId, blob, "interview.webm");
-              
-              setAnalyzingStatusText("Yapay Zekamız mülakat performansını, göz temasını ve konuşma tonunu inceliyor. Lütfen ayrılmayın...");
-              
-              // 3. Durum Polling'ini başlat (her 2.5s)
-              pollAnalysisStatus(interviewId, response.evaluation);
-            } catch (uploadError) {
-              console.error("Kayıt yüklenemedi, düz değerlendirme ekranına geçiliyor:", uploadError);
-              setEvaluation(response.evaluation || null);
-              setCurrentState("RESULTS");
-            }
-          };
-          
-          mediaRecorderRef.current.stop();
-        } else {
-          // Kaydedici aktif değilse doğrudan sonuçlara geç
-          setEvaluation(response.evaluation || null);
-          setCurrentState("RESULTS");
-        }
-      } else {
-        setCurrentQuestion(response.response);
-        speakText(response.response);
-      }
+      await chatService.sendMessageStream(interviewId, currentAnswer, {
+        onChunk: (text) => {
+          streamedText += text;
+          setCurrentQuestion(streamedText);
+        },
+        onDone: (data: ChatStreamDoneData) => {
+          if (data.interview_complete && data.evaluation) {
+            finalizeInterview(data.evaluation);
+          } else {
+            speakText(streamedText);
+          }
+        },
+        onError: (detail, partialSaved) => {
+          console.error("Stream hatası:", detail, "kısmi metin kaydedildi mi:", partialSaved);
+          alert(
+            partialSaved
+              ? "Yanıt üretimi yarıda kesildi, ama o ana kadarki kısım kaydedildi. Lütfen tekrar deneyin."
+              : "Bağlantı hatası oluştu. Lütfen tekrar deneyin."
+          );
+        },
+      });
     } catch (error) {
       console.error("Cevap gönderilemedi:", error);
       alert("Bağlantı hatası oluştu.");
@@ -331,43 +352,21 @@ export default function InterviewRoomPage() {
   };
 
   const handleEndInterviewManual = async () => {
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+      setSpokenWordIndex(-1);
+    }
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    }
+
     setIsThinking(true);
     try {
-      // LLM'e doğrudan bitir emri ver
-      const response = await chatService.sendMessage(interviewId, "Mülakatı burada bitirmek istiyorum. Lütfen değerlendirmeyi oluştur.");
-      if (response.interview_complete && response.evaluation) {
-        stopCamera();
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-          setCurrentState("ANALYZING");
-          mediaRecorderRef.current.onstop = async () => {
-            const mimeType = mediaRecorderRef.current?.mimeType || "video/webm";
-            const blob = new Blob(recordedChunksRef.current, { type: mimeType });
-            try {
-              setAnalyzingStatusText("Mülakat kaydınız analiz sunucusuna aktarılıyor...");
-              await chatService.uploadRecording(interviewId, blob, "interview.webm");
-              setAnalyzingStatusText("Yapay Zekamız mülakat performansını inceliyor...");
-              pollAnalysisStatus(interviewId, response.evaluation);
-            } catch (uploadError) {
-              setEvaluation(response.evaluation || null);
-              setCurrentState("RESULTS");
-            }
-          };
-          mediaRecorderRef.current.stop();
-        } else {
-          setEvaluation(response.evaluation || null);
-          setCurrentState("RESULTS");
-        }
-      } else {
-        // Model JSON yerine metin döndürürse manuel olarak state değiştir
-        stopCamera();
-        setEvaluation({
-           technical_score: 70,
-           confidence_score: 70,
-           vocabulary_score: 70,
-           feedback: "Mülakat manuel olarak sonlandırıldı."
-        });
-        setCurrentState("RESULTS");
-      }
+      // Soru sayısına bakmaksızın o ana kadarki cevaplarla nihai
+      // değerlendirmeyi zorlayan özel uç nokta (bkz. chatService.ts notu).
+      const response = await chatService.finishInterviewEarly(interviewId);
+      finalizeInterview(response.evaluation ?? null);
     } catch (e) {
       console.error("Mülakatı bitirme hatası:", e);
       alert("Mülakat sonlandırılamadı.");

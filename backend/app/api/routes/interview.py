@@ -353,6 +353,70 @@ async def chat_with_ai_stream(
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
+@router.post("/{interview_id}/finish", response_model=ChatResponse)
+async def finish_interview_early(
+    interview_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """
+    Adayın mülakatı MAX_INTERVIEW_QUESTIONS'a ulaşılmadan erken bitirmek
+    istediği durumlar için. Soru sayacına bakmaksızın o ana kadarki
+    geçmişle doğrudan nihai değerlendirmeyi zorlar.
+
+    Not: `/chat` ve `/chat/stream`'de mülakatın bitişi artık kesinlikle
+    sunucu taraflı soru sayacına bağlı (LLM'e "bitir" mesajı göndermek
+    işe yaramaz) — erken sonlandırma için bu ayrı uç nokta gerekir.
+    """
+    try:
+        interview = await get_interview(interview_id, token=token)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Interview not found")
+
+    if interview.get("user_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized to access this interview")
+
+    if interview.get("status") == "completed":
+        raise HTTPException(status_code=400, detail="Bu mülakat zaten tamamlanmış.")
+
+    role = interview.get("role", "Yazılım Mühendisi")
+    topic = interview.get("topic", "Genel")
+
+    try:
+        history_records = await get_interview_history(interview_id, token=token)
+
+        evaluation_data = await llm_service.get_final_evaluation(
+            history=[{"role": m["role"], "content": m["content"]} for m in history_records],
+            role=role,
+            topic=topic,
+        )
+
+        feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
+        tech_score = evaluation_data.get("technical_score", 0)
+        conf_score = evaluation_data.get("confidence_score", 0)
+        vocab_score = evaluation_data.get("vocabulary_score", 0)
+        ai_response_text = (
+            f"Mülakat erken sonlandırıldı.\nDeğerlendirme Raporunuz:\n"
+            f"- Teknik Bilgi: {tech_score}/100\n- Özgüven: {conf_score}/100\n"
+            f"- Kelime Kullanımı: {vocab_score}/100\n\nGeri Bildirim: {feedback}"
+        )
+
+        await save_message(interview_id, role="model", content=ai_response_text, token=token)
+        await finish_interview_and_evaluate(interview_id, evaluation_data, token=token)
+
+        return ChatResponse(
+            response=ai_response_text,
+            interview_complete=True,
+            evaluation=evaluation_data,
+        )
+    except HTTPException:
+        raise
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Bir hata oluştu: {str(e)}")
+
+
 @router.get("/history/{user_id}", response_model=List[Dict[str, Any]])
 async def get_history(
     user_id: str,

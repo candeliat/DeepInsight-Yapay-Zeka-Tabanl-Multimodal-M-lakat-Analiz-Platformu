@@ -6,6 +6,7 @@ class InterviewSummary(BaseModel):
     user_id: str
     role: str
     topic: str
+    difficulty: Optional[str] = None
     status: str
     technical_score: Optional[int] = None
     confidence_score: Optional[int] = None

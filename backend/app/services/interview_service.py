@@ -6,9 +6,23 @@ from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-async def create_interview(user_id: str, role: str, topic: str, token: str = None) -> dict:
+async def create_interview(
+    user_id: str,
+    role: str,
+    topic: str,
+    token: str = None,
+    difficulty: Optional[str] = None,
+    question_pool: Optional[List[Dict[str, Any]]] = None,
+) -> dict:
     """
     Supabase'de yeni bir mülakat kaydı oluşturur.
+
+    `question_pool`: `/start` içinde interview oluşturulmadan ÖNCE
+    `question_bank_service.fetch_question_pool` ile tek seferde çekilen,
+    sırayla tüketilecek soru bankası adayları (bkz. bu modülün üstündeki
+    genel not ve app/api/routes/interview.py). Banka boşsa/atlanmışsa boş
+    liste olarak kaydedilir — mülakat tamamen LLM'in tam-üretim akışıyla
+    devam eder.
     """
     client = get_auth_client(token) if token else supabase
     if not client:
@@ -18,6 +32,8 @@ async def create_interview(user_id: str, role: str, topic: str, token: str = Non
         "user_id": user_id,
         "role": role,
         "topic": topic,
+        "difficulty": difficulty,
+        "question_pool": question_pool or [],
         "status": "ongoing",
         "chat_history": [],
         "created_at": datetime.now(timezone.utc).isoformat(),

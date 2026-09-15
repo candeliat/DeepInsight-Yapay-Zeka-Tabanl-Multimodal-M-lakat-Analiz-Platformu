@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import time
 import asyncio
 import logging
 import tempfile
@@ -11,7 +12,12 @@ from openai import AsyncOpenAI, RateLimitError, NotFoundError, APIStatusError
 from pydantic import BaseModel, field_validator
 
 from app.core.config import settings
-from app.services.prompts import PROMPT_VERSION, build_question_prompt, build_evaluation_prompt
+from app.services.prompts import (
+    PROMPT_VERSION,
+    build_question_prompt,
+    build_question_delivery_prompt,
+    build_evaluation_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +64,28 @@ def _extract_json_object(text: str) -> Optional[dict]:
             return None
 
     return None
+
+
+def _validate_response_length(text: str, purpose: str) -> None:
+    """
+    Canlı testte gözlemlendi: `max_tokens` reasoning aşamasında dolduğunda,
+    bazı reasoning modelleri (bkz. FREE_MODELS yorumu) iç muhakemesini
+    (binlerce karakter, genelde İngilizce, "Okay, let's see..." tarzı) ayrı
+    reasoning_content kanalı yerine `content` alanına sızdırıyor — normalde
+    boş dönmesi beklenen bir hata durumu, bunun yerine kullanıcıya devasa ve
+    anlamsız bir "soru" olarak gösterilebiliyordu.
+
+    Gerçek bir mülakat sorusu/kısa değerlendirme asla settings.LLM_MAX_RESPONSE_CHARS
+    kadar uzun olmaz — bu eşik aşılırsa yanıt reddedilir (ValueError fırlatılır),
+    çağıran taraftaki fallback döngüsü bunu diğer hatalar gibi ele alıp
+    sıradaki modele geçer.
+    """
+    if len(text) > settings.LLM_MAX_RESPONSE_CHARS:
+        raise ValueError(
+            f"[{purpose}] Model anormal uzunlukta bir yanıt döndürdü "
+            f"(len={len(text)} > {settings.LLM_MAX_RESPONSE_CHARS}) — muhtemelen "
+            "'reasoning' (iç muhakeme) metni content alanına sızmış, yanıt reddedildi."
+        )
 
 
 class InterviewEvaluation(BaseModel):
@@ -180,6 +208,119 @@ class LLMService:
             messages.append({"role": turn_role, "content": turn.get("content", "")})
         return messages
 
+    async def embed_text(self, text: str, input_type: str = "query") -> list[float]:
+        """
+        Verilen metnin embedding vektörünü döner (soru bankası RAG retrieval'i
+        için, bkz. question_bank_service.py). `input_type`: "query" (arama
+        sorgusu) veya "passage" (bankaya kaydedilen soru metni) — NVIDIA NIM
+        embedding modelleri asimetriktir, ikisi farklı encode edilir.
+
+        FREE_MODELS'teki chat modellerinin aksine burada bir fallback ZİNCİRİ
+        YOKTUR — tek bir canlı doğrulanmış embedding modeli kullanılır (bkz.
+        settings.QUESTION_BANK_EMBEDDING_MODEL, check_embedding_live.py ile
+        doğrulanmıştır). Hata durumunda exception fırlatılır; çağıran taraf
+        (question_bank_service) bunu "banka bu tur için kullanılamıyor" olarak
+        yorumlayıp LLM'in tam-üretim akışına sessizce düşer — mülakat asla
+        embedding hatası yüzünden kesintiye uğramaz.
+        """
+        response = await self.client.embeddings.create(
+            model=settings.QUESTION_BANK_EMBEDDING_MODEL,
+            input=[text],
+            extra_body={"input_type": input_type},
+        )
+        return response.data[0].embedding
+
+    async def deliver_bank_question(
+        self,
+        bank_question_text: str,
+        message: str,
+        history: list[dict] | None,
+        role: str,
+        topic: str,
+        question_number: int,
+        max_questions: int | None = None,
+    ) -> str:
+        """
+        `get_next_question`'ın HAFİF sürümü: soruyu sıfırdan üretmek yerine,
+        soru bankasından retrieval ile seçilmiş HAZIR bir soruyu (bkz.
+        question_bank_service.py) doğal bir geçişle adaya iletir. Aynı
+        model/fallback zincirini kullanır ama çok daha düşük max_tokens ile —
+        modelin işi "yaz" değil "kısaca yorumla + ilet" olduğu için.
+
+        `message`: adayın bir önceki cevabı (get_next_question'daki gibi
+        `history`'nin SONUNA ayrıca eklenir) — model bu cevaba TEK CÜMLEYLE
+        kısaca değinebilsin diye.
+        """
+        max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
+
+        system_prompt = build_question_delivery_prompt(role, topic, question_number, max_questions, bank_question_text)
+        messages = [{"role": "system", "content": system_prompt}]
+        messages.extend(self._history_to_messages(history))
+        if message:
+            messages.append({"role": "user", "content": message})
+
+        last_error: Exception | None = None
+        for i, model_name in enumerate(self._fallback_models()):
+            self._record_attempt(model_name)
+            try:
+                logger.info("[LLMService] (soru-bankası) Model deneniyor: %s", model_name)
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=0.7,
+                        # Reasoning aşaması burada da (light görev olmasına rağmen)
+                        # önemli miktarda token harcayabiliyor — bkz. _validate_response_length.
+                        max_tokens=1536,
+                    ),
+                    timeout=settings.LLM_ATTEMPT_MAX_DURATION,
+                )
+                result = response.choices[0].message.content
+                if not result or not result.strip():
+                    finish_reason = getattr(response.choices[0], "finish_reason", None)
+                    raise ValueError(f"Model boş bir yanıt döndürdü (finish_reason={finish_reason}).")
+                result = result.strip()
+                _validate_response_length(result, "soru-bankası")
+                self._record_success(model_name, getattr(response, "usage", None), purpose="question_from_bank")
+                logger.info("[LLMService] Başarılı model: %s", model_name)
+                return result
+
+            except asyncio.TimeoutError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning(
+                    "[LLMService] '%s' %.0f saniye içinde tamamlanamadı. Sıradaki deneniyor...",
+                    model_name, settings.LLM_ATTEMPT_MAX_DURATION,
+                )
+                await self._sleep_backoff(i)
+                continue
+            except RateLimitError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] '%s' kota sınırına takıldı (429). Sıradaki deneniyor...", model_name)
+                await self._sleep_backoff(i)
+                continue
+            except NotFoundError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] '%s' bulunamadı (404). Sıradaki deneniyor...", model_name)
+                continue
+            except APIStatusError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] '%s' API hatası (HTTP %s). Sıradaki deneniyor...", model_name, e.status_code)
+                if e.status_code and e.status_code >= 500:
+                    await self._sleep_backoff(i)
+                continue
+            except Exception as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] '%s' beklenmeyen hata: %s. Sıradaki deneniyor...", model_name, str(e)[:120])
+                continue
+
+        logger.error("[LLMService] Soru bankası teslimi için tüm modeller başarısız oldu. Son hata: %s", last_error, exc_info=True)
+        raise RuntimeError(f"AI servisi ile iletişim kurulamadı. Tüm modeller meşgul. Son hata: {last_error}")
+
     async def get_next_question(
         self,
         message: str,
@@ -207,23 +348,39 @@ class LLMService:
             self._record_attempt(model_name)
             try:
                 logger.info("[LLMService] (soru) Model deneniyor: %s", model_name)
-                response = await self.client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    temperature=0.7,
-                    # NOT: FREE_MODELS'teki modeller "reasoning" modelleri — content'ten
-                    # önce ayrı bir reasoning kanalı tüketiyorlar. Düşük max_tokens'ta
-                    # content boş/null dönebilir, bu yüzden yüksek tutuluyor.
-                    max_tokens=1024,
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=0.7,
+                        # NOT: FREE_MODELS'teki modeller "reasoning" modelleri — content'ten
+                        # önce ayrı bir reasoning kanalı tüketiyorlar. Düşük max_tokens'ta
+                        # content boş/null dönebilir, bu yüzden yüksek tutuluyor. Ayrıca
+                        # bkz. _validate_response_length: reasoning content'e sızarsa
+                        # (finish_reason=length) bu da ayrıca yakalanır.
+                        max_tokens=2048,
+                    ),
+                    timeout=settings.LLM_ATTEMPT_MAX_DURATION,
                 )
                 result = response.choices[0].message.content
                 if not result or not result.strip():
                     finish_reason = getattr(response.choices[0], "finish_reason", None)
                     raise ValueError(f"Model boş bir yanıt döndürdü (finish_reason={finish_reason}).")
+                result = result.strip()
+                _validate_response_length(result, "soru")
                 self._record_success(model_name, getattr(response, "usage", None), purpose="question")
                 logger.info("[LLMService] Başarılı model: %s", model_name)
-                return result.strip()
+                return result
 
+            except asyncio.TimeoutError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning(
+                    "[LLMService] '%s' %.0f saniye içinde tamamlanamadı. Sıradaki deneniyor...",
+                    model_name, settings.LLM_ATTEMPT_MAX_DURATION,
+                )
+                await self._sleep_backoff(i)
+                continue
             except RateLimitError as e:
                 last_error = e
                 self._record_failure(model_name)
@@ -262,23 +419,63 @@ class LLMService:
     ):
         """
         `get_next_question` ile aynı işi yapar ama metni token-token (async
-        generator) üretir — SSE ile canlı akış için.
-
-        Fallback davranışı get_next_question'dan FARKLIDIR: bir modelin ilk
-        parçası (chunk) client'a gönderilmeden önce hata alınırsa güvenle
-        sıradaki modele geçilir (tıpkı non-streaming sürümde olduğu gibi).
-        Ama bir model akışın ORTASINDA çökerse, zaten client'a gönderilmiş
-        kısmi metni geri almak mümkün olmadığından sessizce başka modele
-        geçilmez — akış bir hata mesajıyla sonlandırılır ve exception
-        fırlatılır (çağıran taraf bunu SSE'de bir hata event'i olarak
-        iletebilir).
+        generator) üretir — SSE ile canlı akış için. Bkz. `_stream_chat` için
+        fallback/hata davranışı notu.
 
         Yields:
             str: Model tarafından üretilen art arda metin parçaları.
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
-
         system_prompt = build_question_prompt(role, topic, question_number, max_questions)
+        async for delta in self._stream_chat(system_prompt, history, message, max_tokens=1024, purpose="question_stream"):
+            yield delta
+
+    async def stream_deliver_bank_question(
+        self,
+        bank_question_text: str,
+        message: str,
+        history: list[dict] | None,
+        role: str,
+        topic: str,
+        question_number: int,
+        max_questions: int | None = None,
+    ):
+        """
+        `deliver_bank_question`'ın token-token akan sürümü — bkz. `_stream_chat`
+        için fallback/hata davranışı notu.
+
+        Yields:
+            str: Model tarafından üretilen art arda metin parçaları.
+        """
+        max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
+        system_prompt = build_question_delivery_prompt(role, topic, question_number, max_questions, bank_question_text)
+        async for delta in self._stream_chat(system_prompt, history, message, max_tokens=256, purpose="question_from_bank_stream"):
+            yield delta
+
+    async def _stream_chat(
+        self,
+        system_prompt: str,
+        history: list[dict] | None,
+        message: str,
+        max_tokens: int,
+        purpose: str,
+    ):
+        """
+        `stream_next_question` ve `stream_deliver_bank_question`'ın ortak
+        motoru: verilen sistem promptu + geçmiş + son mesajla token-token akış
+        üretir, fallback zincirini dener.
+
+        Fallback davranışı non-streaming metodlardan FARKLIDIR: bir modelin ilk
+        parçası (chunk) client'a gönderilmeden önce hata alınırsa güvenle
+        sıradaki modele geçilir. Ama bir model akışın ORTASINDA çökerse, zaten
+        client'a gönderilmiş kısmi metni geri almak mümkün olmadığından
+        sessizce başka modele geçilmez — akış bir hata mesajıyla sonlandırılır
+        ve exception fırlatılır (çağıran taraf bunu SSE'de bir hata event'i
+        olarak iletebilir).
+
+        Yields:
+            str: Model tarafından üretilen art arda metin parçaları.
+        """
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
         if message:
@@ -289,24 +486,44 @@ class LLMService:
             self._record_attempt(model_name)
             started = False
             usage_info = None
+            attempt_start = time.monotonic()
+            accumulated_len = 0
             try:
-                logger.info("[LLMService] (soru-stream) Model deneniyor: %s", model_name)
+                logger.info("[LLMService] (%s) Model deneniyor: %s", purpose, model_name)
                 stream = await self.client.chat.completions.create(
                     model=model_name,
                     messages=messages,
                     temperature=0.7,
-                    max_tokens=1024,
+                    max_tokens=max_tokens,
                     stream=True,
                     stream_options={"include_usage": True},
                 )
                 try:
                     async for chunk in stream:
+                        # LLM_REQUEST_TIMEOUT (httpx idle timeout) reasoning modeli
+                        # sürekli reasoning_content parçası gönderdiği sürece ASLA
+                        # tetiklenmez — bu yüzden ayrı bir TOPLAM süre sınırı gerekir
+                        # (bkz. settings.LLM_ATTEMPT_MAX_DURATION).
+                        if time.monotonic() - attempt_start > settings.LLM_ATTEMPT_MAX_DURATION:
+                            raise TimeoutError(
+                                f"Model {settings.LLM_ATTEMPT_MAX_DURATION:.0f} saniye içinde tamamlanamadı."
+                            )
                         if getattr(chunk, "usage", None):
                             usage_info = chunk.usage
                         if not chunk.choices:
                             continue
                         delta = chunk.choices[0].delta.content
                         if delta:
+                            # bkz. _validate_response_length — burada da aynı reasoning-sızıntısı
+                            # riski var. Eşik aşılacaksa client'a YEDİRMEDEN (henüz yield
+                            # etmeden) reddet ki mümkünse sessizce başka modele geçilebilsin.
+                            if accumulated_len + len(delta) > settings.LLM_MAX_RESPONSE_CHARS:
+                                raise ValueError(
+                                    f"[{purpose}] Model anormal uzunlukta içerik üretti "
+                                    f"(len={accumulated_len + len(delta)} > {settings.LLM_MAX_RESPONSE_CHARS}) — "
+                                    "muhtemelen 'reasoning' metni content alanına sızmış."
+                                )
+                            accumulated_len += len(delta)
                             started = True
                             yield delta
                 finally:
@@ -321,7 +538,7 @@ class LLMService:
 
                 if not started:
                     raise ValueError("Model akıştan hiç içerik döndürmedi.")
-                self._record_success(model_name, usage_info, purpose="question_stream")
+                self._record_success(model_name, usage_info, purpose=purpose)
                 logger.info("[LLMService] Stream başarılı model: %s", model_name)
                 return
 
@@ -371,15 +588,18 @@ class LLMService:
             self._record_attempt(model_name)
             try:
                 logger.info("[LLMService] (değerlendirme) Model deneniyor: %s", model_name)
-                response = await self.client.chat.completions.create(
-                    model=model_name,
-                    messages=messages,
-                    temperature=0.3,
-                    # NOT: reasoning modelleri (bkz. FREE_MODELS yorumu) uzun rubrikli
-                    # promptlarda reasoning'e çok token harcayabiliyor; content için
-                    # yeterli pay bırakmak adına yüksek tutuluyor.
-                    max_tokens=2048,
-                    response_format={"type": "json_object"},
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=0.3,
+                        # NOT: reasoning modelleri (bkz. FREE_MODELS yorumu) uzun rubrikli
+                        # promptlarda reasoning'e çok token harcayabiliyor; content için
+                        # yeterli pay bırakmak adına yüksek tutuluyor.
+                        max_tokens=2048,
+                        response_format={"type": "json_object"},
+                    ),
+                    timeout=settings.LLM_ATTEMPT_MAX_DURATION,
                 )
                 content = response.choices[0].message.content
                 parsed = _extract_json_object(content or "")
@@ -395,6 +615,15 @@ class LLMService:
                 logger.info("[LLMService] Değerlendirme başarılı, model: %s", model_name)
                 return evaluation.model_dump()
 
+            except asyncio.TimeoutError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning(
+                    "[LLMService] '%s' %.0f saniye içinde tamamlanamadı. Sıradaki deneniyor...",
+                    model_name, settings.LLM_ATTEMPT_MAX_DURATION,
+                )
+                await self._sleep_backoff(i)
+                continue
             except RateLimitError as e:
                 last_error = e
                 self._record_failure(model_name)

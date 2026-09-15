@@ -1,0 +1,142 @@
+[
+  {
+    "role": "Backend Developer",
+    "topic": "Python",
+    "difficulty": "JUNIOR",
+    "question_text": "Python'da liste (list) ile tuple arasındaki temel farklar nelerdir, hangi durumda hangisini tercih edersiniz?",
+    "tags": ["python", "temel"]
+  },
+  {
+    "role": "Backend Developer",
+    "topic": "Python",
+    "difficulty": "JUNIOR",
+    "question_text": "Python'da bir fonksiyonun varsayılan (default) parametre değeri olarak mutable bir nesne (örneğin liste) kullanmak neden risklidir?",
+    "tags": ["python", "temel"]
+  },
+  {
+    "role": "Backend Developer",
+    "topic": "Python",
+    "difficulty": "ORTA",
+    "question_text": "Python'da GIL (Global Interpreter Lock) nedir ve CPU-bound ile I/O-bound işler için çoklu iş parçacığı (threading) performansını nasıl etkiler?",
+    "tags": ["python", "concurrency"]
+  },
+  {
+    "role": "Backend Developer",
+    "topic": "Python",
+    "difficulty": "ORTA",
+    "question_text": "Decorator'lar nedir, kendi decorator'ınızı nasıl yazarsınız ve `functools.wraps` neden önemlidir?",
+    "tags": ["python", "dil-ozellikleri"]
+  },
+  {
+    "role": "Backend Developer",
+    "topic": "Python",
+    "difficulty": "ORTA",
+    "question_text": "FastAPI (ya da benzeri bir async framework) ile senkron bir blocking işlemi (örn. ağır bir dosya işleme) çalıştırırken nelere dikkat edersiniz, event loop'u nasıl bloklamazsınız?",
+    "tags": ["python", "fastapi", "async"]
+  },
+  {
+    "role": "Backend Developer",
+    "topic": "Python",
+    "difficulty": "UZMAN",
+    "question_text": "Yüksek trafikli bir üretim ortamında Python servisinizde bellek sızıntısını (memory leak) nasıl tespit eder ve kök nedenini nasıl analiz edersiniz?",
+    "tags": ["python", "production", "debugging"]
+  },
+  {
+    "role": "Backend Developer",
+    "topic": "Python",
+    "difficulty": "UZMAN",
+    "question_text": "Aynı veritabanı satırına eş zamanlı yazan iki isteğin yol açabileceği race condition'ı, şema değişikliği yapmadan nasıl önlersiniz? Farklı stratejileri (optimistic/pessimistic locking, atomik koşullu update) karşılaştırın.",
+    "tags": ["python", "database", "concurrency"]
+  },
+  {
+    "role": "Yazılım Mühendisi",
+    "topic": "React ve Modern Web Geliştirme",
+    "difficulty": "JUNIOR",
+    "question_text": "React'te `useState` ve `useEffect` hook'ları ne işe yarar, aralarındaki temel fark nedir?",
+    "tags": ["react", "hooks"]
+  },
+  {
+    "role": "Yazılım Mühendisi",
+    "topic": "React ve Modern Web Geliştirme",
+    "difficulty": "JUNIOR",
+    "question_text": "React'te \"props\" ile \"state\" arasındaki fark nedir, bir bileşen kendi props'unu değiştirebilir mi?",
+    "tags": ["react", "temel"]
+  },
+  {
+    "role": "Yazılım Mühendisi",
+    "topic": "React ve Modern Web Geliştirme",
+    "difficulty": "ORTA",
+    "question_text": "React'te gereksiz yeniden render'ları (re-render) önlemek için hangi yöntemleri kullanırsınız (örn. `useMemo`, `useCallback`, `React.memo`)? Birini örnekle açıklayın.",
+    "tags": ["react", "performans"]
+  },
+  {
+    "role": "Yazılım Mühendisi",
+    "topic": "React ve Modern Web Geliştirme",
+    "difficulty": "ORTA",
+    "question_text": "Bir React uygulamasında global state yönetimi için Context API ile Redux/Zustand gibi bir kütüphane arasında nasıl seçim yaparsınız, trade-off'lar nelerdir?",
+    "tags": ["react", "state-management"]
+  },
+  {
+    "role": "Yazılım Mühendisi",
+    "topic": "React ve Modern Web Geliştirme",
+    "difficulty": "ORTA",
+    "question_text": "Next.js'te Server Component ile Client Component arasındaki fark nedir, hangi durumda hangisini kullanırsınız?",
+    "tags": ["react", "nextjs"]
+  },
+  {
+    "role": "Yazılım Mühendisi",
+    "topic": "React ve Modern Web Geliştirme",
+    "difficulty": "UZMAN",
+    "question_text": "Büyük bir React uygulamasında ilk yükleme (initial load) performansını iyileştirmek için hangi stratejileri (code splitting, lazy loading, bundle analizi vb.) uygularsınız? Somut bir örnek üzerinden anlatın.",
+    "tags": ["react", "performans", "mimari"]
+  },
+  {
+    "role": "Frontend Developer",
+    "topic": "JavaScript",
+    "difficulty": "JUNIOR",
+    "question_text": "JavaScript'te `==` ile `===` arasındaki fark nedir, neden genellikle `===` kullanılması önerilir?",
+    "tags": ["javascript", "temel"]
+  },
+  {
+    "role": "Frontend Developer",
+    "topic": "JavaScript",
+    "difficulty": "ORTA",
+    "question_text": "JavaScript'te event loop, call stack ve task queue (microtask/macrotask) kavramlarını bir örnek üzerinden açıklar mısınız?",
+    "tags": ["javascript", "async"]
+  },
+  {
+    "role": "Frontend Developer",
+    "topic": "JavaScript",
+    "difficulty": "ORTA",
+    "question_text": "Closure (kapanış) nedir, pratikte hangi problemleri çözmek için kullanırsınız?",
+    "tags": ["javascript", "dil-ozellikleri"]
+  },
+  {
+    "role": "Frontend Developer",
+    "topic": "JavaScript",
+    "difficulty": "UZMAN",
+    "question_text": "Tarayıcıda bellek sızıntısına (memory leak) yol açan yaygın JavaScript kalıplarını (örn. unutulmuş event listener, kapanan closure referansları) nasıl tespit eder ve önlersiniz?",
+    "tags": ["javascript", "performans"]
+  },
+  {
+    "role": "Veri Bilimci",
+    "topic": "Makine Öğrenmesi",
+    "difficulty": "JUNIOR",
+    "question_text": "Overfitting (aşırı öğrenme) nedir, bir modelin overfit olduğunu nasıl anlarsınız?",
+    "tags": ["ml", "temel"]
+  },
+  {
+    "role": "Veri Bilimci",
+    "topic": "Makine Öğrenmesi",
+    "difficulty": "ORTA",
+    "question_text": "Dengesiz (imbalanced) bir sınıflandırma veri setiyle çalışırken hangi teknikleri (örn. resampling, class weight, farklı metrikler) kullanırsınız?",
+    "tags": ["ml", "veri-hazirlama"]
+  },
+  {
+    "role": "Veri Bilimci",
+    "topic": "Makine Öğrenmesi",
+    "difficulty": "UZMAN",
+    "question_text": "Üretime aldığınız bir modelin zamanla performansının düştüğünü (model/veri kayması — drift) nasıl tespit eder ve buna karşı nasıl bir izleme/yeniden eğitim stratejisi kurarsınız?",
+    "tags": ["ml", "mlops"]
+  }
+]

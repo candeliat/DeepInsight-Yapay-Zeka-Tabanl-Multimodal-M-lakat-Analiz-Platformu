@@ -257,7 +257,7 @@ export default function InterviewRoomPage() {
     
     try {
       // 1. Backend'e başlatma isteği
-      const data = await chatService.startInterview(role, `${topic} (Seviye: ${difficulty})`);
+      const data = await chatService.startInterview(role, topic, difficulty);
       setInterviewId(data.interview_id);
       setCurrentQuestion(data.first_message);
       

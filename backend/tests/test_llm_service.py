@@ -18,6 +18,7 @@ import httpx
 import pytest
 from openai import APIStatusError, NotFoundError, RateLimitError
 
+import app.services.llm_service as llm_service_module
 from app.services.llm_service import LLMService, InterviewEvaluation, _extract_json_object
 
 
@@ -55,6 +56,23 @@ class _FakeStream:
             yield SimpleNamespace(choices=[], usage=self._usage)
         if self._crash_after:
             raise RuntimeError("bağlantı yarıda koptu")
+
+
+class _FakeSlowStream:
+    """`_FakeStream` ile aynı ama her chunk'tan önce bir gecikme uygular —
+    `settings.LLM_ATTEMPT_MAX_DURATION` (toplam süre sınırı) testleri için."""
+
+    def __init__(self, deltas: list[str], delay_per_chunk: float):
+        self._deltas = deltas
+        self._delay = delay_per_chunk
+
+    def __aiter__(self):
+        return self._gen()
+
+    async def _gen(self):
+        for d in self._deltas:
+            await asyncio.sleep(self._delay)
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=d))], usage=None)
 
 
 def _fake_response(content: str, usage: SimpleNamespace | None = None):
@@ -146,6 +164,68 @@ def test_get_next_question_empty_response_treated_as_failure_and_falls_back():
 
     result = run(svc.get_next_question("cevap", [], "Backend Developer", "Python", 1, 5))
     assert result == "Gerçek soru burada."
+
+
+def test_get_next_question_rejects_reasoning_leak_and_falls_back(monkeypatch):
+    """
+    Canlı testte gözlemlenen gerçek hata: max_tokens reasoning aşamasında
+    dolunca bazı reasoning modelleri iç muhakemesini (binlerce karakter)
+    content alanına sızdırıyor. Bu, kullanıcıya devasa/anlamsız bir "soru"
+    olarak gösterilmemeli — reddedilip sıradaki modele düşülmeli.
+    """
+    monkeypatch.setattr(llm_service_module.settings, "LLM_MAX_RESPONSE_CHARS", 50)
+    svc = _service_with_mock_client()
+    leaked_reasoning = "Okay, let's see. The user just answered the first question. " * 5  # > 50 karakter
+    svc.client.chat.completions.create.side_effect = [
+        _fake_response(leaked_reasoning, _fake_usage()),
+        _fake_response("Kısa gerçek soru.", _fake_usage()),
+    ]
+
+    result = run(svc.get_next_question("cevap", [], "Rol", "Konu", 1, 5))
+
+    assert result == "Kısa gerçek soru."
+    assert svc.client.chat.completions.create.call_count == 2
+
+
+def test_get_next_question_falls_back_on_attempt_timeout(monkeypatch):
+    """
+    `LLM_REQUEST_TIMEOUT` (httpx idle timeout) bir model sürekli veri
+    gönderdiği sürece tetiklenmez — `LLM_ATTEMPT_MAX_DURATION` bunun yerine
+    tek bir model denemesi için TOPLAM bir süre sınırı uygular.
+    """
+    monkeypatch.setattr(llm_service_module.settings, "LLM_ATTEMPT_MAX_DURATION", 0.05)
+    svc = _service_with_mock_client()
+
+    calls = {"n": 0}
+
+    async def _side_effect(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            await asyncio.sleep(0.2)
+            return _fake_response("YAVAŞ MODEL ASLA GÖRÜNMEMELİ")
+        return _fake_response("Hızlı ikinci model cevabı.", _fake_usage())
+
+    svc.client.chat.completions.create.side_effect = _side_effect
+
+    result = run(svc.get_next_question("cevap", [], "Rol", "Konu", 1, 5))
+
+    assert result == "Hızlı ikinci model cevabı."
+    assert svc.client.chat.completions.create.call_count == 2
+
+
+def test_deliver_bank_question_rejects_reasoning_leak_and_falls_back(monkeypatch):
+    monkeypatch.setattr(llm_service_module.settings, "LLM_MAX_RESPONSE_CHARS", 50)
+    svc = _service_with_mock_client()
+    leaked_reasoning = "Okay, let's see. The user just answered the first question. " * 5
+    svc.client.chat.completions.create.side_effect = [
+        _fake_response(leaked_reasoning, _fake_usage()),
+        _fake_response("Kısa banka sorusu teslimi.", _fake_usage()),
+    ]
+
+    result = run(svc.deliver_bank_question("Bankadan soru.", "cevap", [], "Rol", "Konu", 2, 5))
+
+    assert result == "Kısa banka sorusu teslimi."
+    assert svc.client.chat.completions.create.call_count == 2
 
 
 def test_paid_models_excluded_by_default(monkeypatch):
@@ -348,3 +428,40 @@ def test_stream_next_question_raises_when_all_models_fail_before_starting():
         run_stream(svc.stream_next_question("cevap", [], "Rol", "Konu", 1, 5))
 
     assert svc.client.chat.completions.create.call_count == len(LLMService.FREE_MODELS)
+
+
+def test_stream_next_question_rejects_reasoning_leak_and_falls_back(monkeypatch):
+    """
+    Canlı testte gözlemlenen gerçek hata: reasoning modeli, max_tokens
+    reasoning aşamasında dolunca TEK BÜYÜK bir chunk'ta (binlerce karakter,
+    genelde İngilizce iç muhakeme) sözde "content" döndürüyor. Bu chunk
+    client'a hiç YEDİRİLMEDEN reddedilip sıradaki modele düşülmeli.
+    """
+    monkeypatch.setattr(llm_service_module.settings, "LLM_MAX_RESPONSE_CHARS", 50)
+    svc = _service_with_mock_client()
+    leaked_reasoning = "Okay, let's see. The user just answered the first question. " * 5
+    svc.client.chat.completions.create.side_effect = [
+        _FakeStream([leaked_reasoning]),
+        _FakeStream(["kısa ", "gerçek ", "soru"]),
+    ]
+
+    text = run_stream(svc.stream_next_question("cevap", [], "Rol", "Konu", 1, 5))
+
+    assert text == "kısa gerçek soru"
+    assert svc.client.chat.completions.create.call_count == 2
+
+
+def test_stream_next_question_falls_back_on_attempt_timeout(monkeypatch):
+    """`LLM_ATTEMPT_MAX_DURATION` aşılırsa (bkz. non-streaming eşdeğeri),
+    akış henüz hiçbir chunk göndermediyse güvenle sıradaki modele düşülür."""
+    monkeypatch.setattr(llm_service_module.settings, "LLM_ATTEMPT_MAX_DURATION", 0.05)
+    svc = _service_with_mock_client()
+    svc.client.chat.completions.create.side_effect = [
+        _FakeSlowStream(["YAVAŞ MODEL ASLA GÖRÜNMEMELİ"], delay_per_chunk=0.15),
+        _FakeStream(["ikinci ", "model ", "cevabı"]),
+    ]
+
+    text = run_stream(svc.stream_next_question("cevap", [], "Rol", "Konu", 1, 5))
+
+    assert text == "ikinci model cevabı"
+    assert svc.client.chat.completions.create.call_count == 2

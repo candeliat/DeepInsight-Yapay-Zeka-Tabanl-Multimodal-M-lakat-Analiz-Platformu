@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from app.core.config import settings
 from app.services.llm_service import llm_service
+from app.services import question_bank_service
 from app.services.interview_service import (
     create_interview,
     save_message,
@@ -62,9 +63,17 @@ def _sanitize_label(value: str) -> str:
 
 # --- Request / Response Models ---
 
+_VALID_DIFFICULTIES = {"JUNIOR", "ORTA", "UZMAN"}
+
+
 class StartInterviewRequest(BaseModel):
     role: str = Field(min_length=2, max_length=80)
     topic: str = Field(min_length=2, max_length=120)
+    # Opsiyonel: eskiden dashboard bunu topic string'ine gizliyordu
+    # (bkz. proje notları), artık gerçek bir alan. Soru bankası retrieval'i
+    # (question_bank_service.fetch_question_pool) bunu kesin filtre olarak
+    # kullanır; None ise zorluk filtresiz eşleşme yapılır.
+    difficulty: Optional[str] = None
 
     @field_validator("role", "topic")
     @classmethod
@@ -73,6 +82,14 @@ class StartInterviewRequest(BaseModel):
         if not v:
             raise ValueError("Bu alan boş olamaz.")
         return v
+
+    @field_validator("difficulty")
+    @classmethod
+    def _clean_difficulty(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        v = _sanitize_label(v).upper()
+        return v if v in _VALID_DIFFICULTIES else None
 
 class StartInterviewResponse(BaseModel):
     interview_id: str
@@ -97,6 +114,56 @@ class ChatResponse(BaseModel):
     interview_complete: bool = False
     evaluation: Optional[Dict[str, Any]] = None
 
+# --- Soru bankası (RAG) destekli soru üretimi ---
+
+async def _ask_question(
+    role: str,
+    topic: str,
+    question_number: int,
+    max_questions: int,
+    message: str,
+    history_dicts: List[Dict[str, Any]],
+    question_pool: List[Dict[str, Any]],
+) -> str:
+    """
+    Sıradaki mülakat sorusunu üretir. Önce `/start`'ta bir kez çekilmiş soru
+    bankası havuzunu (question_pool) sırayla tüketmeyi dener — `question_number`
+    zaten 0-indexed sıradaki index'e karşılık gelir (1. soru -> index 0),
+    ayrı bir "hangi sorular soruldu" durumu tutmaya gerek yoktur.
+
+    Havuzda bu index için karşılık yoksa (banka bu rol/konu/zorluk için
+    boş/yetersizdi) ya da hafif teslim çağrısı (deliver_bank_question) başarısız
+    olursa, LLM'in tam-üretim akışına (get_next_question) sessizce düşülür —
+    mülakat bu yüzden ASLA kesintiye uğramaz.
+    """
+    index = question_number - 1
+    if 0 <= index < len(question_pool):
+        try:
+            return await llm_service.deliver_bank_question(
+                bank_question_text=question_pool[index]["question_text"],
+                message=message,
+                history=history_dicts,
+                role=role,
+                topic=topic,
+                question_number=question_number,
+                max_questions=max_questions,
+            )
+        except Exception:
+            logger.warning(
+                "[interview] deliver_bank_question başarısız (question_number=%d), tam-üretime düşülüyor.",
+                question_number, exc_info=True,
+            )
+
+    return await llm_service.get_next_question(
+        message=message,
+        history=history_dicts,
+        role=role,
+        topic=topic,
+        question_number=question_number,
+        max_questions=max_questions,
+    )
+
+
 # --- Endpoints ---
 
 @router.post("/start", response_model=StartInterviewResponse)
@@ -109,24 +176,39 @@ async def start_interview(
     Kullanıcının belirlediği rol ve konuya göre yeni bir mülakat oturumu başlatır.
     """
     try:
+        max_questions = settings.MAX_INTERVIEW_QUESTIONS
+
+        # Mülakat başlamadan ÖNCE, soru bankasından role+topic(+difficulty) için
+        # TEK SEFERDE en iyi eşleşen `max_questions` adet aday çekilir (best-effort
+        # — banka boş/yetersizse veya embedding/RPC başarısız olursa boş liste
+        # döner, bkz. question_bank_service.fetch_question_pool). Bu havuz
+        # interview kaydına yazılır ve her tur `_ask_question` tarafından
+        # sırayla tüketilir.
+        question_pool = await question_bank_service.fetch_question_pool(
+            role=request.role, topic=request.topic, difficulty=request.difficulty, size=max_questions,
+        )
+
         # DB'de mülakat oluştur
         interview_data = await create_interview(
             user_id=current_user.id,
             role=request.role,
             topic=request.topic,
-            token=token
+            token=token,
+            difficulty=request.difficulty,
+            question_pool=question_pool,
         )
         interview_id = str(interview_data["id"])
 
         # AI'dan ilk selamlama ve soruyu al (başlatma mesajı ile)
         # Mesaj geçmişi henüz yok.
-        ai_response = await llm_service.get_next_question(
-            message="Mülakatı başlat.",
-            history=[],
+        ai_response = await _ask_question(
             role=request.role,
             topic=request.topic,
             question_number=1,
-            max_questions=settings.MAX_INTERVIEW_QUESTIONS,
+            max_questions=max_questions,
+            message="Mülakatı başlat.",
+            history_dicts=[],
+            question_pool=question_pool,
         )
 
         # Kullanıcının ilk mülakatı başlatma isteğini anlık olarak kaydet 
@@ -240,13 +322,14 @@ async def chat_with_ai(
             history_dicts = [{"role": item["role"], "content": item["content"]} for item in history_records[:-1]]
             last_message = history_records[-1]["content"] if history_records else request.message
 
-            ai_response_text = await llm_service.get_next_question(
-                message=last_message,
-                history=history_dicts,
+            ai_response_text = await _ask_question(
                 role=role,
                 topic=topic,
                 question_number=questions_asked + 1,
                 max_questions=max_questions,
+                message=last_message,
+                history_dicts=history_dicts,
+                question_pool=interview.get("question_pool") or [],
             )
 
         # AI cevabını anlık kaydet
@@ -365,18 +448,60 @@ async def chat_with_ai_stream(
             history_dicts = [{"role": item["role"], "content": item["content"]} for item in history_records[:-1]]
             last_message = history_records[-1]["content"] if history_records else request.message
 
+            # Soru bankası havuzunda bu index için bir aday varsa (bkz. _ask_question
+            # ve /start'taki genel not), önce hafif "teslim" akışını dener; havuzda
+            # karşılık yoksa ya da hiç chunk gönderilmeden başarısız olursa (full_parts
+            # boşsa — yani client'a henüz bir şey iletilmediyse) tam-üretim akışına
+            # (stream_next_question) sessizce düşülür.
+            question_pool = interview.get("question_pool") or []
+            pool_index = questions_asked
+            bank_question_text = (
+                question_pool[pool_index]["question_text"] if 0 <= pool_index < len(question_pool) else None
+            )
+
             full_parts: list[str] = []
             try:
-                async for delta in llm_service.stream_next_question(
-                    message=last_message,
-                    history=history_dicts,
-                    role=role,
-                    topic=topic,
-                    question_number=questions_asked + 1,
-                    max_questions=max_questions,
-                ):
-                    full_parts.append(delta)
-                    yield _sse("chunk", delta)
+                if bank_question_text:
+                    try:
+                        async for delta in llm_service.stream_deliver_bank_question(
+                            bank_question_text=bank_question_text,
+                            message=last_message,
+                            history=history_dicts,
+                            role=role,
+                            topic=topic,
+                            question_number=questions_asked + 1,
+                            max_questions=max_questions,
+                        ):
+                            full_parts.append(delta)
+                            yield _sse("chunk", delta)
+                    except RuntimeError:
+                        if full_parts:
+                            raise
+                        logger.warning(
+                            "[chat/stream] stream_deliver_bank_question başarısız, tam-üretime düşülüyor (question_number=%d).",
+                            questions_asked + 1, exc_info=True,
+                        )
+                        async for delta in llm_service.stream_next_question(
+                            message=last_message,
+                            history=history_dicts,
+                            role=role,
+                            topic=topic,
+                            question_number=questions_asked + 1,
+                            max_questions=max_questions,
+                        ):
+                            full_parts.append(delta)
+                            yield _sse("chunk", delta)
+                else:
+                    async for delta in llm_service.stream_next_question(
+                        message=last_message,
+                        history=history_dicts,
+                        role=role,
+                        topic=topic,
+                        question_number=questions_asked + 1,
+                        max_questions=max_questions,
+                    ):
+                        full_parts.append(delta)
+                        yield _sse("chunk", delta)
             except RuntimeError as e:
                 partial_text = "".join(full_parts)
                 if partial_text:

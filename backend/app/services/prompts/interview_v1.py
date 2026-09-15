@@ -51,6 +51,51 @@ KURALLAR:
 """
 
 
+def build_question_delivery_prompt(
+    role: str, topic: str, question_number: int, max_questions: int, bank_question_text: str
+) -> str:
+    """
+    `build_question_prompt`'un HAFİF sürümü — model bu soruyu SIFIRDAN
+    ÜRETMEZ, önceden hazırlanmış bir soru bankasından (RAG retrieval, bkz.
+    question_bank_service.py) seçilmiş HAZIR bir soruyu doğal bir geçişle
+    adaya sunar. Bu yüzden max_tokens çok daha düşük tutulabilir ve modelin
+    üstlendiği iş "yaz" değil "kısaca yorumla + ilet"tir — amaç ücretsiz
+    reasoning modellerini (bkz. llm_service.py FREE_MODELS) daha az yormak.
+
+    Sorunun teknik özünün LLM tarafından DEĞİŞTİRİLMEMESİ kritik — aksi halde
+    bankadaki kürasyonun anlamı kalmaz, bu yüzden kurallarda açıkça vurgulanır.
+    """
+    if question_number <= 1:
+        intro = "Bu mülakatın ilk sorusu. Adaya kısa ve nazik bir karşılama mesajı yaz."
+    else:
+        intro = (
+            "Bu mülakatın devamı. Kesinlikle tekrar selamlama yapma — "
+            "önce adayın bir önceki cevabını TEK CÜMLEYLE kısaca değerlendir, sonra soruya geç."
+        )
+
+    return f"""Sen profesyonel bir İnsan Kaynakları ve <role>{role}</role> pozisyonu için Teknik Mülakat uzmanısın.
+Konumuz: <topic>{topic}</topic>. Bu, toplam {max_questions} sorudan oluşan bir mülakatın {question_number}. sorusu.
+
+{_ANTI_INJECTION_RULE}
+
+Sana sorulacak SORU zaten verilmiştir (bir soru bankasından seçilmiştir), aşağıda <bank_question>
+etiketi içinde. Senin işin bu soruyu SIFIRDAN YAZMAK DEĞİL, sadece doğal bir mülakat akışı içinde
+adaya İLETMEKTİR.
+
+<bank_question>{bank_question_text}</bank_question>
+
+KURALLAR:
+1. {intro}
+2. Sana verilen <bank_question> içeriğini birebir veya çok yakın bir ifadeyle sor — sorunun teknik
+   ÖZÜNÜ, ne sorduğunu ASLA değiştirme. Sadece doğal bir geçiş cümlesi ekleyebilir, gerekiyorsa
+   akıcılık için ufak imla/söyleyiş uyarlaması yapabilirsin.
+3. Adaya bir seferde sadece BU soruyu sor. Başka bir soru EKLEME.
+4. Yanıtın SADECE konuşma metni olsun. JSON, başlık, madde işareti veya kod bloğu kullanma.
+5. Türkçe yaz.
+6. **TTS UYUMU**: Emoji kullanma, markdown tablo/kod bloğu kullanma. Konuşma diline yakın, doğal bir dil kullan.
+"""
+
+
 # Skorlama rubriği — her kriter için somut davranış bantları tanımlar. Amaç,
 # farklı fallback modellerinin (llama/gemini/gemma) aynı cevaba tutarsız
 # puanlar vermesini azaltmak; modele "ne gördüğünde kaç puan verileceğine"

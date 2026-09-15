@@ -5,6 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
 from app.api.schemas.question_bank_admin import (
+    GenerateCandidatesRequest,
+    QuestionBankCandidateItem,
     QuestionBankCreate,
     QuestionBankGapItem,
     QuestionBankItem,
@@ -88,3 +90,50 @@ async def list_gaps(
     current_user: UserProfile = Depends(get_current_user),
 ):
     return await admin_service.list_gaps()
+
+
+@router.post("/candidates/generate", response_model=List[QuestionBankCandidateItem])
+async def generate_candidates(
+    payload: GenerateCandidatesRequest,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """En çok görülen boşluklar için LLM'den birer soru ÖNERİSİ üretir —
+    öneriler doğrudan bankaya eklenmez, 'pending' kuyruğa düşer."""
+    return await admin_service.generate_candidates_for_gaps(limit=payload.limit)
+
+
+@router.get("/candidates", response_model=List[QuestionBankCandidateItem])
+async def list_candidates(
+    status: str = "pending",
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    return await admin_service.list_candidates(status=status)
+
+
+@router.post("/candidates/{candidate_id}/approve", response_model=QuestionBankItem)
+async def approve_candidate(
+    candidate_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    try:
+        return await admin_service.approve_candidate(candidate_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e) or "Öneri bulunamadı")
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.post("/candidates/{candidate_id}/reject")
+async def reject_candidate(
+    candidate_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    try:
+        await admin_service.reject_candidate(candidate_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    return {"status": "rejected"}

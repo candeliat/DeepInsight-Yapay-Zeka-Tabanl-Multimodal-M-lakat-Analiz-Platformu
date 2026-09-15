@@ -73,3 +73,19 @@ class QuestionBankGapItem(BaseModel):
     miss_count: int
     last_missing_count: int
     last_seen_at: Optional[str] = None
+
+
+class GenerateCandidatesRequest(BaseModel):
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class QuestionBankCandidateItem(BaseModel):
+    id: str
+    role: str
+    topic: str
+    difficulty: Optional[str] = None
+    question_text: str
+    source_gap_id: Optional[str] = None
+    status: str
+    created_at: Optional[str] = None
+    reviewed_at: Optional[str] = None

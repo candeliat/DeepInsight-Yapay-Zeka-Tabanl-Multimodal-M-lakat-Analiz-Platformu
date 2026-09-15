@@ -10,6 +10,7 @@ otomatik olarak burada hesaplanır.
 """
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.core.database import supabase
@@ -109,3 +110,104 @@ async def list_gaps() -> List[Dict[str, Any]]:
         .execute()
     )
     return result.data or []
+
+
+# --------------------------------------------------------------------------
+# Soru önerisi (candidate) kuyruğu — hibrit LLM üretimi + insan onayı.
+# Hiçbir öneri buradan doğrudan `question_bank`'a girmez; yalnızca
+# `approve_candidate` ile (bir insan onayladıktan sonra) gerçek bir soruya
+# dönüşür. Bkz. sql/004_question_candidates.sql ve proje notları.
+# --------------------------------------------------------------------------
+
+async def generate_candidates_for_gaps(limit: int = 5) -> List[Dict[str, Any]]:
+    """
+    En yüksek `miss_count`'lu boşluklar için birer soru ÖNERİSİ üretip
+    `question_bank_candidates`'e 'pending' olarak ekler. Best-effort: bir
+    boşluk için üretim başarısız olursa o boşluk atlanır, diğerleri
+    denenmeye devam eder — tek bir modelin çökmesi tüm toplu üretimi
+    engellemez.
+    """
+    if not supabase:
+        return []
+
+    gaps_result = (
+        supabase.table("question_bank_gaps").select("*").order("miss_count", desc=True).limit(limit).execute()
+    )
+    gaps = gaps_result.data or []
+
+    created: List[Dict[str, Any]] = []
+    for gap in gaps:
+        try:
+            question_text = await llm_service.generate_question_candidate(
+                gap["role"], gap["topic"], gap.get("difficulty"),
+            )
+            record = {
+                "role": gap["role"],
+                "topic": gap["topic"],
+                "difficulty": gap.get("difficulty"),
+                "question_text": question_text,
+                "source_gap_id": gap["id"],
+                "status": "pending",
+            }
+            result = supabase.table("question_bank_candidates").insert(record).execute()
+            if result.data:
+                created.append(result.data[0])
+        except Exception:
+            logger.warning(
+                "[question_bank_admin_service] Boşluk için öneri üretilemedi (gap_id=%s, role=%s, topic=%s).",
+                gap.get("id"), gap.get("role"), gap.get("topic"), exc_info=True,
+            )
+            continue
+
+    return created
+
+
+async def list_candidates(status: str = "pending") -> List[Dict[str, Any]]:
+    if not supabase:
+        return []
+    result = (
+        supabase.table("question_bank_candidates")
+        .select("*")
+        .eq("status", status)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return result.data or []
+
+
+async def approve_candidate(candidate_id: str) -> Dict[str, Any]:
+    """Bir öneriyi gerçek bir soruya dönüştürür (embedding hesaplanıp
+    `question_bank`'a eklenir) ve öneriyi 'approved' olarak işaretler."""
+    if not supabase:
+        raise RuntimeError("Supabase client is not initialized")
+
+    cand_result = supabase.table("question_bank_candidates").select("*").eq("id", candidate_id).execute()
+    if not cand_result.data:
+        raise ValueError("Öneri bulunamadı")
+    candidate = cand_result.data[0]
+
+    created = await create_question(
+        role=candidate["role"],
+        topic=candidate["topic"],
+        difficulty=candidate.get("difficulty"),
+        question_text=candidate["question_text"],
+        tags=["ai-onerisi"],
+        family_id=None,
+        new_family=False,
+    )
+
+    supabase.table("question_bank_candidates").update({
+        "status": "approved",
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", candidate_id).execute()
+
+    return created
+
+
+async def reject_candidate(candidate_id: str) -> None:
+    if not supabase:
+        raise RuntimeError("Supabase client is not initialized")
+    supabase.table("question_bank_candidates").update({
+        "status": "rejected",
+        "reviewed_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", candidate_id).execute()

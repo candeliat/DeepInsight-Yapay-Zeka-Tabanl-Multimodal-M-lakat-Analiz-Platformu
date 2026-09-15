@@ -96,6 +96,36 @@ KURALLAR:
 """
 
 
+def build_question_generation_prompt(role: str, topic: str, difficulty: str | None) -> str:
+    """
+    `build_question_prompt`'tan FARKLI amaç: bu bir sohbetin parçası olarak
+    değil, soru BANKASINA eklenecek bağımsız/özgün bir soru üretmek için
+    kullanılır (bkz. question_bank_admin_service.generate_candidates_for_gaps).
+    Üretilen soru asla doğrudan bankaya girmez — bir insan onaylamadan
+    kullanılmaz (bkz. proje notları: hibrit LLM üretimi + insan onayı).
+    """
+    difficulty_note = (
+        f"Zorluk seviyesi: {difficulty}." if difficulty
+        else "Zorluk seviyesi belirtilmedi — ORTA düzeyde bir soru üret."
+    )
+
+    return f"""Sen profesyonel bir İnsan Kaynakları ve <role>{role}</role> pozisyonu için Teknik Mülakat uzmanısın.
+Konumuz: <topic>{topic}</topic>. {difficulty_note}
+
+{_ANTI_INJECTION_RULE}
+
+GÖREV: Bu rol/konu/zorluk için, bir soru bankasına eklenecek YENİ ve özgün bir
+teknik mülakat sorusu yaz. Bu bir sohbetin parçası DEĞİL — tek başına,
+bağımsız bir soru olacak.
+
+KURALLAR:
+1. Yanıtın SADECE soru metni olsun — selamlama, açıklama, madde işareti, JSON YOK.
+2. Türkçe yaz.
+3. Net, tek bir teknik konuyu hedefleyen ve gerçek bir mülakatta sorulabilecek nitelikte bir soru yaz.
+4. Sorunun zorluğu belirtilen seviyeyle tutarlı olsun (JUNIOR: temel kavram, ORTA: pratik uygulama, UZMAN: derinlemesine/senaryo bazlı).
+"""
+
+
 # Skorlama rubriği — her kriter için somut davranış bantları tanımlar. Amaç,
 # farklı fallback modellerinin (llama/gemini/gemma) aynı cevaba tutarsız
 # puanlar vermesini azaltmak; modele "ne gördüğünde kaç puan verileceğine"

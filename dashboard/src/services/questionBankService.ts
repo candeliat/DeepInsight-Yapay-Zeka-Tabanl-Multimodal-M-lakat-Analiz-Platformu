@@ -23,6 +23,18 @@ export interface QuestionBankGapItem {
   last_seen_at: string | null;
 }
 
+export interface QuestionBankCandidateItem {
+  id: string;
+  role: string;
+  topic: string;
+  difficulty: string | null;
+  question_text: string;
+  source_gap_id: string | null;
+  status: string;
+  created_at: string | null;
+  reviewed_at: string | null;
+}
+
 export interface CreateQuestionPayload {
   role: string;
   topic: string;
@@ -98,6 +110,49 @@ export const questionBankService = {
     try {
       const response = await api.get("/api/v1/question-bank/gaps");
       return response.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error));
+    }
+  },
+
+  /**
+   * En çok görülen boşluklar için LLM'den birer soru ÖNERİSİ üretir —
+   * öneriler doğrudan bankaya eklenmez, 'pending' kuyruğa düşer, bir insan
+   * onaylamadan (approveCandidate) mülakatlarda kullanılmaz.
+   */
+  async generateCandidates(limit = 5): Promise<QuestionBankCandidateItem[]> {
+    try {
+      const response = await api.post("/api/v1/question-bank/candidates/generate", { limit });
+      return response.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error));
+    }
+  },
+
+  /** Onay bekleyen (varsayılan: "pending") soru önerilerini getirir. */
+  async listCandidates(status = "pending"): Promise<QuestionBankCandidateItem[]> {
+    try {
+      const response = await api.get("/api/v1/question-bank/candidates", { params: { status } });
+      return response.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error));
+    }
+  },
+
+  /** Bir öneriyi onaylar — gerçek bir soruya dönüşür (embedding hesaplanır, bankaya eklenir). */
+  async approveCandidate(id: string): Promise<QuestionBankItem> {
+    try {
+      const response = await api.post(`/api/v1/question-bank/candidates/${id}/approve`);
+      return response.data;
+    } catch (error: unknown) {
+      throw new Error(extractErrorMessage(error));
+    }
+  },
+
+  /** Bir öneriyi reddeder — bankaya asla eklenmez. */
+  async rejectCandidate(id: string): Promise<void> {
+    try {
+      await api.post(`/api/v1/question-bank/candidates/${id}/reject`);
     } catch (error: unknown) {
       throw new Error(extractErrorMessage(error));
     }

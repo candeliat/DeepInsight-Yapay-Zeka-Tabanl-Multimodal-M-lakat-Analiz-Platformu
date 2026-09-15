@@ -16,6 +16,7 @@ from app.services.prompts import (
     PROMPT_VERSION,
     build_question_prompt,
     build_question_delivery_prompt,
+    build_question_generation_prompt,
     build_evaluation_prompt,
 )
 
@@ -319,6 +320,78 @@ class LLMService:
                 continue
 
         logger.error("[LLMService] Soru bankası teslimi için tüm modeller başarısız oldu. Son hata: %s", last_error, exc_info=True)
+        raise RuntimeError(f"AI servisi ile iletişim kurulamadı. Tüm modeller meşgul. Son hata: {last_error}")
+
+    async def generate_question_candidate(self, role: str, topic: str, difficulty: Optional[str]) -> str:
+        """
+        Soru bankası boşluklarını (bkz. question_bank_gaps) doldurmak için
+        YENİ bir soru ÖNERİSİ üretir. Bu metodun ürettiği soru ASLA doğrudan
+        `question_bank`'a eklenmez — `question_bank_admin_service` tarafından
+        `question_bank_candidates`'e 'pending' olarak yazılır ve bir insan
+        onaylamadan (Soru Bankası ekranından) mülakatlarda kullanılmaz (bkz.
+        proje notları: hibrit LLM üretimi + insan onayı büyüme döngüsü).
+        """
+        system_prompt = build_question_generation_prompt(role, topic, difficulty)
+        messages = [{"role": "system", "content": system_prompt}]
+
+        last_error: Exception | None = None
+        for i, model_name in enumerate(self._fallback_models()):
+            self._record_attempt(model_name)
+            try:
+                logger.info("[LLMService] (soru-önerisi) Model deneniyor: %s", model_name)
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=0.8,  # daha yüksek — bankaya çeşitlilik katması için
+                        max_tokens=1024,
+                    ),
+                    timeout=settings.LLM_ATTEMPT_MAX_DURATION,
+                )
+                result = response.choices[0].message.content
+                if not result or not result.strip():
+                    finish_reason = getattr(response.choices[0], "finish_reason", None)
+                    raise ValueError(f"Model boş bir yanıt döndürdü (finish_reason={finish_reason}).")
+                result = result.strip()
+                _validate_response_length(result, "soru-önerisi")
+                self._record_success(model_name, getattr(response, "usage", None), purpose="question_candidate")
+                logger.info("[LLMService] Başarılı model: %s", model_name)
+                return result
+
+            except asyncio.TimeoutError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning(
+                    "[LLMService] '%s' %.0f saniye içinde tamamlanamadı. Sıradaki deneniyor...",
+                    model_name, settings.LLM_ATTEMPT_MAX_DURATION,
+                )
+                await self._sleep_backoff(i)
+                continue
+            except RateLimitError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] '%s' kota sınırına takıldı (429). Sıradaki deneniyor...", model_name)
+                await self._sleep_backoff(i)
+                continue
+            except NotFoundError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] '%s' bulunamadı (404). Sıradaki deneniyor...", model_name)
+                continue
+            except APIStatusError as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] '%s' API hatası (HTTP %s). Sıradaki deneniyor...", model_name, e.status_code)
+                if e.status_code and e.status_code >= 500:
+                    await self._sleep_backoff(i)
+                continue
+            except Exception as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] '%s' beklenmeyen hata: %s. Sıradaki deneniyor...", model_name, str(e)[:120])
+                continue
+
+        logger.error("[LLMService] Soru önerisi üretimi için tüm modeller başarısız oldu. Son hata: %s", last_error, exc_info=True)
         raise RuntimeError(f"AI servisi ile iletişim kurulamadı. Tüm modeller meşgul. Son hata: {last_error}")
 
     async def get_next_question(

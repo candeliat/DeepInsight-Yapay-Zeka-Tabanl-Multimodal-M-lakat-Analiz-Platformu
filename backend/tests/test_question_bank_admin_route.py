@@ -128,3 +128,72 @@ def test_list_gaps_returns_service_result(client, monkeypatch):
 
     assert resp.status_code == 200
     assert resp.json()[0]["miss_count"] == 3
+
+
+# --------------------------------------------------------------------------
+# Soru önerisi (candidate) kuyruğu
+# --------------------------------------------------------------------------
+
+def _candidate_row(**overrides):
+    base = {
+        "id": "c-1", "role": "Backend Developer", "topic": "Python", "difficulty": "ORTA",
+        "question_text": "Yeni önerilen soru?", "source_gap_id": "g-1", "status": "pending",
+        "created_at": "2026-01-01T00:00:00Z", "reviewed_at": None,
+    }
+    base.update(overrides)
+    return base
+
+
+def test_generate_candidates_returns_service_result(client, monkeypatch):
+    gen_mock = AsyncMock(return_value=[_candidate_row()])
+    monkeypatch.setattr(route.admin_service, "generate_candidates_for_gaps", gen_mock)
+
+    resp = client.post("/api/v1/question-bank/candidates/generate", json={"limit": 3})
+
+    assert resp.status_code == 200
+    assert resp.json()[0]["question_text"] == "Yeni önerilen soru?"
+    gen_mock.assert_awaited_once_with(limit=3)
+
+
+def test_generate_candidates_rejects_out_of_range_limit(client):
+    resp = client.post("/api/v1/question-bank/candidates/generate", json={"limit": 100})
+    assert resp.status_code == 422
+
+
+def test_list_candidates_defaults_to_pending(client, monkeypatch):
+    list_mock = AsyncMock(return_value=[_candidate_row()])
+    monkeypatch.setattr(route.admin_service, "list_candidates", list_mock)
+
+    resp = client.get("/api/v1/question-bank/candidates")
+
+    assert resp.status_code == 200
+    list_mock.assert_awaited_once_with(status="pending")
+
+
+def test_approve_candidate_success(client, monkeypatch):
+    approve_mock = AsyncMock(return_value=_question_row(id="q-new", question_text="Yeni önerilen soru?"))
+    monkeypatch.setattr(route.admin_service, "approve_candidate", approve_mock)
+
+    resp = client.post("/api/v1/question-bank/candidates/c-1/approve")
+
+    assert resp.status_code == 200
+    assert resp.json()["question_text"] == "Yeni önerilen soru?"
+    approve_mock.assert_awaited_once_with("c-1")
+
+
+def test_approve_candidate_returns_404_when_not_found(client, monkeypatch):
+    monkeypatch.setattr(route.admin_service, "approve_candidate", AsyncMock(side_effect=ValueError("Öneri bulunamadı")))
+
+    resp = client.post("/api/v1/question-bank/candidates/does-not-exist/approve")
+
+    assert resp.status_code == 404
+
+
+def test_reject_candidate_success(client, monkeypatch):
+    reject_mock = AsyncMock(return_value=None)
+    monkeypatch.setattr(route.admin_service, "reject_candidate", reject_mock)
+
+    resp = client.post("/api/v1/question-bank/candidates/c-1/reject")
+
+    assert resp.status_code == 200
+    reject_mock.assert_awaited_once_with("c-1")

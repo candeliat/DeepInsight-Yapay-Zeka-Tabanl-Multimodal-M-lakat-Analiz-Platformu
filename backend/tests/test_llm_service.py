@@ -228,6 +228,55 @@ def test_deliver_bank_question_rejects_reasoning_leak_and_falls_back(monkeypatch
     assert svc.client.chat.completions.create.call_count == 2
 
 
+# --------------------------------------------------------------------------
+# generate_question_candidate — soru bankası boşlukları için öneri üretimi
+# --------------------------------------------------------------------------
+
+def test_generate_question_candidate_success():
+    svc = _service_with_mock_client()
+    svc.client.chat.completions.create.return_value = _fake_response(
+        "Python'da context manager nedir?", _fake_usage()
+    )
+
+    result = run(svc.generate_question_candidate("Backend Developer", "Python", "ORTA"))
+
+    assert result == "Python'da context manager nedir?"
+
+
+def test_generate_question_candidate_falls_back_on_rate_limit():
+    svc = _service_with_mock_client()
+    svc.client.chat.completions.create.side_effect = [
+        _api_error(RateLimitError, 429),
+        _fake_response("İkinci modelden gelen öneri.", _fake_usage()),
+    ]
+
+    result = run(svc.generate_question_candidate("Backend Developer", "Python", None))
+
+    assert result == "İkinci modelden gelen öneri."
+
+
+def test_generate_question_candidate_rejects_reasoning_leak(monkeypatch):
+    monkeypatch.setattr(llm_service_module.settings, "LLM_MAX_RESPONSE_CHARS", 50)
+    svc = _service_with_mock_client()
+    leaked_reasoning = "Okay, let's see. The user wants a new question. " * 5
+    svc.client.chat.completions.create.side_effect = [
+        _fake_response(leaked_reasoning, _fake_usage()),
+        _fake_response("Kısa öneri.", _fake_usage()),
+    ]
+
+    result = run(svc.generate_question_candidate("Backend Developer", "Python", "UZMAN"))
+
+    assert result == "Kısa öneri."
+
+
+def test_generate_question_candidate_raises_when_all_models_fail():
+    svc = _service_with_mock_client()
+    svc.client.chat.completions.create.side_effect = _api_error(RateLimitError, 429)
+
+    with pytest.raises(RuntimeError):
+        run(svc.generate_question_candidate("Backend Developer", "Python", None))
+
+
 def test_paid_models_excluded_by_default(monkeypatch):
     svc = _service_with_mock_client()
     assert set(svc._fallback_models()) == set(LLMService.FREE_MODELS)

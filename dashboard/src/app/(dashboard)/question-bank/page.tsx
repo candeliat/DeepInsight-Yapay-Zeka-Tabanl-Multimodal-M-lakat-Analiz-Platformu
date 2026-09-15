@@ -1,11 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, Check, X, AlertTriangle, Layers, Loader2, Database } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, X, AlertTriangle, Layers, Loader2, Database, Sparkles, ThumbsUp, ThumbsDown } from "lucide-react";
 import {
   questionBankService,
   QuestionBankItem,
   QuestionBankGapItem,
+  QuestionBankCandidateItem,
 } from "@/services/questionBankService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -22,8 +23,11 @@ const DIFFICULTY_TONE: Record<string, string> = {
 export default function QuestionBankPage() {
   const [questions, setQuestions] = useState<QuestionBankItem[]>([]);
   const [gaps, setGaps] = useState<QuestionBankGapItem[]>([]);
+  const [candidates, setCandidates] = useState<QuestionBankCandidateItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   // Yeni soru formu
   const [role, setRole] = useState("");
@@ -43,9 +47,14 @@ export default function QuestionBankPage() {
     setLoading(true);
     setLoadError(null);
     try {
-      const [q, g] = await Promise.all([questionBankService.listQuestions(), questionBankService.listGaps()]);
+      const [q, g, c] = await Promise.all([
+        questionBankService.listQuestions(),
+        questionBankService.listGaps(),
+        questionBankService.listCandidates(),
+      ]);
       setQuestions(q);
       setGaps(g);
+      setCandidates(c);
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : "Yüklenemedi.");
     } finally {
@@ -56,6 +65,42 @@ export default function QuestionBankPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const handleGenerateCandidates = async () => {
+    setGenerating(true);
+    try {
+      await questionBankService.generateCandidates(5);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Öneri üretilemedi.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleApproveCandidate = async (c: QuestionBankCandidateItem) => {
+    setReviewingId(c.id);
+    try {
+      await questionBankService.approveCandidate(c.id);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Onaylanamadı.");
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
+  const handleRejectCandidate = async (c: QuestionBankCandidateItem) => {
+    setReviewingId(c.id);
+    try {
+      await questionBankService.rejectCandidate(c.id);
+      await load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Reddedilemedi.");
+    } finally {
+      setReviewingId(null);
+    }
+  };
 
   const families = new Map<string, QuestionBankItem[]>();
   const standalone: QuestionBankItem[] = [];
@@ -289,9 +334,22 @@ export default function QuestionBankPage() {
       {/* Boşluklar */}
       {gaps.length > 0 && (
         <div className="bg-warning/5 border border-warning/20 rounded-2xl p-5 mb-8">
-          <h2 className="font-bold text-foreground text-sm mb-3 flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-warning" /> Boşluklar — bunlar için yeterli soru yok
-          </h2>
+          <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <h2 className="font-bold text-foreground text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-warning" /> Boşluklar — bunlar için yeterli soru yok
+            </h2>
+            <Button type="button" size="sm" variant="outline" onClick={handleGenerateCandidates} disabled={generating}>
+              {generating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Öneriler üretiliyor...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5" /> Bu boşluklar için soru öner
+                </>
+              )}
+            </Button>
+          </div>
           <div className="space-y-2">
             {gaps.slice(0, 8).map((g) => (
               <div key={g.id} className="flex items-center justify-between text-xs">
@@ -302,6 +360,55 @@ export default function QuestionBankPage() {
                 <span className="text-muted-foreground shrink-0 ml-3">{g.miss_count} kez görüldü</span>
               </div>
             ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-3">
+            Öneriler yapay zeka tarafından üretilir ama doğrudan bankaya eklenmez — aşağıda onaylamanız/reddetmeniz gerekir.
+          </p>
+        </div>
+      )}
+
+      {/* Onay Bekleyen Öneriler */}
+      {candidates.length > 0 && (
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl p-5 mb-8">
+          <h2 className="font-bold text-foreground text-sm mb-3 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-primary" /> Onay Bekleyen Öneriler ({candidates.length})
+          </h2>
+          <div className="space-y-3">
+            {candidates.map((c) => {
+              const isReviewing = reviewingId === c.id;
+              return (
+                <div key={c.id} className="bg-card border border-border rounded-xl p-4">
+                  <p className="text-sm text-foreground leading-relaxed">{c.question_text}</p>
+                  <div className="flex items-center justify-between mt-2.5 flex-wrap gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full text-muted-foreground bg-muted">
+                        {c.role} · {c.topic}
+                        {c.difficulty ? ` · ${c.difficulty}` : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => handleApproveCandidate(c)}
+                        disabled={isReviewing}
+                      >
+                        {isReviewing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ThumbsUp className="w-3.5 h-3.5" />} Onayla
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleRejectCandidate(c)}
+                        disabled={isReviewing}
+                      >
+                        <ThumbsDown className="w-3.5 h-3.5" /> Reddet
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

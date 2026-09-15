@@ -1,0 +1,42 @@
+[
+  {
+    "family": "python-concurrency",
+    "role": "Backend Developer",
+    "topic": "Python",
+    "tags": ["python", "concurrency", "family-demo"],
+    "variants": [
+      {
+        "difficulty": "JUNIOR",
+        "question_text": "Python'da threading modülünü kullanarak iki thread'i aynı anda çalıştırdığınızda, bu thread'ler gerçekten paralel mi çalışır, yoksa sırayla mı işletilir? Kısaca açıklar mısınız?"
+      },
+      {
+        "difficulty": "ORTA",
+        "question_text": "Python'da GIL (Global Interpreter Lock) tam olarak neyi kısıtlar ve bu kısıtlama CPU-bound ile I/O-bound işler için threading performansını nasıl farklı etkiler?"
+      },
+      {
+        "difficulty": "UZMAN",
+        "question_text": "GIL'in CPU-bound işlerde threading'i verimsiz kıldığını fark edip multiprocessing'e geçtiniz. Farklı süreçler arasında paylaşılan durumu yönetmek için hangi yaklaşımları (Queue, shared memory, lock-free tasarım) değerlendirir, hangi durumda hangisini tercih edersiniz?"
+      }
+    ]
+  },
+  {
+    "family": "react-render-performance",
+    "role": "Yazılım Mühendisi",
+    "topic": "React ve Modern Web Geliştirme",
+    "tags": ["react", "performans", "family-demo"],
+    "variants": [
+      {
+        "difficulty": "JUNIOR",
+        "question_text": "React'te bir component'in ne zaman yeniden render edildiğini (re-render) tetikleyen temel durumlar nelerdir?"
+      },
+      {
+        "difficulty": "ORTA",
+        "question_text": "React'te gereksiz yeniden render'ları önlemek için `useMemo`, `useCallback` ve `React.memo` gibi araçları nasıl ve ne zaman kullanırsınız?"
+      },
+      {
+        "difficulty": "UZMAN",
+        "question_text": "Yüzlerce bileşenli büyük bir React uygulamasında render performansını profillemek ve gereksiz re-render zincirlerini tespit etmek için nasıl bir yaklaşım izlersiniz?"
+      }
+    ]
+  }
+]

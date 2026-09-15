@@ -9,6 +9,10 @@ from app.services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
+# Aile zincirlerini zorluk sırasına göre dizmek için (bkz. _fetch_family_chain).
+# Tanınmayan/boş zorluk en kolay kabul edilir.
+_DIFFICULTY_RANK = {"JUNIOR": 0, "ORTA": 1, "UZMAN": 2}
+
 
 async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], size: int) -> List[Dict[str, Any]]:
     """
@@ -77,10 +81,11 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
         row for row in rows
         if row.get("similarity") is not None and row["similarity"] >= settings.QUESTION_BANK_MIN_SIMILARITY
     ]
-    selected_rows = _rank_with_exposure_penalty(relevant_rows)[:size]
+    ranked_rows = _rank_with_exposure_penalty(relevant_rows)
+    selected_rows = await _pack_pool_with_family_chains(ranked_rows, size)
 
     pool = [
-        {"id": row["id"], "question_text": row["question_text"], "similarity": row["similarity"]}
+        {"id": row["id"], "question_text": row["question_text"], "similarity": row.get("similarity")}
         for row in selected_rows
     ]
 
@@ -96,6 +101,83 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
         await _increment_times_served([row["id"] for row in selected_rows])
 
     return pool
+
+
+async def _pack_pool_with_family_chains(ranked_rows: List[Dict[str, Any]], size: int) -> List[Dict[str, Any]]:
+    """
+    Sıralanmış adaylardan `size` uzunluğunda nihai havuzu oluşturur. Bir aday
+    bir aileye (`family_id`) aitse ve o aile bu havuzda daha önce hiç
+    kullanılmadıysa, tek satır yerine o ailenin EŞLEŞEN zorluktan başlayıp
+    daha zoruna doğru giden TÜM varyantları ardışık slotlara paketlenir —
+    gerçek mülakatların "tek bir konuyu derinleştirme" desenini statik olarak
+    taklit eder (bkz. modül başındaki genel not). Aile üyesi olmayan adaylar
+    olduğu gibi eklenir.
+
+    Not: Bu fonksiyon `/start` sırasında TEK SEFERE çalışır — sonraki turlar
+    (`/chat`) yalnızca burada üretilen sabit listeyi index'e göre tüketir,
+    adayın cevap kalitesine göre gerçek zamanlı bir dallanma YAPMAZ (bkz.
+    proje notları: bu kasıtlı bir kapsam kararı, ek LLM çağrısı gerektirmez).
+    """
+    selected: List[Dict[str, Any]] = []
+    used_ids: set = set()
+    used_family_ids: set = set()
+
+    for row in ranked_rows:
+        if len(selected) >= size:
+            break
+        if row["id"] in used_ids:
+            continue
+
+        family_id = row.get("family_id")
+        if family_id and family_id not in used_family_ids:
+            used_family_ids.add(family_id)
+            chain = await _fetch_family_chain(family_id, start_difficulty=row.get("difficulty"))
+            if not chain:
+                # Zincir çekilemedi/boş döndü — en azından eşleşen tek soruyu kullan.
+                chain = [row]
+            for member in chain:
+                if len(selected) >= size or member["id"] in used_ids:
+                    continue
+                selected.append(member)
+                used_ids.add(member["id"])
+        else:
+            selected.append(row)
+            used_ids.add(row["id"])
+
+    return selected
+
+
+async def _fetch_family_chain(family_id: str, start_difficulty: Optional[str]) -> List[Dict[str, Any]]:
+    """
+    Bir ailenin, verilen başlangıç zorluğundan (dahil) daha zor ya da eşit
+    olan varyantlarını zorluk ARTAN sırada döner. Embedding sıralamasından
+    gelmediği için bu satırların `similarity` alanı yoktur (havuz sözlüğünde
+    None olarak görünür — yalnızca bilgilendirme amaçlı, akışı etkilemez).
+
+    Best-effort: hata/boş sonuç durumunda boş liste döner — çağıran taraf
+    bu durumda eşleşen tek soruya geri düşer (bkz. _pack_pool_with_family_chains).
+    """
+    if not supabase:
+        return []
+    try:
+        result = (
+            supabase.table("question_bank")
+            .select("id, question_text, difficulty")
+            .eq("family_id", family_id)
+            .eq("is_active", True)
+            .execute()
+        )
+    except Exception:
+        logger.warning("[question_bank_service] Aile zinciri çekilemedi (family_id=%s).", family_id, exc_info=True)
+        return []
+
+    rows = result.data or []
+    start_rank = _DIFFICULTY_RANK.get(start_difficulty, 0)
+    chain = [row for row in rows if _DIFFICULTY_RANK.get(row.get("difficulty"), 0) >= start_rank]
+    chain.sort(key=lambda row: _DIFFICULTY_RANK.get(row.get("difficulty"), 0))
+    for row in chain:
+        row["similarity"] = None
+    return chain
 
 
 def _rank_with_exposure_penalty(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

@@ -32,20 +32,24 @@ class _FakeResult:
         self.data = data
 
 
-def _row(id_, similarity, times_served=0, role="Backend Developer", topic="Python", difficulty="ORTA"):
+def _row(id_, similarity, times_served=0, role="Backend Developer", topic="Python", difficulty="ORTA", family_id=None):
     return {
         "id": id_, "question_text": f"Soru {id_}", "role": role, "topic": topic,
         "difficulty": difficulty, "times_served": times_served, "similarity": similarity,
+        "family_id": family_id,
     }
 
 
-def _fake_supabase(match_rows, gap_existing_row=None):
+def _fake_supabase(match_rows, gap_existing_row=None, family_chains=None):
     """
     `.rpc("match_questions", ...)` -> match_rows
     `.rpc("increment_times_served", ...)` -> no-op (sonuç kullanılmıyor)
     `.table("question_bank_gaps")` -> basit bir select/insert/update zinciri;
       `gap_existing_row` verilirse select bunu döndürür (upsert'in "güncelle"
       koluna girer), yoksa boş döner (insert koluna girer).
+    `.table("question_bank")` (yalnızca aile zinciri lookup'ı için, bkz.
+      _fetch_family_chain) -> `.eq("family_id", X)` çağrılan family_id'ye göre
+      `family_chains[X]` döner (verilmemişse boş liste).
     """
     fake = MagicMock()
 
@@ -70,9 +74,32 @@ def _fake_supabase(match_rows, gap_existing_row=None):
     gaps_table.insert.return_value.execute.return_value = _FakeResult([{"id": "new-gap"}])
     gaps_table.update.return_value.eq.return_value.execute.return_value = _FakeResult([{"id": "existing-gap"}])
 
+    chains = family_chains or {}
+
+    def _question_bank_select(*_args, **_kwargs):
+        chain_builder = MagicMock()
+        state = {"family_id": None}
+
+        def _eq(field, value):
+            if field == "family_id":
+                state["family_id"] = value
+            return chain_builder
+
+        def _execute():
+            return _FakeResult(list(chains.get(state["family_id"], [])))
+
+        chain_builder.eq.side_effect = _eq
+        chain_builder.execute.side_effect = _execute
+        return chain_builder
+
+    question_bank_table = MagicMock()
+    question_bank_table.select.side_effect = _question_bank_select
+
     def _table(name):
         if name == "question_bank_gaps":
             return gaps_table
+        if name == "question_bank":
+            return question_bank_table
         raise AssertionError(f"Beklenmeyen table() çağrısı: {name}")
 
     fake.table.side_effect = _table
@@ -294,3 +321,84 @@ def test_fetch_question_pool_survives_when_gap_logging_fails(monkeypatch):
     pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=3))
 
     assert pool == [{"id": "q1", "question_text": "Soru q1", "similarity": 0.8}]
+
+
+# --------------------------------------------------------------------------
+# Soru aileleri (zorluk-artan zincir paketleme)
+# --------------------------------------------------------------------------
+
+def test_fetch_question_pool_expands_family_into_escalating_chain(monkeypatch):
+    """
+    En iyi eşleşme bir ailenin ORTA varyantıysa, havuz o aileden ORTA ve
+    UZMAN varyantlarını (JUNIOR HARİÇ — eşleşen zorluktan daha kolay) zorluk
+    artan sırada ardışık paketlemeli, kalan slot(lar) aile-dışı adaylarla
+    doldurulmalı.
+    """
+    monkeypatch.setattr(question_bank_service.settings, "QUESTION_BANK_MIN_SIMILARITY", 0.1)
+    monkeypatch.setattr(llm_service, "embed_text", AsyncMock(return_value=[0.1, 0.2, 0.3]))
+
+    fake_supabase = _fake_supabase(
+        [
+            _row("fam-orta", 0.8, difficulty="ORTA", family_id="fam-1"),
+            _row("other", 0.5, family_id=None),
+        ],
+        family_chains={
+            "fam-1": [
+                {"id": "fam-junior", "question_text": "Junior varyant", "difficulty": "JUNIOR"},
+                {"id": "fam-orta", "question_text": "Orta varyant", "difficulty": "ORTA"},
+                {"id": "fam-uzman", "question_text": "Uzman varyant", "difficulty": "UZMAN"},
+            ]
+        },
+    )
+    monkeypatch.setattr(question_bank_service, "supabase", fake_supabase)
+
+    pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=3))
+
+    ids = [p["id"] for p in pool]
+    assert ids == ["fam-orta", "fam-uzman", "other"]
+    assert "fam-junior" not in ids  # eşleşen zorluktan daha kolay -> paketlenmemeli
+    assert pool[0]["question_text"] == "Orta varyant"
+    assert pool[1]["question_text"] == "Uzman varyant"
+
+
+def test_fetch_question_pool_falls_back_to_single_row_when_family_chain_lookup_empty(monkeypatch):
+    """Aile zinciri çekilemez/boş dönerse (RPC/tablo hatası, ya da satır
+    yalnız kalmışsa), en azından eşleşen tek soru havuzda kalmalı — mülakat
+    kesintiye uğramamalı."""
+    monkeypatch.setattr(question_bank_service.settings, "QUESTION_BANK_MIN_SIMILARITY", 0.1)
+    monkeypatch.setattr(llm_service, "embed_text", AsyncMock(return_value=[0.1, 0.2, 0.3]))
+
+    fake_supabase = _fake_supabase([_row("fam-x", 0.8, family_id="orphan-family")], family_chains={})
+    monkeypatch.setattr(question_bank_service, "supabase", fake_supabase)
+
+    pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=3))
+
+    assert pool == [{"id": "fam-x", "question_text": "Soru fam-x", "similarity": 0.8}]
+
+
+def test_fetch_question_pool_expands_same_family_only_once(monkeypatch):
+    """İki farklı sıralanmış aday aynı aileye aitse, aile zinciri yalnızca
+    İLK karşılaşmada bir kez çekilmeli — ikinci aday zaten `used_ids`
+    içinde bulunup atlanmalı, tekrar bir table() sorgusu tetiklenmemeli."""
+    monkeypatch.setattr(question_bank_service.settings, "QUESTION_BANK_MIN_SIMILARITY", 0.1)
+    monkeypatch.setattr(llm_service, "embed_text", AsyncMock(return_value=[0.1, 0.2, 0.3]))
+
+    fake_supabase = _fake_supabase(
+        [
+            _row("fam-a", 0.9, difficulty="ORTA", family_id="fam-1"),
+            _row("fam-b", 0.85, difficulty="ORTA", family_id="fam-1"),
+        ],
+        family_chains={
+            "fam-1": [
+                {"id": "fam-a", "question_text": "A", "difficulty": "ORTA"},
+                {"id": "fam-b", "question_text": "B", "difficulty": "ORTA"},
+            ]
+        },
+    )
+    monkeypatch.setattr(question_bank_service, "supabase", fake_supabase)
+
+    pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=5))
+
+    assert sorted(p["id"] for p in pool) == ["fam-a", "fam-b"]
+    question_bank_table = fake_supabase.table("question_bank")
+    assert question_bank_table.select.call_count == 1

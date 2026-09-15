@@ -70,6 +70,16 @@ class Settings:
     # Banka büyüdükçe (her konu için daha fazla/çeşitli soru) içi-benzerlik artar,
     # bu değer zamanla artırılabilir.
     QUESTION_BANK_MIN_SIMILARITY: float = float(os.getenv("QUESTION_BANK_MIN_SIMILARITY", "0.22"))
+    # Exposure control: sık seçilmiş sorular benzerlik sıralamasında hafifçe
+    # cezalandırılır (adjusted = similarity - PENALTY * log1p(times_served)) —
+    # amaç, banka küçükken bile aynı popüler sorunun her mülakatta tekrar
+    # tekrar seçilmesini engellemek (bkz. CAT sistemlerindeki "item exposure
+    # control" prensibi, proje notları).
+    QUESTION_BANK_EXPOSURE_PENALTY: float = float(os.getenv("QUESTION_BANK_EXPOSURE_PENALTY", "0.03"))
+    # Yeniden sıralama için gerekenden fazla aday çekilir (size * bu çarpan,
+    # en fazla 30) — yoksa exposure penalty'nin seçebileceği bir "ikinci en
+    # iyi" aday havuzu olmaz.
+    QUESTION_BANK_CANDIDATE_POOL_MULTIPLIER: int = int(os.getenv("QUESTION_BANK_CANDIDATE_POOL_MULTIPLIER", "4"))
 
 settings = Settings()
 

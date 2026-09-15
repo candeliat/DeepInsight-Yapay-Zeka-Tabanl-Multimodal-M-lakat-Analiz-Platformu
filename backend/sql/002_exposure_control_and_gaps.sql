@@ -12,8 +12,12 @@
 alter table question_bank
   add column if not exists times_served int not null default 0;
 
--- match_questions RPC'sinin times_served'i de döndürmesi gerekiyor —
--- fonksiyonu bu ek kolonla yeniden tanımlıyoruz (create or replace güvenli).
+-- match_questions RPC'sinin times_served'i de döndürmesi gerekiyor.
+-- Postgres, dönüş tipini (OUT parametrelerini) değiştiren bir fonksiyonu
+-- CREATE OR REPLACE ile güncellemeye izin vermiyor ("cannot change return
+-- type of existing function") — bu yüzden önce eski imzayla DROP ediliyor.
+drop function if exists match_questions(vector, text, integer);
+
 create or replace function match_questions(
   query_embedding vector(2048),
   filter_difficulty text default null,

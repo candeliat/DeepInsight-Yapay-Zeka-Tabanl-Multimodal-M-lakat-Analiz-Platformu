@@ -14,6 +14,7 @@ interface InterviewState {
   interviewId: string | null;
   role: string;
   topic: string;
+  difficulty: string | null;
   currentQuestion: string;
   evaluation: EvaluationData | null;
   
@@ -23,7 +24,7 @@ interface InterviewState {
   isThinking: boolean;
   
   // Aksiyonlar
-  setRoleTopic: (role: string, topic: string) => void;
+  setRoleTopic: (role: string, topic: string, difficulty?: string | null) => void;
   startInterview: () => Promise<void>;
   sendMessage: (message: string) => Promise<boolean>; // Bitti mi (true/false) döner
   /** `sendMessage` ile aynı sözleşme, ama soruyu token-token akıtır (currentQuestion
@@ -44,22 +45,24 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   interviewId: null,
   role: 'Yazılım Mühendisi',
   topic: 'Genel',
+  difficulty: null,
   currentQuestion: '',
   evaluation: null,
-  
+
   micOn: true,
   cameraOn: true,
   isThinking: false,
 
-  setRoleTopic: (role, topic) => set({ role, topic }),
+  setRoleTopic: (role, topic, difficulty = null) => set({ role, topic, difficulty }),
 
   startInterview: async () => {
     set({ isThinking: true, evaluation: null });
     try {
-      const { role, topic } = get();
+      const { role, topic, difficulty } = get();
       const response = await api.post('/api/v1/interview/start', {
         role,
-        topic
+        topic,
+        difficulty: difficulty ?? undefined,
       });
       
       set({ 

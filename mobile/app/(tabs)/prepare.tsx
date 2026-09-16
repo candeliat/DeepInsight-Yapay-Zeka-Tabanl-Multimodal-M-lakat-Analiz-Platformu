@@ -44,7 +44,8 @@ export default function PrepareScreen() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [micPermission, requestMicPermission] = useMicrophonePermissions();
 
-  const [selectedTopic, setSelectedTopic] = useState('Yazılım Mühendisi');
+  const [selectedRole, setSelectedRole] = useState('Yazılım Mühendisi');
+  const [selectedTopic, setSelectedTopic] = useState('React ve Modern Web Geliştirme');
   const [selectedDifficulty, setSelectedDifficulty] = useState(DIFFICULTIES[1]);
 
   const { setRoleTopic, startInterview, isThinking } = useInterviewStore();
@@ -76,9 +77,11 @@ export default function PrepareScreen() {
     }
 
     try {
-      const role = selectedTopic;
-      const topic = selectedDifficulty.label;
-      setRoleTopic(role, topic);
+      // NOT: Önceden zorluk seviyesi yanlışlıkla `topic` alanına, tek metin
+      // girişi ise `role` alanına gönderiliyordu (gerçek bir konu alanı hiç
+      // yoktu) — backend'in artık gerçek bir `difficulty` alanı olduğu
+      // (bkz. dashboard'daki aynı düzeltme) için burada da düzeltildi.
+      setRoleTopic(selectedRole, selectedTopic, selectedDifficulty.label);
       await startInterview();
       router.push('/interview-room');
     } catch (e) {
@@ -195,13 +198,22 @@ export default function PrepareScreen() {
         <View style={styles.setupCard}>
           <Text style={styles.cardTitle}>Kurulum Detayları</Text>
 
-          {/* Mülakat Konusu / Hedef Rol */}
+          {/* Hedef Rol */}
           <CustomInput
-            label="MÜLAKAT KONUSU / HEDEF ROL"
+            label="HEDEF ROL / POZİSYON"
             placeholder="Örn: Yazılım Mühendisi"
+            value={selectedRole}
+            onChangeText={setSelectedRole}
+            iconName="briefcase-outline"
+          />
+
+          {/* Mülakat Konusu */}
+          <CustomInput
+            label="MÜLAKAT KONUSU"
+            placeholder="Örn: React ve Modern Web Geliştirme"
             value={selectedTopic}
             onChangeText={setSelectedTopic}
-            iconName="briefcase-outline"
+            iconName="book-outline"
           />
 
           {/* Zorluk Seviyesi */}
@@ -232,7 +244,7 @@ export default function PrepareScreen() {
           <View style={styles.aiInfoBox}>
             <Ionicons name="information-circle-outline" size={18} color={Colors.secondary} />
             <Text style={styles.aiInfoText}>
-              YZ, {selectedTopic || 'seçilen alan'} müfredatına özel 12 soru üretecek.
+              YZ, {selectedRole || 'seçilen rol'} pozisyonu için {selectedTopic || 'seçilen konu'} üzerine {selectedDifficulty.label.toLowerCase()} seviyesinde sorular soracak.
             </Text>
           </View>
         </View>

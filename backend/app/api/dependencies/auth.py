@@ -28,9 +28,10 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
                 id=user.id,
                 email=user.email,
                 created_at=str(user.created_at),
-                user_metadata=user.user_metadata or {}
+                user_metadata=user.user_metadata or {},
+                app_metadata=user.app_metadata or {}
             )
-            
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials"
@@ -41,3 +42,18 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
             detail=f"Could not validate credentials: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def require_admin(current_user: UserProfile = Depends(get_current_user)) -> UserProfile:
+    """
+    get_current_user'ın üzerine kurulu: kullanıcının app_metadata.role'ü
+    'admin' değilse 403 döner. app_metadata yalnızca service_role ile
+    (backend tarafından) yazılabildiği için — user_metadata'nın aksine —
+    yetkilendirme için güvenilir bir alan.
+    """
+    if current_user.app_metadata.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bu işlem için yönetici yetkisi gereklidir."
+        )
+    return current_user

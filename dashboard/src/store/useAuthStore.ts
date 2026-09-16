@@ -11,6 +11,10 @@ interface UserProfile {
     last_name?: string;
     [key: string]: any;
   };
+  app_metadata: {
+    role?: string;
+    [key: string]: any;
+  };
 }
 
 interface AuthState {

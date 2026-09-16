@@ -10,14 +10,19 @@ const candidateLinks = [
   { href: "/interviews", label: "Mülakatlarım", icon: Video },
   { href: "/chat", label: "AI Danışman", icon: MessageSquare },
   { href: "/chat/text", label: "Yazılı Mülakat", icon: MessageCircle },
-  { href: "/question-bank", label: "Soru Bankası", icon: Database },
   { href: "/profile", label: "Profil", icon: User },
+];
+
+const adminLinks = [
+  { href: "/question-bank", label: "Soru Bankası", icon: Database },
 ];
 
 export default function Sidebar() {
   const { user } = useAuthStore();
   const pathname = usePathname();
   const displayName = user?.user_metadata?.first_name || "Aday";
+  const isAdmin = user?.app_metadata?.role === "admin";
+  const links = isAdmin ? [...candidateLinks, ...adminLinks] : candidateLinks;
 
   return (
     <aside className="w-64 bg-card border-r border-border h-screen flex flex-col">
@@ -36,7 +41,7 @@ export default function Sidebar() {
             {displayName} Paneli
           </p>
           <div className="space-y-1">
-            {candidateLinks.map((link) => {
+            {links.map((link) => {
               const Icon = link.icon;
               const isActive = pathname === link.href;
               return (

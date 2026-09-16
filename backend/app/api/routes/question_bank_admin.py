@@ -3,7 +3,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.api.dependencies.auth import get_current_user, oauth2_scheme
+from app.api.dependencies.auth import oauth2_scheme, require_admin
 from app.api.schemas.question_bank_admin import (
     GenerateCandidatesRequest,
     QuestionBankCandidateItem,
@@ -18,17 +18,11 @@ from app.services import question_bank_admin_service as admin_service
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-# NOT: Uygulamada henüz bir rol/admin sistemi yok — bu uç noktalar (diğer
-# tüm uç noktalar gibi) yalnızca "giriş yapmış kullanıcı" ile korunuyor,
-# ayrı bir yetki katmanı yok. Bu, DeepInsight'ı yöneten küçük bir ekip için
-# kabul edilebilir; gerçek çok kullanıcılı bir ortamda burası bir admin
-# rolüyle daha sıkı kısıtlanmalıdır.
-
 
 @router.get("/questions", response_model=List[QuestionBankItem])
 async def list_questions(
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     return await admin_service.list_questions()
 
@@ -37,7 +31,7 @@ async def list_questions(
 async def create_question(
     payload: QuestionBankCreate,
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     try:
         return await admin_service.create_question(
@@ -61,7 +55,7 @@ async def update_question(
     question_id: str,
     payload: QuestionBankUpdate,
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     try:
         return await admin_service.update_question(question_id, payload.model_dump())
@@ -75,7 +69,7 @@ async def update_question(
 async def delete_question(
     question_id: str,
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     try:
         await admin_service.delete_question(question_id)
@@ -87,7 +81,7 @@ async def delete_question(
 @router.get("/gaps", response_model=List[QuestionBankGapItem])
 async def list_gaps(
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     return await admin_service.list_gaps()
 
@@ -96,7 +90,7 @@ async def list_gaps(
 async def generate_candidates(
     payload: GenerateCandidatesRequest,
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     """En çok görülen boşluklar için LLM'den birer soru ÖNERİSİ üretir —
     öneriler doğrudan bankaya eklenmez, 'pending' kuyruğa düşer."""
@@ -107,7 +101,7 @@ async def generate_candidates(
 async def list_candidates(
     status: str = "pending",
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     return await admin_service.list_candidates(status=status)
 
@@ -116,7 +110,7 @@ async def list_candidates(
 async def approve_candidate(
     candidate_id: str,
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     try:
         return await admin_service.approve_candidate(candidate_id)
@@ -130,7 +124,7 @@ async def approve_candidate(
 async def reject_candidate(
     candidate_id: str,
     token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user),
+    current_user: UserProfile = Depends(require_admin),
 ):
     try:
         await admin_service.reject_candidate(candidate_id)

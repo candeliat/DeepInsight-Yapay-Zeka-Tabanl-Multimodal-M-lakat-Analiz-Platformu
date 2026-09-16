@@ -23,3 +23,4 @@ class UserProfile(BaseModel):
     email: str
     created_at: str
     user_metadata: Dict[str, Any]
+    app_metadata: Dict[str, Any] = {}

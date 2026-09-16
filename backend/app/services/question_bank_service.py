@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import math
 from datetime import datetime, timezone
@@ -6,6 +7,7 @@ from typing import Any, Dict, List, Optional
 from app.core.config import settings
 from app.core.database import supabase
 from app.services.llm_service import llm_service
+from app.services.local_embedding_service import embed_text_local
 
 logger = logging.getLogger(__name__)
 
@@ -46,14 +48,23 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
     # benzerlik aranır (bkz. sql/001_question_bank.sql'deki match_questions).
     query_text = f"{role} pozisyonu için {topic} konusunda teknik mülakat sorusu"
 
+    rpc_name = "match_questions"
     try:
         query_embedding = await llm_service.embed_text(query_text, input_type="query")
     except Exception:
         logger.warning(
-            "[question_bank_service] Embedding alınamadı (role=%s, topic=%s) — banka bu mülakat için atlanıyor.",
+            "[question_bank_service] API embedding alınamadı (role=%s, topic=%s) — yerel modele düşülüyor.",
             role, topic, exc_info=True,
         )
-        return []
+        try:
+            query_embedding = await asyncio.to_thread(embed_text_local, query_text)
+            rpc_name = "match_questions_local"
+        except Exception:
+            logger.warning(
+                "[question_bank_service] Yerel embedding fallback de başarısız (role=%s, topic=%s) — banka bu mülakat için atlanıyor.",
+                role, topic, exc_info=True,
+            )
+            return []
 
     # Exposure-control ile yeniden sıralayabilmek için `size`'dan daha fazla
     # aday çekilir — yoksa cezalandırılan bir sorunun yerini alacak "ikinci
@@ -62,7 +73,7 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
 
     try:
         result = supabase.rpc(
-            "match_questions",
+            rpc_name,
             {
                 "query_embedding": query_embedding,
                 "filter_difficulty": difficulty,
@@ -71,8 +82,8 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
         ).execute()
     except Exception:
         logger.warning(
-            "[question_bank_service] match_questions RPC başarısız (role=%s, topic=%s) — banka bu mülakat için atlanıyor.",
-            role, topic, exc_info=True,
+            "[question_bank_service] %s RPC başarısız (role=%s, topic=%s) — banka bu mülakat için atlanıyor.",
+            rpc_name, role, topic, exc_info=True,
         )
         return []
 

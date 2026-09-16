@@ -14,3 +14,4 @@ numpy
 opencv-python-headless
 soundfile
 imageio-ffmpeg
+sentence-transformers

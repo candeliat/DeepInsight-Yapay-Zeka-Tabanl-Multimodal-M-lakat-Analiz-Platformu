@@ -12,17 +12,21 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.api.dependencies.auth import get_current_user, oauth2_scheme
+from app.api.dependencies.auth import get_current_user, oauth2_scheme, require_admin
 from app.api.schemas.user import UserProfile
 import app.api.routes.question_bank_admin as route
 
-FAKE_USER = UserProfile(id="user-1", email="aday@example.com", created_at="2026-01-01T00:00:00Z", user_metadata={})
+FAKE_ADMIN = UserProfile(
+    id="user-1", email="admin@example.com", created_at="2026-01-01T00:00:00Z",
+    user_metadata={}, app_metadata={"role": "admin"},
+)
 
 
 @pytest.fixture
 def client():
     app.dependency_overrides[oauth2_scheme] = lambda: "fake-token"
-    app.dependency_overrides[get_current_user] = lambda: FAKE_USER
+    app.dependency_overrides[get_current_user] = lambda: FAKE_ADMIN
+    app.dependency_overrides[require_admin] = lambda: FAKE_ADMIN
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
@@ -36,6 +40,21 @@ def _question_row(**overrides):
     }
     base.update(overrides)
     return base
+
+
+def test_list_questions_rejects_non_admin():
+    non_admin = UserProfile(
+        id="user-2", email="aday@example.com", created_at="2026-01-01T00:00:00Z",
+        user_metadata={}, app_metadata={},
+    )
+    app.dependency_overrides[oauth2_scheme] = lambda: "fake-token"
+    app.dependency_overrides[get_current_user] = lambda: non_admin
+    try:
+        with TestClient(app) as c:
+            resp = c.get("/api/v1/question-bank/questions")
+        assert resp.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_list_questions_returns_service_result(client, monkeypatch):

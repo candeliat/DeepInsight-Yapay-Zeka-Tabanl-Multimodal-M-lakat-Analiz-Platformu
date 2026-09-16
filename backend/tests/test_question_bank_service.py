@@ -55,7 +55,7 @@ def _fake_supabase(match_rows, gap_existing_row=None, family_chains=None):
 
     def _rpc(name, params=None, **kwargs):
         m = MagicMock()
-        if name == "match_questions":
+        if name in ("match_questions", "match_questions_local"):
             m.execute.return_value = _FakeResult(match_rows)
         elif name == "increment_times_served":
             m.execute.return_value = _FakeResult(None)
@@ -150,8 +150,9 @@ def test_fetch_question_pool_drops_rows_below_threshold(monkeypatch):
     assert pool[0]["id"] == "q1"
 
 
-def test_fetch_question_pool_returns_empty_when_embedding_fails(monkeypatch):
+def test_fetch_question_pool_returns_empty_when_embedding_and_local_fallback_both_fail(monkeypatch):
     monkeypatch.setattr(llm_service, "embed_text", AsyncMock(side_effect=RuntimeError("AI servisi ile iletişim kurulamadı.")))
+    monkeypatch.setattr(question_bank_service, "embed_text_local", MagicMock(side_effect=RuntimeError("yerel model yüklenemedi")))
     fake_supabase = _fake_supabase([])
     monkeypatch.setattr(question_bank_service, "supabase", fake_supabase)
 
@@ -159,6 +160,21 @@ def test_fetch_question_pool_returns_empty_when_embedding_fails(monkeypatch):
 
     assert pool == []
     fake_supabase.rpc.assert_not_called()
+
+
+def test_fetch_question_pool_falls_back_to_local_embedding_when_api_fails(monkeypatch):
+    monkeypatch.setattr(question_bank_service.settings, "QUESTION_BANK_MIN_SIMILARITY", 0.1)
+    monkeypatch.setattr(llm_service, "embed_text", AsyncMock(side_effect=RuntimeError("AI servisi ile iletişim kurulamadı.")))
+    monkeypatch.setattr(question_bank_service, "embed_text_local", MagicMock(return_value=[0.1, 0.2, 0.3]))
+
+    fake_supabase = _fake_supabase([_row("q1", 0.8)])
+    monkeypatch.setattr(question_bank_service, "supabase", fake_supabase)
+
+    pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=5))
+
+    assert pool == [{"id": "q1", "question_text": "Soru q1", "similarity": 0.8}]
+    match_calls = _rpc_calls_named(fake_supabase, "match_questions_local")
+    assert len(match_calls) == 1
 
 
 def test_fetch_question_pool_returns_empty_when_rpc_fails(monkeypatch):

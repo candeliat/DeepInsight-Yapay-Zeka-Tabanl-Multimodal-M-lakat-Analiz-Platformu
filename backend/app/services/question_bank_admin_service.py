@@ -8,6 +8,7 @@ Amaç: soru eklemek/düzenlemek için artık Supabase SQL Editor'e girip elle
 INSERT yazmaya ya da seed script'i çalıştırmaya gerek kalmasın — embedding
 otomatik olarak burada hesaplanır.
 """
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -15,6 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from app.core.database import supabase
 from app.services.llm_service import llm_service
+from app.services.local_embedding_service import embed_text_local
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,26 @@ _SELECT_COLUMNS = "id, role, topic, difficulty, question_text, tags, family_id, 
 def _strip_embedding(row: Dict[str, Any]) -> Dict[str, Any]:
     row = dict(row)
     row.pop("embedding", None)
+    row.pop("embedding_local", None)
     return row
+
+
+async def _embed_local_best_effort(question_text: str) -> Optional[List[float]]:
+    """
+    Yerel fallback embedding'i hesaplar (bkz. local_embedding_service.py).
+    Best-effort: model henüz yüklenmemiş/kurulmamışsa ya da hata verirse
+    None döner — asıl yazma işlemini (API embedding'iyle) ASLA engellemez,
+    yalnızca o satır için `embedding_local` boş kalır (sonradan backfill
+    script'iyle doldurulabilir, bkz. scripts/backfill_local_embeddings.py).
+    """
+    try:
+        return await asyncio.to_thread(embed_text_local, question_text, "passage")
+    except Exception:
+        logger.warning(
+            "[question_bank_admin_service] Yerel embedding hesaplanamadı — embedding_local boş bırakılıyor.",
+            exc_info=True,
+        )
+        return None
 
 
 async def list_questions() -> List[Dict[str, Any]]:
@@ -56,6 +77,10 @@ async def create_question(
     # "passage" — bankaya kaydedilen soru metni olarak encode edilir (arama
     # sorgusu değil), bkz. llm_service.embed_text ve question_bank_service.py.
     embedding = await llm_service.embed_text(question_text, input_type="passage")
+    # Yerel fallback embedding'i HER yazımda hesaplanır (lazy değil) ki
+    # embedding_local her zaman API'nin ulaşılamadığı bir anda gerçek bir
+    # fallback olarak hazır olsun (bkz. question_bank_service.fetch_question_pool).
+    embedding_local = await _embed_local_best_effort(question_text)
 
     record = {
         "role": role,
@@ -65,6 +90,7 @@ async def create_question(
         "tags": tags,
         "family_id": resolved_family_id,
         "embedding": embedding,
+        "embedding_local": embedding_local,
     }
     result = supabase.table("question_bank").insert(record).execute()
     if not result.data:
@@ -85,6 +111,11 @@ async def update_question(question_id: str, updates: Dict[str, Any]) -> Dict[str
 
     if "question_text" in record:
         record["embedding"] = await llm_service.embed_text(record["question_text"], input_type="passage")
+        # Yerel embedding'i de tazele — best-effort: başarısız olursa mevcut
+        # embedding_local değerine dokunulmaz (None ile üzerine yazılmaz).
+        embedding_local = await _embed_local_best_effort(record["question_text"])
+        if embedding_local is not None:
+            record["embedding_local"] = embedding_local
 
     result = supabase.table("question_bank").update(record).eq("id", question_id).execute()
     if not result.data:

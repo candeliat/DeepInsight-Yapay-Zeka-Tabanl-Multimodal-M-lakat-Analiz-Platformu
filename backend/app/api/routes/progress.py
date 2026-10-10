@@ -25,7 +25,8 @@ async def my_progress(
 ):
     """Tamamlanmış mülakatlardan zaman serisi, eğilim, konu bazında performans ve öneriler."""
     try:
-        return await asyncio.to_thread(progress_service.get_user_progress, current_user.id)
+        # Supabase çağrıları to_thread'siz: paylaşılan istemci iş parçacıkları arasında güvenli değil.
+        return progress_service.get_user_progress(current_user.id)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
 
@@ -37,7 +38,8 @@ async def my_progress_report(
 ):
     """Gelişim raporunun PDF'i (2 sayfa: özet + eğilim grafiği + öneriler, konu tablosu + geçmiş)."""
     try:
-        progress = await asyncio.to_thread(progress_service.get_user_progress, current_user.id)
+        progress = progress_service.get_user_progress(current_user.id)
+        # PDF üretimi CPU işi ve veritabanına dokunmaz; iş parçacığında güvenle çalışır.
         pdf = await asyncio.to_thread(progress_report.build_progress_pdf, progress, _display_name(current_user))
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))

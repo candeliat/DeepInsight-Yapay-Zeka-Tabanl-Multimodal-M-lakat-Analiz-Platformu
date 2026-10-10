@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from typing import List
 
@@ -84,10 +83,10 @@ async def list_members(
 ):
     """Üyeler + kurum bağlamındaki katılımları. Skor yalnızca öğrenci paylaşım rızası verdiyse döner."""
     memberships = await org_service.list_members(org_id)
-    data = await asyncio.to_thread(progress_service.fetch_org_data, org_id)
-    identities = {
-        str(m["user_id"]): await asyncio.to_thread(insights.get_identity, str(m["user_id"])) for m in memberships
-    }
+    # Supabase istemcisi (paylaşılan HTTP/2 bağlantısı) iş parçacıkları arasında eşzamanlı
+    # kullanılınca bağlantı kopuyor (RemoteProtocolError) — çağrılar to_thread'siz yapılır.
+    data = progress_service.fetch_org_data(org_id)
+    identities = {str(m["user_id"]): insights.get_identity(str(m["user_id"])) for m in memberships}
     return insights.build_member_rows(memberships, data, identities)
 
 
@@ -102,7 +101,7 @@ async def org_overview(
     if not org:
         raise HTTPException(status_code=404, detail="Kurum bulunamadı")
     memberships = await org_service.list_members(org_id)
-    data = await asyncio.to_thread(progress_service.fetch_org_data, org_id)
+    data = progress_service.fetch_org_data(org_id)
     return insights.build_overview(org, memberships, data)
 
 
@@ -115,7 +114,7 @@ async def member_progress(
 ):
     """Bir öğrencinin kurum içindeki ilerlemesi — yalnızca öğrenci paylaşım rızası verdiyse."""
     memberships = await org_service.list_members(org_id)
-    data = await asyncio.to_thread(progress_service.fetch_org_data, org_id)
+    data = progress_service.fetch_org_data(org_id)
     try:
         progress = insights.member_progress(memberships, user_id, data)
     except ValueError as e:

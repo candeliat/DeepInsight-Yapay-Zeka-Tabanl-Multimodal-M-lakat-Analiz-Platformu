@@ -32,15 +32,28 @@ def _parse(iso: Optional[str]) -> Optional[datetime]:
         return None
 
 
+_IDENTITY_TTL = timedelta(minutes=5)
+_identity_cache: Dict[str, Any] = {}
+
+
 def get_identity(user_id: str) -> Dict[str, Optional[str]]:
-    """Üyenin e-posta ve adını Supabase Auth'tan okur (yalnızca kurum yöneticisi/eğitmen görür)."""
+    """
+    Üyenin e-posta ve adını Supabase Auth'tan okur (yalnızca kurum yöneticisi/eğitmen görür).
+    Üye başına ayrı bir Auth isteği gerektiği için 5 dakika süreç içinde önbelleğe alınır.
+    """
+    now = datetime.now(timezone.utc)
+    cached = _identity_cache.get(user_id)
+    if cached and cached[0] > now:
+        return cached[1]
     try:
         user = supabase.auth.admin.get_user_by_id(user_id).user
     except Exception:
-        return {"email": None, "name": None}
+        return {"email": None, "name": None}  # hata önbelleğe alınmaz
     meta = user.user_metadata or {}
     name = " ".join(p for p in (meta.get("first_name"), meta.get("last_name")) if p) or None
-    return {"email": user.email, "name": name}
+    identity = {"email": user.email, "name": name}
+    _identity_cache[user_id] = (now + _IDENTITY_TTL, identity)
+    return identity
 
 
 def build_overview(org: Dict[str, Any], memberships: List[Dict[str, Any]], data: Dict[str, Any],

@@ -1,5 +1,7 @@
+import httpx
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
+from supabase_auth.errors import AuthRetryableError
 from app.core.database import supabase
 from app.api.schemas.user import UserProfile
 from app.services import organization_service
@@ -36,6 +38,16 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authentication credentials"
+        )
+    except HTTPException:
+        raise
+    except (httpx.TransportError, AuthRetryableError, TimeoutError, OSError) as e:
+        # Supabase'e ulaşılamadı/zaman aşımı: token geçersiz DEĞİL. 401 dönülürse
+        # istemci oturumu kapatır (dashboard'daki api.ts 401'de token'ı siler) —
+        # geçici bir ağ yavaşlığı kullanıcıyı sistemden atmamalı.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Kimlik doğrulama servisine şu an ulaşılamıyor, lütfen tekrar deneyin. ({type(e).__name__})",
         )
     except Exception as e:
         raise HTTPException(

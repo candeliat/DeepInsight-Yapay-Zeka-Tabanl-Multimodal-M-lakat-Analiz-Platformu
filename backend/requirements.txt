@@ -15,3 +15,6 @@ opencv-python-headless
 soundfile
 imageio-ffmpeg
 sentence-transformers
+pymupdf
+python-docx
+easyocr

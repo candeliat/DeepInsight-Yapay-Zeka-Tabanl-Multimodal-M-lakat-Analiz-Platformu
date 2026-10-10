@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import interview, auth, users, analytics, question_bank_admin, organizations, cv
+from app.api.routes import interview, auth, users, analytics, question_bank_admin, organizations, cv, jobs
 
 app = FastAPI(
     title="DeepInsight Backend API",
@@ -31,6 +31,7 @@ app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytic
 app.include_router(question_bank_admin.router, prefix="/api/v1/question-bank", tags=["Question Bank Admin"])
 app.include_router(organizations.router, prefix="/api/v1/organizations", tags=["Organizations"])
 app.include_router(cv.router, prefix="/api/v1/cv", tags=["CV"])
+app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])
 
 @app.get("/")
 def root():

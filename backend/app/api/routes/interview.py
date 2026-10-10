@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from app.core.config import settings
 from app.services.llm_service import llm_service
-from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service
+from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching
 from app.services.interview_service import (
     create_interview,
     save_message,
@@ -80,6 +80,10 @@ class StartInterviewRequest(BaseModel):
     # Opsiyonel: kullanıcının kendi CV'si. Verilirse CV profili soru seçimini ve
     # soru üretimini kişiselleştirir (CV önceden analiz edilmiş olmalı).
     cv_id: Optional[str] = Field(default=None, max_length=64)
+    # Opsiyonel: kullanıcının kaydettiği bir iş ilanı ("bu ilana göre mülakat").
+    # Soru seçimi ilanın zorunlu becerilerine yönelir; CV de verilmişse adayda
+    # eksik görünen beceriler nazikçe yoklanır.
+    job_id: Optional[str] = Field(default=None, max_length=64)
 
     @field_validator("role", "topic")
     @classmethod
@@ -173,17 +177,35 @@ async def _ask_question(
     )
 
 
+def _build_interview_context(cv: Optional[Dict[str, Any]], job: Optional[Dict[str, Any]]) -> Optional[str]:
+    """CV profili ve/veya hedef ilandan kısa, kimlik bilgisi içermeyen bir bağlam üretir."""
+    profile = (cv or {}).get("profile")
+    parts = []
+    if profile:
+        parts.append(cv_analysis_service.build_candidate_context(profile))
+    if job:
+        missing = None
+        if profile:
+            missing = skill_matching.compute_match(
+                job.get("requirements") or {}, profile, cv.get("extracted_text") or "",
+            )["missing_required"]
+        parts.append(job_service.build_job_context(job, missing))
+    joined = "\n".join(p for p in parts if p)
+    return joined or None
+
+
 async def _candidate_context_for(interview: Dict[str, Any], user_id: str) -> Optional[str]:
-    """Mülakata bağlı CV varsa kişiselleştirme bağlamını üretir. CV silindiyse
-    (interviews.cv_id on delete set null) ya da okunamazsa None döner — mülakat kesilmez."""
-    cv_id = interview.get("cv_id")
-    if not cv_id:
+    """Mülakata bağlı CV/ilan varsa kişiselleştirme bağlamını üretir. CV ya da ilan
+    silindiyse (on delete set null) ya da okunamazsa o kısım atlanır — mülakat kesilmez."""
+    cv_id, job_id = interview.get("cv_id"), interview.get("job_id")
+    if not cv_id and not job_id:
         return None
     try:
-        cv = await cv_service.get_cv(user_id, cv_id)
-        return cv_analysis_service.build_candidate_context(cv.get("profile")) if cv else None
+        cv = await cv_service.get_cv(user_id, cv_id) if cv_id else None
+        job = await job_service.get_job(user_id, job_id) if job_id else None
+        return _build_interview_context(cv, job)
     except Exception:
-        logger.warning("[interview] Aday bağlamı okunamadı (cv_id=%s).", cv_id, exc_info=True)
+        logger.warning("[interview] Aday bağlamı okunamadı (cv_id=%s, job_id=%s).", cv_id, job_id, exc_info=True)
         return None
 
 
@@ -209,16 +231,26 @@ async def start_interview(
             except organization_service.QuotaExceededError as e:
                 raise HTTPException(status_code=429, detail=str(e))
 
-        candidate_context = None
-        skills_hint = None
+        cv = None
+        job = None
         if request.cv_id:
             cv = await cv_service.get_cv(current_user.id, request.cv_id)
             if not cv:
                 raise HTTPException(status_code=404, detail="CV bulunamadı")
             if not cv.get("profile"):
                 raise HTTPException(status_code=422, detail="Bu CV henüz analiz edilmemiş. Önce CV analizini çalıştırın.")
-            candidate_context = cv_analysis_service.build_candidate_context(cv["profile"])
-            skills_hint = cv["profile"].get("skills") or None
+        if request.job_id:
+            job = await job_service.get_job(current_user.id, request.job_id)
+            if not job:
+                raise HTTPException(status_code=404, detail="İlan bulunamadı")
+
+        candidate_context = _build_interview_context(cv, job)
+        # İlan varsa soru havuzu ilanın zorunlu becerilerine, yoksa CV becerilerine yönelir.
+        skills_hint = (
+            ((job.get("requirements") or {}).get("required_skills") if job else None)
+            or ((cv or {}).get("profile") or {}).get("skills")
+            or None
+        )
 
         # Mülakat başlamadan ÖNCE, soru bankasından role+topic(+difficulty) için
         # TEK SEFERDE en iyi eşleşen `max_questions` adet aday çekilir (best-effort
@@ -242,6 +274,7 @@ async def start_interview(
             question_pool=question_pool,
             org_id=request.org_id,
             cv_id=request.cv_id,
+            job_id=request.job_id,
         )
         interview_id = str(interview_data["id"])
 

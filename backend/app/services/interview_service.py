@@ -15,6 +15,7 @@ async def create_interview(
     question_pool: Optional[List[Dict[str, Any]]] = None,
     org_id: Optional[str] = None,
     cv_id: Optional[str] = None,
+    job_id: Optional[str] = None,
 ) -> dict:
     """
     Supabase'de yeni bir mülakat kaydı oluşturur.
@@ -45,6 +46,8 @@ async def create_interview(
         record["org_id"] = org_id
     if cv_id:
         record["cv_id"] = cv_id
+    if job_id:
+        record["job_id"] = job_id
 
     result = client.table("interviews").insert(record).execute()
     if not result.data:

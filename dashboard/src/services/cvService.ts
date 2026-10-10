@@ -29,6 +29,8 @@ export interface CVProfile {
   projects: { name?: string; description?: string; tech?: string[] }[];
   certifications: string[];
   seniority: "JUNIOR" | "ORTA" | "UZMAN" | null;
+  /** Tam zamanlı deneyim yılı (stajlar hariç), koddan hesaplanır; tarih okunamazsa null. */
+  experience_years?: number | null;
   target_roles: string[];
   improvement_tips: string[];
 }

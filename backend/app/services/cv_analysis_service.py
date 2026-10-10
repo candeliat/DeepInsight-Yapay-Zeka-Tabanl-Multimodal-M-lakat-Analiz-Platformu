@@ -7,6 +7,8 @@ Veri minimizasyonu: LLM'e gönderilen metinde e-posta/telefon maskelenir ve
 açı parantezleri temizlenir (prompt'taki etiket sınırlarının kırılmasını önler).
 """
 import logging
+import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -82,6 +84,57 @@ class CVProfile(BaseModel):
         return v if v in {"JUNIOR", "ORTA", "UZMAN"} else None
 
 
+_YEAR_RE = re.compile(r"(19|20)\d{2}")
+_ONGOING_WORDS = ("devam", "present", "halen", "hala", "gunumuz", "bugun", "current", "now", "suan")
+_INTERNSHIP_WORDS = ("staj", "intern")
+
+
+def estimate_experience_years(experience: List[dict], current_year: Optional[int] = None) -> Optional[int]:
+    """
+    Tam zamanlı deneyim yılını deneyim tarihlerinden hesaplar: stajlar hariç,
+    çakışan dönemler birleştirilir. Hiçbir tarih okunamazsa None döner (bu
+    durumda LLM'in kıdem tahminine düşülür). LLM'in kıdem tahmini canlı
+    testlerde tutarsız çıktığı için (aynı ~4 yıllık deneyime bir kez JUNIOR,
+    bir kez UZMAN) kıdem mümkün olduğunda koddan, deterministik belirlenir.
+    """
+    current_year = current_year or datetime.now(timezone.utc).year
+    spans = []
+    saw_dates = False
+    for exp in experience:
+        start_match = _YEAR_RE.search(str(exp.get("start") or ""))
+        if not start_match:
+            continue
+        saw_dates = True
+        if any(w in ats_service.fold(str(exp.get("title") or "")) for w in _INTERNSHIP_WORDS):
+            continue
+        start = int(start_match.group(0))
+        end_raw = str(exp.get("end") or "")
+        end_match = _YEAR_RE.search(end_raw)
+        if end_match:
+            end = int(end_match.group(0))
+        elif any(w in ats_service.fold(end_raw) for w in _ONGOING_WORDS):
+            end = current_year
+        else:
+            end = start
+        if start <= end <= current_year:
+            spans.append((start, end))
+
+    if not saw_dates:
+        return None
+    total, last_end = 0, None
+    for start, end in sorted(spans):
+        if last_end is not None and start < last_end:
+            start = last_end
+        if end > start:
+            total += end - start
+        last_end = max(last_end or end, end)
+    return total
+
+
+def seniority_from_years(years: int) -> str:
+    return "JUNIOR" if years < 2 else ("ORTA" if years < 5 else "UZMAN")
+
+
 def _llm_safe_text(text: str) -> str:
     cleaned = ats_service.mask_contact(text).replace("<", " ").replace(">", " ")
     return cleaned[:MAX_LLM_CV_CHARS]
@@ -104,6 +157,10 @@ async def analyze_cv(user_id: str, cv_id: str) -> Dict[str, Any]:
         profile = CVProfile.model_validate(raw).model_dump()
         profile["email"] = ats["contact"]["email"]
         profile["phone"] = ats["contact"]["phone"]
+        years = estimate_experience_years(profile["experience"])
+        profile["experience_years"] = years
+        if years is not None:
+            profile["seniority"] = seniority_from_years(years)
     except Exception as e:
         profile_error = "Profil çıkarma şu an yapılamadı; ATS skoru yine de hesaplandı."
         logger.warning("[cv_analysis] Profil çıkarılamadı (cv_id=%s): %s", cv_id, str(e)[:160])

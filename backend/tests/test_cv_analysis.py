@@ -154,3 +154,44 @@ def test_analyze_unknown_or_foreign_cv_raises(monkeypatch):
     monkeypatch.setattr(cv_service, "get_cv", AsyncMock(return_value=None))
     with pytest.raises(ValueError):
         asyncio.run(cv_analysis_service.analyze_cv("user-a", "cv-of-user-b"))
+
+
+# --- deterministik kıdem ---
+
+def test_experience_years_ongoing_job_and_internship_excluded():
+    exp = [
+        {"title": "Frontend Developer", "start": "2022", "end": "Devam ediyor"},
+        {"title": "Stajyer Geliştirici", "start": "2021", "end": "2022"},
+    ]
+    years = cv_analysis_service.estimate_experience_years(exp, current_year=2026)
+    assert years == 4
+    assert cv_analysis_service.seniority_from_years(years) == "ORTA"
+
+
+def test_experience_years_merges_overlapping_jobs():
+    exp = [
+        {"title": "Backend Dev", "start": "2015", "end": "2020"},
+        {"title": "Danışman", "start": "Mar 2018", "end": "2021"},
+    ]
+    assert cv_analysis_service.estimate_experience_years(exp, current_year=2026) == 6
+
+
+def test_experience_years_none_when_no_dates():
+    assert cv_analysis_service.estimate_experience_years([{"title": "Dev", "company": "Acme"}]) is None
+
+
+def test_only_internships_means_junior():
+    years = cv_analysis_service.estimate_experience_years([{"title": "Intern", "start": "2024", "end": "2025"}], current_year=2026)
+    assert years == 0 and cv_analysis_service.seniority_from_years(years) == "JUNIOR"
+
+
+def test_analyze_overrides_llm_seniority_with_computed_one(monkeypatch):
+    monkeypatch.setattr(cv_service, "get_cv", AsyncMock(return_value=_cv_row()))
+    monkeypatch.setattr(cv_analysis_service, "supabase", _fake_supabase())
+    monkeypatch.setattr(llm_service, "generate_json", AsyncMock(return_value={
+        "seniority": "JUNIOR",
+        "experience": [{"title": "Backend Developer", "start": "2015", "end": "Devam ediyor"}],
+    }))
+    result = asyncio.run(cv_analysis_service.analyze_cv("user-a", "cv-1"))
+    assert result["profile"]["seniority"] == "UZMAN"
+    assert result["profile"]["experience_years"] >= 10

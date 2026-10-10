@@ -361,6 +361,12 @@ export default function CVPage() {
               <div className="bg-card border border-border rounded-3xl p-12 text-center text-sm text-muted-foreground">
                 Analiz için soldan bir CV yükleyin veya seçin.
               </div>
+            ) : !analysis && (busy === "upload" || busy === "analyze") ? (
+              <div className="bg-card border border-border rounded-3xl p-10 text-center space-y-3" aria-live="polite">
+                <Loader2 className="w-7 h-7 animate-spin text-primary mx-auto" />
+                <p className="text-sm font-semibold text-foreground">CV&apos;niz analiz ediliyor...</p>
+                <p className="text-xs text-muted-foreground">ATS kontrolleri ve profil çıkarma birkaç saniye ile bir dakika arası sürebilir.</p>
+              </div>
             ) : !analysis ? (
               <div className="bg-card border border-border rounded-3xl p-10 text-center space-y-4">
                 <p className="text-sm text-muted-foreground">Bu CV için henüz analiz yapılmadı.</p>
@@ -431,7 +437,10 @@ export default function CVPage() {
                     <div className="flex items-center justify-between gap-3 flex-wrap">
                       <h3 className="font-bold text-foreground text-sm">Çıkarılan Profil</h3>
                       {profile.seniority && (
-                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">{profile.seniority}</span>
+                        <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">
+                          {profile.seniority}
+                          {profile.experience_years != null && ` · ~${profile.experience_years} yıl deneyim`}
+                        </span>
                       )}
                     </div>
                     {profile.target_roles.length > 0 && (

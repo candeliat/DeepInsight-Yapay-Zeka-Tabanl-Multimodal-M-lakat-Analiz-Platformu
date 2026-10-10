@@ -69,13 +69,16 @@ async def create_organization(name: str, created_by: str, admin_email: Optional[
 
 
 async def list_user_orgs(user_id: str) -> List[Dict[str, Any]]:
-    memberships = _db().table("memberships").select("org_id, role").eq("user_id", user_id).execute().data or []
+    memberships = _db().table("memberships").select("org_id, role, share_progress").eq("user_id", user_id).execute().data or []
     if not memberships:
         return []
     org_ids = [m["org_id"] for m in memberships]
     orgs = _db().table("organizations").select("id, name, created_at").in_("id", org_ids).execute().data or []
-    role_by_org = {m["org_id"]: m["role"] for m in memberships}
-    return [{**org, "role": role_by_org[org["id"]]} for org in orgs]
+    by_org = {m["org_id"]: m for m in memberships}
+    return [
+        {**org, "role": by_org[org["id"]]["role"], "share_progress": bool(by_org[org["id"]].get("share_progress"))}
+        for org in orgs
+    ]
 
 
 async def get_membership(org_id: str, user_id: str) -> Optional[Dict[str, Any]]:
@@ -105,8 +108,34 @@ async def join_by_invite_code(user_id: str, invite_code: str) -> Dict[str, Any]:
 
 
 async def list_members(org_id: str) -> List[Dict[str, Any]]:
-    result = _db().table("memberships").select("user_id, role, created_at").eq("org_id", org_id).execute()
+    result = _db().table("memberships").select("user_id, role, share_progress, created_at").eq("org_id", org_id).execute()
     return result.data or []
+
+
+async def set_share_progress(org_id: str, user_id: str, share: bool) -> bool:
+    """Öğrencinin bu kurumla ilerleme paylaşım rızası (yalnızca kendisi değiştirebilir)."""
+    if not await get_membership(org_id, user_id):
+        raise ValueError("Bu kurumun üyesi değilsiniz")
+    _db().table("memberships").update({"share_progress": share}).eq("org_id", org_id).eq("user_id", user_id).execute()
+    await log_audit(user_id, org_id, "member.share_progress", "user", user_id, {"share_progress": share})
+    return share
+
+
+async def update_settings(actor_id: str, org_id: str, name: Optional[str], quota: Optional[int], clear_quota: bool) -> Dict[str, Any]:
+    changes: Dict[str, Any] = {}
+    if name is not None:
+        changes["name"] = name.strip()
+    if clear_quota:
+        changes["monthly_interview_quota"] = None
+    elif quota is not None:
+        changes["monthly_interview_quota"] = quota
+    if not changes:
+        raise ValueError("Güncellenecek alan yok")
+    result = _db().table("organizations").update(changes).eq("id", org_id).execute()
+    if not result.data:
+        raise ValueError("Kurum bulunamadı")
+    await log_audit(actor_id, org_id, "org.settings_update", "organization", org_id, changes)
+    return result.data[0]
 
 
 async def _count_admins(org_id: str) -> int:

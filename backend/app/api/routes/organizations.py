@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import List
 
@@ -6,16 +7,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.api.dependencies.auth import get_current_user, oauth2_scheme, require_admin, require_org_role
 from app.api.schemas.organization import (
     JoinOrganizationRequest,
+    MemberDetail,
     MemberItem,
     MyOrganizationItem,
     OrganizationCreate,
     OrganizationDetail,
     OrganizationItem,
+    OrganizationSettingsUpdate,
+    SharingRequest,
     UpdateMemberRoleRequest,
 )
 from app.api.schemas.question_bank_admin import QuestionBankCreate, QuestionBankItem, QuestionBankUpdate
 from app.api.schemas.user import UserProfile
 from app.services import organization_service as org_service
+from app.services import org_insights_service as insights
+from app.services import progress_service
 from app.services import question_bank_admin_service as question_service
 
 logger = logging.getLogger(__name__)
@@ -70,13 +76,83 @@ async def get_organization(
     return org
 
 
-@router.get("/{org_id}/members", response_model=List[MemberItem])
+@router.get("/{org_id}/members", response_model=List[MemberDetail])
 async def list_members(
     org_id: str,
     token: str = Depends(oauth2_scheme),
     current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
 ):
-    return await org_service.list_members(org_id)
+    """Üyeler + kurum bağlamındaki katılımları. Skor yalnızca öğrenci paylaşım rızası verdiyse döner."""
+    memberships = await org_service.list_members(org_id)
+    data = await asyncio.to_thread(progress_service.fetch_org_data, org_id)
+    identities = {
+        str(m["user_id"]): await asyncio.to_thread(insights.get_identity, str(m["user_id"])) for m in memberships
+    }
+    return insights.build_member_rows(memberships, data, identities)
+
+
+@router.get("/{org_id}/overview")
+async def org_overview(
+    org_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    """Kurum geneli katılım ve (en az 3 öğrenci katkı verdiyse) toplu skor istatistikleri."""
+    org = await org_service.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Kurum bulunamadı")
+    memberships = await org_service.list_members(org_id)
+    data = await asyncio.to_thread(progress_service.fetch_org_data, org_id)
+    return insights.build_overview(org, memberships, data)
+
+
+@router.get("/{org_id}/members/{user_id}/progress")
+async def member_progress(
+    org_id: str,
+    user_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    """Bir öğrencinin kurum içindeki ilerlemesi — yalnızca öğrenci paylaşım rızası verdiyse."""
+    memberships = await org_service.list_members(org_id)
+    data = await asyncio.to_thread(progress_service.fetch_org_data, org_id)
+    try:
+        progress = insights.member_progress(memberships, user_id, data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+    await org_service.log_audit(current_user.id, org_id, "member.view_progress", "user", user_id)
+    return progress
+
+
+@router.put("/{org_id}/me/sharing")
+async def update_my_sharing(
+    org_id: str,
+    payload: SharingRequest,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor", "candidate")),
+):
+    """Öğrenci kendi ilerlemesini bu kurumun eğitmenleriyle paylaşıp paylaşmamayı seçer."""
+    try:
+        return {"share_progress": await org_service.set_share_progress(org_id, current_user.id, payload.share_progress)}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.patch("/{org_id}", response_model=OrganizationDetail)
+async def update_organization(
+    org_id: str,
+    payload: OrganizationSettingsUpdate,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin")),
+):
+    try:
+        return await org_service.update_settings(
+            current_user.id, org_id, payload.name, payload.monthly_interview_quota, payload.clear_quota,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.patch("/{org_id}/members/{user_id}", response_model=MemberItem)

@@ -36,17 +36,11 @@ def _mean(values: List[Optional[float]]) -> Optional[float]:
     return round(sum(vals) / len(vals), 1) if vals else None
 
 
-def fetch_user_data(user_id: str) -> Dict[str, Any]:
-    """Kullanıcının tamamlanmış mülakatlarını ve tamamlanmış video analizlerini çeker."""
-    if not supabase:
-        raise RuntimeError("Supabase client is not initialized")
-    interviews = (
-        supabase.table("interviews")
-        .select("id, role, topic, difficulty, status, technical_score, confidence_score, vocabulary_score, created_at")
-        .eq("user_id", user_id).eq("status", "completed").order("created_at").execute().data or []
-    )
+_INTERVIEW_COLUMNS = "id, user_id, role, topic, difficulty, status, technical_score, confidence_score, vocabulary_score, created_at"
+
+
+def _fetch_analytics(ids: List[str]) -> Dict[str, Dict[str, Any]]:
     analytics: Dict[str, Dict[str, Any]] = {}
-    ids = [i["id"] for i in interviews]
     for start in range(0, len(ids), 100):
         rows = (
             supabase.table("interview_analytics")
@@ -54,7 +48,27 @@ def fetch_user_data(user_id: str) -> Dict[str, Any]:
             .in_("interview_id", ids[start:start + 100]).eq("analysis_status", "completed").execute().data or []
         )
         analytics.update({r["interview_id"]: r for r in rows})
-    return {"interviews": interviews, "analytics": analytics}
+    return analytics
+
+
+def _fetch_completed(filters: Dict[str, str]) -> Dict[str, Any]:
+    if not supabase:
+        raise RuntimeError("Supabase client is not initialized")
+    query = supabase.table("interviews").select(_INTERVIEW_COLUMNS)
+    for column, value in filters.items():
+        query = query.eq(column, value)
+    interviews = query.eq("status", "completed").order("created_at").execute().data or []
+    return {"interviews": interviews, "analytics": _fetch_analytics([i["id"] for i in interviews])}
+
+
+def fetch_user_data(user_id: str) -> Dict[str, Any]:
+    """Kullanıcının tamamlanmış mülakatlarını ve tamamlanmış video analizlerini çeker."""
+    return _fetch_completed({"user_id": user_id})
+
+
+def fetch_org_data(org_id: str) -> Dict[str, Any]:
+    """Bir kurum bağlamında (interviews.org_id) yapılmış tüm tamamlanmış mülakatlar."""
+    return _fetch_completed({"org_id": org_id})
 
 
 def build_timeline(interviews: List[Dict[str, Any]], analytics: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:

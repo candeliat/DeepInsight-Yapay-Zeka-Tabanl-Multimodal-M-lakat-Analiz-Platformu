@@ -41,6 +41,9 @@ def as_user(monkeypatch):
 
     monkeypatch.setattr(organization_service, "get_membership", _get_membership)
     monkeypatch.setattr(organization_service, "list_members", AsyncMock(return_value=[]))
+    from app.services import org_insights_service, progress_service
+    monkeypatch.setattr(progress_service, "fetch_org_data", lambda org_id: {"interviews": [], "analytics": {}})
+    monkeypatch.setattr(org_insights_service, "get_identity", lambda uid: {"email": None, "name": None})
     monkeypatch.setattr(organization_service, "rotate_invite_code", AsyncMock(return_value="yeni-kod"))
 
     def _login(user_id, platform_admin=False):

@@ -13,6 +13,7 @@ async def create_interview(
     token: str = None,
     difficulty: Optional[str] = None,
     question_pool: Optional[List[Dict[str, Any]]] = None,
+    org_id: Optional[str] = None,
 ) -> dict:
     """
     Supabase'de yeni bir mülakat kaydı oluşturur.
@@ -38,6 +39,9 @@ async def create_interview(
         "chat_history": [],
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+
+    if org_id:
+        record["org_id"] = org_id
 
     result = client.table("interviews").insert(record).execute()
     if not result.data:

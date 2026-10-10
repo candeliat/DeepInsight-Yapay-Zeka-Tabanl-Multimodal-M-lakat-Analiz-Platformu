@@ -7,11 +7,16 @@ açık, politika yok). Yetki kontrolü bu modülde değil, çağıran route'lard
 """
 import logging
 import secrets
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.core.database import supabase
 
 logger = logging.getLogger(__name__)
+
+
+class QuotaExceededError(Exception):
+    pass
 
 
 def _db():
@@ -137,6 +142,29 @@ async def rotate_invite_code(actor_id: str, org_id: str) -> str:
     _db().table("organizations").update({"invite_code": code}).eq("id", org_id).execute()
     await log_audit(actor_id, org_id, "org.invite_rotate", "organization", org_id)
     return code
+
+
+async def check_interview_quota(org_id: str) -> None:
+    """
+    Kurumun bu ayki mülakat sayısı `monthly_interview_quota`'ya ulaştıysa
+    QuotaExceededError fırlatır. Kota null ise sınırsızdır. LLM maliyetini
+    kurum bazında sınırlamak için `/interview/start` öncesinde çağrılır.
+    """
+    org = await get_organization(org_id)
+    if not org:
+        raise ValueError("Kurum bulunamadı")
+    quota = org.get("monthly_interview_quota")
+    if quota is None:
+        return
+
+    now = datetime.now(timezone.utc)
+    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).isoformat()
+    used = (
+        _db().table("interviews").select("id", count="exact")
+        .eq("org_id", org_id).gte("created_at", month_start).execute()
+    ).count or 0
+    if used >= quota:
+        raise QuotaExceededError(f"Kurumun aylık mülakat kotası doldu ({used}/{quota}).")
 
 
 async def log_audit(

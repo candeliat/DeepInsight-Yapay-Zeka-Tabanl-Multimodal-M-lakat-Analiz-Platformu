@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from app.core.config import settings
 from app.services.llm_service import llm_service
-from app.services import question_bank_service
+from app.services import question_bank_service, organization_service
 from app.services.interview_service import (
     create_interview,
     save_message,
@@ -74,6 +74,9 @@ class StartInterviewRequest(BaseModel):
     # (question_bank_service.fetch_question_pool) bunu kesin filtre olarak
     # kullanır; None ise zorluk filtresiz eşleşme yapılır.
     difficulty: Optional[str] = None
+    # Opsiyonel: mülakat bir kurum bağlamında yapılıyorsa (kurumun soru
+    # bankası + aylık kotası devreye girer). Kullanıcı o kurumun üyesi olmalı.
+    org_id: Optional[str] = Field(default=None, max_length=64)
 
     @field_validator("role", "topic")
     @classmethod
@@ -178,6 +181,14 @@ async def start_interview(
     try:
         max_questions = settings.MAX_INTERVIEW_QUESTIONS
 
+        if request.org_id:
+            if not await organization_service.get_membership(request.org_id, current_user.id):
+                raise HTTPException(status_code=403, detail="Bu kurumun üyesi değilsiniz.")
+            try:
+                await organization_service.check_interview_quota(request.org_id)
+            except organization_service.QuotaExceededError as e:
+                raise HTTPException(status_code=429, detail=str(e))
+
         # Mülakat başlamadan ÖNCE, soru bankasından role+topic(+difficulty) için
         # TEK SEFERDE en iyi eşleşen `max_questions` adet aday çekilir (best-effort
         # — banka boş/yetersizse veya embedding/RPC başarısız olursa boş liste
@@ -186,6 +197,7 @@ async def start_interview(
         # sırayla tüketilir.
         question_pool = await question_bank_service.fetch_question_pool(
             role=request.role, topic=request.topic, difficulty=request.difficulty, size=max_questions,
+            org_id=request.org_id,
         )
 
         # DB'de mülakat oluştur
@@ -196,6 +208,7 @@ async def start_interview(
             token=token,
             difficulty=request.difficulty,
             question_pool=question_pool,
+            org_id=request.org_id,
         )
         interview_id = str(interview_data["id"])
 

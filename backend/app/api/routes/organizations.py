@@ -13,8 +13,10 @@ from app.api.schemas.organization import (
     OrganizationItem,
     UpdateMemberRoleRequest,
 )
+from app.api.schemas.question_bank_admin import QuestionBankCreate, QuestionBankItem, QuestionBankUpdate
 from app.api.schemas.user import UserProfile
 from app.services import organization_service as org_service
+from app.services import question_bank_admin_service as question_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -117,3 +119,77 @@ async def rotate_invite_code(
 ):
     """Eski davet kodunu geçersiz kılıp yenisini üretir."""
     return {"invite_code": await org_service.rotate_invite_code(current_user.id, org_id)}
+
+
+# --------------------------------------------------------------------------
+# Kuruma özel soru bankası. Tüm işlemler org_id kapsamına sabitlenir
+# (bkz. question_bank_admin_service._scope): kurum yalnızca kendi sorularını
+# görür/değiştirir; global sorulara dokunamaz.
+# --------------------------------------------------------------------------
+
+@router.get("/{org_id}/questions", response_model=List[QuestionBankItem])
+async def list_org_questions(
+    org_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    return await question_service.list_questions(org_id=org_id)
+
+
+@router.post("/{org_id}/questions", response_model=QuestionBankItem)
+async def create_org_question(
+    org_id: str,
+    payload: QuestionBankCreate,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    try:
+        created = await question_service.create_question(
+            role=payload.role,
+            topic=payload.topic,
+            difficulty=payload.difficulty,
+            question_text=payload.question_text,
+            tags=payload.tags,
+            family_id=payload.family_id,
+            new_family=payload.new_family,
+            org_id=org_id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    await org_service.log_audit(current_user.id, org_id, "question.create", "question", str(created.get("id")))
+    return created
+
+
+@router.patch("/{org_id}/questions/{question_id}", response_model=QuestionBankItem)
+async def update_org_question(
+    org_id: str,
+    question_id: str,
+    payload: QuestionBankUpdate,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    try:
+        updated = await question_service.update_question(question_id, payload.model_dump(), org_id=org_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e) or "Soru bulunamadı")
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    await org_service.log_audit(current_user.id, org_id, "question.update", "question", question_id)
+    return updated
+
+
+@router.delete("/{org_id}/questions/{question_id}")
+async def delete_org_question(
+    org_id: str,
+    question_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    try:
+        await question_service.delete_question(question_id, org_id=org_id)
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    await org_service.log_audit(current_user.id, org_id, "question.delete", "question", question_id)
+    return {"status": "deleted"}

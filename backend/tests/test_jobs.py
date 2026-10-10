@@ -260,3 +260,15 @@ def test_roadmap_steps_and_focus_are_not_cut_at_skill_length():
     long_step = "Apollo Server ile basit bir GraphQL API oluşturun ve bunu mevcut Next.js projenize entegre ederek uçtan uca deneyin."
     items = job_service._clean_roadmap([{"skill": "GraphQL", "steps": [long_step], "est_weeks": 3}], ["GraphQL"])
     assert items[0]["steps"][0] == long_step and len(long_step) > 80
+
+
+def test_roadmap_priority_follows_required_not_llm():
+    items = job_service._clean_roadmap(
+        [
+            {"skill": "AWS", "priority": "yüksek", "steps": ["a"]},
+            {"skill": "React Testing Library", "priority": "orta", "steps": ["b"]},
+        ],
+        ["React Testing Library", "AWS"],
+        ["React Testing Library"],
+    )
+    assert [(i["skill"], i["priority"]) for i in items] == [("React Testing Library", "yüksek"), ("AWS", "orta")]

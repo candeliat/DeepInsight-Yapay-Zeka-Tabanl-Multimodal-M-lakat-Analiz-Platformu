@@ -164,8 +164,15 @@ def _fallback_roadmap(missing: List[str]) -> List[Dict[str, Any]]:
     ]
 
 
-def _clean_roadmap(items: Any, allowed: List[str]) -> List[Dict[str, Any]]:
+def _clean_roadmap(items: Any, allowed: List[str], required: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+    """
+    LLM yol haritasını temizler: eksik listesinde olmayan (uydurulan) becerileri
+    atar. Öncelik LLM'e bırakılmaz (testte tercih edilen bir beceriye "yüksek",
+    zorunlu bir beceriye "orta" dediği görüldü): ilanda zorunlu olan eksikler
+    "yüksek" ve listenin başında, tercih edilenler "orta".
+    """
     allowed_keys = {skill_matching.skill_key(s) for s in allowed}
+    required_keys = {skill_matching.skill_key(s) for s in (required or [])}
     out = []
     for item in items if isinstance(items, list) else []:
         if not isinstance(item, dict) or not isinstance(item.get("skill"), str):
@@ -178,11 +185,12 @@ def _clean_roadmap(items: Any, allowed: List[str]) -> List[Dict[str, Any]]:
             weeks = 2
         out.append({
             "skill": item["skill"][:80],
-            "priority": "orta" if item.get("priority") == "orta" else "yüksek",
+            "priority": "yüksek" if skill_matching.skill_key(item["skill"]) in required_keys else "orta",
             "why": str(item.get("why") or "")[:300],
             "steps": _str_list(item.get("steps"), 4, max_len=240),
             "est_weeks": weeks,
         })
+    out.sort(key=lambda r: r["priority"] != "yüksek")  # kararlı sıralama: zorunlular önce
     return out[:6]
 
 
@@ -220,7 +228,7 @@ async def match_job_with_cv(user_id: str, job_id: str, cv_id: str) -> Dict[str, 
             )
             if isinstance(raw.get("summary"), str) and raw["summary"].strip():
                 summary = raw["summary"].strip()[:600]
-            roadmap = _clean_roadmap(raw.get("roadmap"), missing)
+            roadmap = _clean_roadmap(raw.get("roadmap"), missing, match["missing_required"])
             interview_focus = _str_list(raw.get("interview_focus"), 5, max_len=160)
         except Exception as e:
             llm_error = "Yol haritası yapay zekâ ile hazırlanamadı; temel bir plan gösteriliyor."

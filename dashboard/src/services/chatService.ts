@@ -4,6 +4,7 @@ export interface StartInterviewRequest {
   difficulty?: string;
   user_id?: string;
   cv_id?: string;
+  job_id?: string;
 }
 
 export interface StartInterviewResponse {
@@ -50,9 +51,9 @@ export const chatService = {
   /**
    * Yeni bir mülakat oturumu başlatır.
    */
-  async startInterview(role: string, topic: string, difficulty?: string, userId?: string, cvId?: string): Promise<StartInterviewResponse> {
+  async startInterview(role: string, topic: string, difficulty?: string, userId?: string, cvId?: string, jobId?: string): Promise<StartInterviewResponse> {
     try {
-      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, user_id: userId, cv_id: cvId } satisfies StartInterviewRequest);
+      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, user_id: userId, cv_id: cvId, job_id: jobId } satisfies StartInterviewRequest);
       return response.data;
     } catch (error: unknown) {
       const e = error as { response?: { data?: { detail?: string } }, message?: string };

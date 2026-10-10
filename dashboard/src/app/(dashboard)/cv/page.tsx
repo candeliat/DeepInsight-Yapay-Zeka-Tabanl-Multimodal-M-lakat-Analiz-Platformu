@@ -17,45 +17,13 @@ import {
 } from "lucide-react";
 import { cvService, ConsentStatus, CVItem, CVAnalysis, ATSCheck } from "@/services/cvService";
 import { Button } from "@/components/ui/Button";
+import { ScoreRing } from "@/components/ui/ScoreRing";
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = [".pdf", ".docx", ".png", ".jpg", ".jpeg"];
 
-function scoreTone(score: number) {
-  if (score >= 80) return { text: "text-success", stroke: "stroke-success", label: "Güçlü" };
-  if (score >= 55) return { text: "text-warning", stroke: "stroke-warning", label: "Geliştirilebilir" };
-  return { text: "text-destructive", stroke: "stroke-destructive", label: "Zayıf" };
-}
-
 function formatSize(bytes: number) {
   return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
-}
-
-function ScoreRing({ score }: { score: number }) {
-  const tone = scoreTone(score);
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
-  return (
-    <div className="relative w-36 h-36 shrink-0" role="img" aria-label={`ATS uyumluluk skoru ${score} / 100`}>
-      <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-        <circle cx="60" cy="60" r={radius} className="fill-none stroke-muted" strokeWidth="10" />
-        <circle
-          cx="60"
-          cy="60"
-          r={radius}
-          className={`fill-none ${tone.stroke} transition-all duration-700`}
-          strokeWidth="10"
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference * (1 - score / 100)}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className={`font-serif text-4xl ${tone.text}`}>{score}</span>
-        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{tone.label}</span>
-      </div>
-    </div>
-  );
 }
 
 function CheckRow({ check }: { check: ATSCheck }) {
@@ -379,7 +347,7 @@ export default function CVPage() {
               <div className="space-y-6">
                 <div className="bg-card border border-border rounded-3xl shadow-sm p-6">
                   <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                    <ScoreRing score={analysis.ats_score} />
+                    <ScoreRing score={analysis.ats_score} ariaLabel={`ATS uyumluluk skoru ${analysis.ats_score} / 100`} />
                     <div className="flex-1 min-w-0 text-center sm:text-left">
                       <h2 className="font-serif italic text-2xl text-foreground">ATS Uyumluluk Skoru</h2>
                       <p className="text-xs text-muted-foreground mt-1 leading-relaxed">

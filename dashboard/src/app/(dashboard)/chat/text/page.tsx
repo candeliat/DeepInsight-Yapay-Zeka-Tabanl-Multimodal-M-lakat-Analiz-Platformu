@@ -12,11 +12,13 @@ import {
   ArrowRight,
   KeyRound,
   FileText,
+  Briefcase,
 } from "lucide-react";
 import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { cvService, CVDetail } from "@/services/cvService";
+import { jobService, JobDetail } from "@/services/jobService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -39,7 +41,9 @@ export default function TextInterviewPage() {
 
 function TextInterviewContent() {
   const router = useRouter();
-  const cvId = useSearchParams().get("cv");
+  const searchParams = useSearchParams();
+  const cvId = searchParams.get("cv");
+  const jobId = searchParams.get("job");
 
   const [currentState, setCurrentState] = useState<InterviewState>("SETUP");
 
@@ -50,6 +54,8 @@ function TextInterviewContent() {
 
   // CV'ye özel mülakat (opsiyonel, ?cv=<id>)
   const [cv, setCv] = useState<CVDetail | null>(null);
+  // İlana göre mülakat (opsiyonel, ?job=<id>)
+  const [job, setJob] = useState<JobDetail | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
 
   // Mülakat State
@@ -67,30 +73,34 @@ function TextInterviewContent() {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
-  // CV seçilmişse bilgisini yükle; rol/konu/zorluğu profilden öner (kullanıcı değiştirebilir).
+  // CV ve/veya ilan seçilmişse yükle; rol/konu/zorluğu öner (kullanıcı değiştirebilir).
+  // İlan varsa öneriler ilandan, yoksa CV profilinden gelir.
   useEffect(() => {
-    if (!cvId) {
+    if (!cvId && !jobId) {
       setCv(null);
+      setJob(null);
       return;
     }
     let cancelled = false;
-    cvService
-      .getCv(cvId)
-      .then((detail) => {
+    Promise.all([cvId ? cvService.getCv(cvId) : null, jobId ? jobService.getJob(jobId) : null])
+      .then(([cvDetail, jobDetail]) => {
         if (cancelled) return;
-        setCv(detail);
-        const profile = detail.profile;
-        if (profile) {
-          if (profile.target_roles[0]) setRole(profile.target_roles[0]);
-          if (profile.skills.length > 0) setTopic(profile.skills.slice(0, 2).join(" ve "));
-          if (profile.seniority) setDifficulty(profile.seniority);
-        }
+        setCv(cvDetail);
+        setJob(jobDetail);
+        const profile = cvDetail?.profile;
+        const reqs = jobDetail?.requirements;
+        const suggestedRole = jobDetail?.title || profile?.target_roles[0];
+        const skills = reqs?.required_skills.length ? reqs.required_skills : profile?.skills ?? [];
+        const suggestedLevel = reqs?.seniority || profile?.seniority;
+        if (suggestedRole) setRole(suggestedRole);
+        if (skills.length > 0) setTopic(skills.slice(0, 2).join(" ve "));
+        if (suggestedLevel) setDifficulty(suggestedLevel);
       })
-      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "CV yüklenemedi."));
+      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "CV veya ilan yüklenemedi."));
     return () => {
       cancelled = true;
     };
-  }, [cvId]);
+  }, [cvId, jobId]);
 
   useEffect(() => {
     if (currentState === "INTERVIEWING" && !isThinking) {
@@ -107,7 +117,7 @@ function TextInterviewContent() {
     setStartError(null);
 
     try {
-      const data = await chatService.startInterview(role, topic, difficulty, undefined, cv ? cv.id : undefined);
+      const data = await chatService.startInterview(role, topic, difficulty, undefined, cv?.id, job?.id);
       setInterviewId(data.interview_id);
       setMessages([{ role: "ai", content: data.first_message }]);
       setCurrentState("INTERVIEWING");
@@ -195,6 +205,16 @@ function TextInterviewContent() {
               Rolünüzü ve mülakat konusunu seçin, yapay zeka mülakatçınızla yazışarak ilerleyin.
             </p>
           </div>
+
+          {job && (
+            <div className="mb-3 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+              <Briefcase className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="text-xs flex-1 min-w-0">
+                <p className="font-bold text-foreground">Bu ilana göre mülakat</p>
+                <p className="text-muted-foreground truncate">{[job.title, job.company].filter(Boolean).join(" · ")}</p>
+              </div>
+            </div>
+          )}
 
           {cv && (
             <div className="mb-6 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">

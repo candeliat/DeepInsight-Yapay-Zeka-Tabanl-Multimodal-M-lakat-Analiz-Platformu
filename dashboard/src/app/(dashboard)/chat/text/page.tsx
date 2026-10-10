@@ -19,6 +19,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { cvService, CVDetail } from "@/services/cvService";
 import { jobService, JobDetail } from "@/services/jobService";
+import { orgService, MyOrganization } from "@/services/orgService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -60,6 +61,9 @@ function TextInterviewContent() {
   const [cv, setCv] = useState<CVDetail | null>(null);
   // İlana göre mülakat (opsiyonel, ?job=<id>)
   const [job, setJob] = useState<JobDetail | null>(null);
+  // Kurum bağlamı (opsiyonel): varsayılan bireysel — mülakatın kuruma görünmesi bilinçli bir seçim olmalı.
+  const [orgs, setOrgs] = useState<MyOrganization[]>([]);
+  const [orgId, setOrgId] = useState("");
   const [startError, setStartError] = useState<string | null>(null);
 
   // Mülakat State
@@ -76,6 +80,10 @@ function TextInterviewContent() {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
+
+  useEffect(() => {
+    orgService.myOrganizations().then(setOrgs).catch(() => setOrgs([]));
+  }, []);
 
   useEffect(() => {
     if (roleParam) setRole(roleParam.slice(0, 80));
@@ -127,7 +135,7 @@ function TextInterviewContent() {
     setStartError(null);
 
     try {
-      const data = await chatService.startInterview(role, topic, difficulty, undefined, cv?.id, job?.id);
+      const data = await chatService.startInterview(role, topic, difficulty, { cvId: cv?.id, jobId: job?.id, orgId: orgId || undefined });
       setInterviewId(data.interview_id);
       setMessages([{ role: "ai", content: data.first_message }]);
       setCurrentState("INTERVIEWING");
@@ -284,6 +292,29 @@ function TextInterviewContent() {
                 ))}
               </div>
             </div>
+
+            {orgs.length > 0 && (
+              <div className="space-y-2">
+                <label htmlFor="org-select" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Mülakat bağlamı</label>
+                <select
+                  id="org-select"
+                  value={orgId}
+                  onChange={(e) => setOrgId(e.target.value)}
+                  className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                >
+                  <option value="">Bireysel (kuruma görünmez)</option>
+                  {orgs.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+                {orgId && (
+                  <p className="text-[11px] text-muted-foreground ml-1">
+                    Bu mülakat kurumun kotasından düşer ve kurumun soru bankası kullanılır. Eğitmenler katılımınızı görür;
+                    skorlarınızı yalnızca &quot;Kurumlarım&quot; sayfasından paylaşım izni verdiyseniz görür.
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-2 bg-muted border border-border p-4 rounded-xl text-xs text-muted-foreground font-semibold mb-2">
               <KeyRound className="w-5 h-5 text-primary shrink-0" />

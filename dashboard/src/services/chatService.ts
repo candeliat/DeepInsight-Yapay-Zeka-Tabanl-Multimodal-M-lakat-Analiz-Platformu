@@ -5,6 +5,14 @@ export interface StartInterviewRequest {
   user_id?: string;
   cv_id?: string;
   job_id?: string;
+  org_id?: string;
+}
+
+/** Mülakatın opsiyonel bağlamı: kişiselleştirme (CV/ilan) ve kurum (kota, kurum soru bankası, eğitmen görünürlüğü). */
+export interface StartInterviewContext {
+  cvId?: string;
+  jobId?: string;
+  orgId?: string;
 }
 
 export interface StartInterviewResponse {
@@ -51,9 +59,9 @@ export const chatService = {
   /**
    * Yeni bir mülakat oturumu başlatır.
    */
-  async startInterview(role: string, topic: string, difficulty?: string, userId?: string, cvId?: string, jobId?: string): Promise<StartInterviewResponse> {
+  async startInterview(role: string, topic: string, difficulty?: string, context: StartInterviewContext = {}): Promise<StartInterviewResponse> {
     try {
-      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, user_id: userId, cv_id: cvId, job_id: jobId } satisfies StartInterviewRequest);
+      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, cv_id: context.cvId, job_id: context.jobId, org_id: context.orgId } satisfies StartInterviewRequest);
       return response.data;
     } catch (error: unknown) {
       const e = error as { response?: { data?: { detail?: string } }, message?: string };

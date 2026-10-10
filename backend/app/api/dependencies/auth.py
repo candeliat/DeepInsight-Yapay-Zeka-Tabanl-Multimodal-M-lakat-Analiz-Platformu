@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.core.database import supabase
 from app.api.schemas.user import UserProfile
+from app.services import organization_service
 
 # tokenUrl must point to a route that accepts application/x-www-form-urlencoded
 # We will create /api/v1/auth/swagger-login for Swagger UI to fetch the token
@@ -42,6 +43,27 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
             detail=f"Could not validate credentials: {str(e)}",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+
+def require_org_role(*allowed_roles: str):
+    """
+    Path'teki `org_id` kurumunda kullanıcının `allowed_roles`'tan birine sahip
+    olmasını şart koşan bir dependency üretir. Platform admini destek amaçlı
+    her kuruma erişebilir. Üye olmayan kullanıcı, kurumun var olup olmadığını
+    sızdırmamak için 404 değil 403 alır.
+    """
+    async def _dependency(org_id: str, current_user: UserProfile = Depends(get_current_user)) -> UserProfile:
+        if current_user.app_metadata.get("role") == "admin":
+            return current_user
+        membership = await organization_service.get_membership(org_id, current_user.id)
+        if not membership or membership["role"] not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bu kurumda bu işlem için yetkiniz yok."
+            )
+        return current_user
+
+    return _dependency
 
 
 def require_admin(current_user: UserProfile = Depends(get_current_user)) -> UserProfile:

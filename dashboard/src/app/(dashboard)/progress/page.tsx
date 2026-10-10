@@ -65,10 +65,12 @@ function Delta({ value }: { value: number | null }) {
 }
 
 function StatTile({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
+  // Sayılar büyük, kelime değerleri (örn. "İletişim ve kelime") taşmasın diye daha küçük puntoda.
+  const isNumeric = /\d/.test(value);
   return (
     <div className="bg-card border border-border rounded-2xl p-5">
       <p className="text-xs font-semibold text-muted-foreground">{label}</p>
-      <p className="text-3xl font-semibold text-foreground mt-1">{value}</p>
+      <p className={`${isNumeric ? "text-3xl" : "text-xl leading-tight"} font-semibold text-foreground mt-1`}>{value}</p>
       {children && <div className="mt-1">{children}</div>}
     </div>
   );
@@ -208,9 +210,18 @@ export default function ProgressPage() {
                         const p = payload?.[0]?.payload;
                         return p ? `${p.label} · ${p.topic ?? ""}` : "";
                       }}
-                      formatter={(value) => [`${Math.round(Number(value))}/100`]}
+                      // Seri adı yazılı olsun ve metin metin renginde kalsın: kimlik yalnız renkle taşınmaz.
+                      formatter={(value, name) => [`${Math.round(Number(value))}/100`, name]}
+                      itemStyle={{ color: "#0b0b0b" }}
                     />
-                    <Legend verticalAlign="top" height={28} iconType="plainline" wrapperStyle={{ fontSize: 12, color: "#52514e" }} />
+                    <Legend
+                      verticalAlign="top"
+                      height={28}
+                      iconType="plainline"
+                      wrapperStyle={{ fontSize: 12 }}
+                      // Metin seri renginde değil metin renginde; kimliği yanındaki çizgi taşır.
+                      formatter={(value) => <span style={{ color: "#52514e" }}>{value}</span>}
+                    />
                     {SERIES.map((s) => (
                       <Line
                         key={s.key}

@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -25,3 +25,24 @@ class CVDetail(CVItem):
     extracted_text: Optional[str] = None
     extraction_stats: Dict[str, Any] = {}
     profile: Optional[Dict[str, Any]] = None
+
+
+class ATSCheck(BaseModel):
+    id: str
+    label: str
+    weight: int
+    earned: int
+    status: str
+    detail: str
+    tip: Optional[str] = None
+
+
+class CVAnalysis(BaseModel):
+    cv_id: str
+    analysis_id: Optional[str] = None
+    ats_score: int
+    breakdown: List[ATSCheck]
+    suggestions: List[str]
+    profile: Optional[Dict[str, Any]] = None
+    profile_error: Optional[str] = None
+    created_at: Optional[str] = None

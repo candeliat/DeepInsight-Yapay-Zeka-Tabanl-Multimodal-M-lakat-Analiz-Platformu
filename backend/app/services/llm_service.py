@@ -731,6 +731,57 @@ class LLMService:
         )
         return InterviewEvaluation().model_dump()
 
+    async def generate_json(
+        self,
+        system_prompt: str,
+        user_content: str,
+        purpose: str,
+        max_tokens: int = 3000,
+        temperature: float = 0.2,
+    ) -> dict:
+        """
+        Genel amaçlı yapılandırılmış çıktı: aynı model zinciri / zaman aşımı /
+        geri çekilme mantığıyla bir JSON nesnesi döner (bkz. get_final_evaluation).
+        `get_final_evaluation`'ın aksine güvenli bir varsayılan UYDURMAZ: tüm
+        modeller başarısız olursa RuntimeError fırlatır, çağıran taraf karar verir.
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+        last_error: Exception | None = None
+        for i, model_name in enumerate(self._fallback_models()):
+            self._record_attempt(model_name)
+            try:
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        response_format={"type": "json_object"},
+                    ),
+                    timeout=settings.LLM_ATTEMPT_MAX_DURATION,
+                )
+                content = response.choices[0].message.content
+                parsed = _extract_json_object(content or "")
+                if parsed is None:
+                    finish_reason = getattr(response.choices[0], "finish_reason", None)
+                    raise ValueError(f"Model geçerli bir JSON döndürmedi (finish_reason={finish_reason}).")
+                self._record_success(model_name, getattr(response, "usage", None), purpose=purpose)
+                return parsed
+            except (asyncio.TimeoutError, RateLimitError, APIStatusError) as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] (%s) '%s' başarısız: %s. Sıradaki deneniyor...", purpose, model_name, type(e).__name__)
+                await self._sleep_backoff(i)
+            except Exception as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] (%s) '%s' beklenmeyen hata: %s. Sıradaki deneniyor...", purpose, model_name, str(e)[:120])
+
+        raise RuntimeError(f"AI servisi ile iletişim kurulamadı. Son hata: {last_error}")
+
     async def transcribe_audio(self, audio_bytes: bytes, mime_type: str = "audio/m4a") -> str:
         """
         Transcribes an audio file into text using the shared local Whisper model

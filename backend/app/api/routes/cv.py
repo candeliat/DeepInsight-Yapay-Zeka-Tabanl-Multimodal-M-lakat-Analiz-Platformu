@@ -4,9 +4,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
-from app.api.schemas.cv import ConsentStatus, CVDetail, CVItem
+from app.api.schemas.cv import ConsentStatus, CVAnalysis, CVDetail, CVItem
 from app.api.schemas.user import UserProfile
-from app.services import cv_service, cv_text_service, organization_service
+from app.services import cv_analysis_service, cv_service, cv_text_service, organization_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -90,6 +90,34 @@ async def get_my_cv(
     if not cv:
         raise HTTPException(status_code=404, detail="CV bulunamadı")
     return cv
+
+
+@router.post("/{cv_id}/analyze", response_model=CVAnalysis)
+async def analyze_my_cv(
+    cv_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """ATS skoru (her zaman) + LLM profil çıkarma/öneriler (best-effort) üretir."""
+    try:
+        return await cv_analysis_service.analyze_cv(current_user.id, cv_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{cv_id}/analysis", response_model=CVAnalysis)
+async def get_latest_analysis(
+    cv_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    try:
+        analysis = await cv_analysis_service.latest_analysis(current_user.id, cv_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    if not analysis:
+        raise HTTPException(status_code=404, detail="Bu CV için henüz analiz yapılmadı")
+    return analysis
 
 
 @router.delete("/{cv_id}")

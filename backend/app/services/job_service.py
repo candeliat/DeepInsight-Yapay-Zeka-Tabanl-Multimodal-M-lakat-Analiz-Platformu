@@ -37,10 +37,11 @@ def _safe(text: str, limit: int) -> str:
     return ats_service.mask_contact(str(text or "")).replace("<", " ").replace(">", " ")[:limit]
 
 
-def _str_list(v: Any, limit: int) -> List[str]:
+def _str_list(v: Any, limit: int, max_len: int = 80) -> List[str]:
+    """max_len: beceri adları için 80 yeterli; cümle olan alanlar (adımlar, konular) daha uzun sınır alır."""
     if not isinstance(v, list):
         return []
-    return [str(x).strip()[:80] for x in v if isinstance(x, (str, int, float)) and str(x).strip()][:limit]
+    return [str(x).strip()[:max_len] for x in v if isinstance(x, (str, int, float)) and str(x).strip()][:limit]
 
 
 class JobRequirements(BaseModel):
@@ -89,7 +90,7 @@ class JobRequirements(BaseModel):
     @field_validator("responsibilities", mode="before")
     @classmethod
     def _resp(cls, v):
-        return [s[:200] for s in _str_list(v, 8)]
+        return _str_list(v, 8, max_len=200)
 
     @field_validator("languages", mode="before")
     @classmethod
@@ -179,7 +180,7 @@ def _clean_roadmap(items: Any, allowed: List[str]) -> List[Dict[str, Any]]:
             "skill": item["skill"][:80],
             "priority": "orta" if item.get("priority") == "orta" else "yüksek",
             "why": str(item.get("why") or "")[:300],
-            "steps": _str_list(item.get("steps"), 4),
+            "steps": _str_list(item.get("steps"), 4, max_len=240),
             "est_weeks": weeks,
         })
     return out[:6]
@@ -220,7 +221,7 @@ async def match_job_with_cv(user_id: str, job_id: str, cv_id: str) -> Dict[str, 
             if isinstance(raw.get("summary"), str) and raw["summary"].strip():
                 summary = raw["summary"].strip()[:600]
             roadmap = _clean_roadmap(raw.get("roadmap"), missing)
-            interview_focus = _str_list(raw.get("interview_focus"), 5)
+            interview_focus = _str_list(raw.get("interview_focus"), 5, max_len=160)
         except Exception as e:
             llm_error = "Yol haritası yapay zekâ ile hazırlanamadı; temel bir plan gösteriliyor."
             logger.warning("[job_service] Yol haritası üretilemedi (job_id=%s): %s", job_id, str(e)[:160])

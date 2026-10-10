@@ -254,3 +254,9 @@ def test_turn_context_survives_deleted_job(monkeypatch):
     monkeypatch.setattr(job_service, "get_job", AsyncMock(return_value=None))
     ctx = asyncio.run(interview_route._candidate_context_for({"cv_id": "cv-1", "job_id": "gone"}, "user-a"))
     assert "Beceriler:" in ctx and "Hedef ilan" not in ctx
+
+
+def test_roadmap_steps_and_focus_are_not_cut_at_skill_length():
+    long_step = "Apollo Server ile basit bir GraphQL API oluşturun ve bunu mevcut Next.js projenize entegre ederek uçtan uca deneyin."
+    items = job_service._clean_roadmap([{"skill": "GraphQL", "steps": [long_step], "est_weeks": 3}], ["GraphQL"])
+    assert items[0]["steps"][0] == long_step and len(long_step) > 80

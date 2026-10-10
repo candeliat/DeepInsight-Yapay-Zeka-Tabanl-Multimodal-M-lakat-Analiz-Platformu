@@ -3,6 +3,7 @@ export interface StartInterviewRequest {
   topic: string;
   difficulty?: string;
   user_id?: string;
+  cv_id?: string;
 }
 
 export interface StartInterviewResponse {
@@ -49,9 +50,9 @@ export const chatService = {
   /**
    * Yeni bir mülakat oturumu başlatır.
    */
-  async startInterview(role: string, topic: string, difficulty?: string, userId?: string): Promise<StartInterviewResponse> {
+  async startInterview(role: string, topic: string, difficulty?: string, userId?: string, cvId?: string): Promise<StartInterviewResponse> {
     try {
-      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, user_id: userId } satisfies StartInterviewRequest);
+      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, user_id: userId, cv_id: cvId } satisfies StartInterviewRequest);
       return response.data;
     } catch (error: unknown) {
       const e = error as { response?: { data?: { detail?: string } }, message?: string };

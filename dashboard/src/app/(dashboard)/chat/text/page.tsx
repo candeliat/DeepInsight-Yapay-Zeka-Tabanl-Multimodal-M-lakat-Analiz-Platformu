@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { Suspense, useState, useRef, useEffect } from "react";
 import {
   Send,
   Loader2,
@@ -11,9 +11,12 @@ import {
   MessageSquare,
   ArrowRight,
   KeyRound,
+  FileText,
 } from "lucide-react";
 import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { cvService, CVDetail } from "@/services/cvService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -26,7 +29,17 @@ type TranscriptMessage = {
 };
 
 export default function TextInterviewPage() {
+  // useSearchParams bir Suspense sınırı gerektirir.
+  return (
+    <Suspense fallback={null}>
+      <TextInterviewContent />
+    </Suspense>
+  );
+}
+
+function TextInterviewContent() {
   const router = useRouter();
+  const cvId = useSearchParams().get("cv");
 
   const [currentState, setCurrentState] = useState<InterviewState>("SETUP");
 
@@ -34,6 +47,10 @@ export default function TextInterviewPage() {
   const [role, setRole] = useState("Yazılım Mühendisi");
   const [topic, setTopic] = useState("React ve Modern Web Geliştirme");
   const [difficulty, setDifficulty] = useState("ORTA");
+
+  // CV'ye özel mülakat (opsiyonel, ?cv=<id>)
+  const [cv, setCv] = useState<CVDetail | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
 
   // Mülakat State
   const [interviewId, setInterviewId] = useState("");
@@ -50,6 +67,31 @@ export default function TextInterviewPage() {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
 
+  // CV seçilmişse bilgisini yükle; rol/konu/zorluğu profilden öner (kullanıcı değiştirebilir).
+  useEffect(() => {
+    if (!cvId) {
+      setCv(null);
+      return;
+    }
+    let cancelled = false;
+    cvService
+      .getCv(cvId)
+      .then((detail) => {
+        if (cancelled) return;
+        setCv(detail);
+        const profile = detail.profile;
+        if (profile) {
+          if (profile.target_roles[0]) setRole(profile.target_roles[0]);
+          if (profile.skills.length > 0) setTopic(profile.skills.slice(0, 2).join(" ve "));
+          if (profile.seniority) setDifficulty(profile.seniority);
+        }
+      })
+      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "CV yüklenemedi."));
+    return () => {
+      cancelled = true;
+    };
+  }, [cvId]);
+
   useEffect(() => {
     if (currentState === "INTERVIEWING" && !isThinking) {
       textareaRef.current?.focus();
@@ -62,15 +104,16 @@ export default function TextInterviewPage() {
   const handleStartInterview = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsThinking(true);
+    setStartError(null);
 
     try {
-      const data = await chatService.startInterview(role, topic, difficulty);
+      const data = await chatService.startInterview(role, topic, difficulty, undefined, cv ? cv.id : undefined);
       setInterviewId(data.interview_id);
       setMessages([{ role: "ai", content: data.first_message }]);
       setCurrentState("INTERVIEWING");
     } catch (error) {
       console.error("Mülakat başlatılamadı:", error);
-      alert("Mülakat başlatılırken bir hata oluştu.");
+      setStartError(error instanceof Error ? error.message : "Mülakat başlatılırken bir hata oluştu.");
     } finally {
       setIsThinking(false);
     }
@@ -153,6 +196,22 @@ export default function TextInterviewPage() {
             </p>
           </div>
 
+          {cv && (
+            <div className="mb-6 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+              <FileText className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="text-xs flex-1 min-w-0">
+                <p className="font-bold text-foreground">CV&apos;nize göre kişiselleştirilecek</p>
+                <p className="text-muted-foreground truncate">{cv.original_filename}</p>
+                {!cv.profile && (
+                  <p className="text-warning mt-1">
+                    Bu CV henüz analiz edilmemiş. <Link href="/cv" className="underline font-semibold">CV sayfasında analiz edin.</Link>
+                  </p>
+                )}
+              </div>
+              <Link href="/chat/text" className="text-[11px] text-muted-foreground underline shrink-0">CV&apos;siz devam et</Link>
+            </div>
+          )}
+
           <form onSubmit={handleStartInterview} className="space-y-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
@@ -200,6 +259,12 @@ export default function TextInterviewPage() {
               <KeyRound className="w-5 h-5 text-primary shrink-0" />
               <span>Kamera ve mikrofon gerekmez — mülakat tamamen yazışarak ilerler.</span>
             </div>
+
+            {startError && (
+              <p role="alert" className="text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-3">
+                {startError}
+              </p>
+            )}
 
             <Button type="submit" size="lg" disabled={isThinking} className="w-full">
               {isThinking ? (

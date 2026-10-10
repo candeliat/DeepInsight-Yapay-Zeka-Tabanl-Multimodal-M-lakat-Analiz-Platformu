@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from app.core.config import settings
 from app.services.llm_service import llm_service
-from app.services import question_bank_service, organization_service
+from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service
 from app.services.interview_service import (
     create_interview,
     save_message,
@@ -77,6 +77,9 @@ class StartInterviewRequest(BaseModel):
     # Opsiyonel: mülakat bir kurum bağlamında yapılıyorsa (kurumun soru
     # bankası + aylık kotası devreye girer). Kullanıcı o kurumun üyesi olmalı.
     org_id: Optional[str] = Field(default=None, max_length=64)
+    # Opsiyonel: kullanıcının kendi CV'si. Verilirse CV profili soru seçimini ve
+    # soru üretimini kişiselleştirir (CV önceden analiz edilmiş olmalı).
+    cv_id: Optional[str] = Field(default=None, max_length=64)
 
     @field_validator("role", "topic")
     @classmethod
@@ -127,6 +130,7 @@ async def _ask_question(
     message: str,
     history_dicts: List[Dict[str, Any]],
     question_pool: List[Dict[str, Any]],
+    candidate_context: Optional[str] = None,
 ) -> str:
     """
     Sıradaki mülakat sorusunu üretir. Önce `/start`'ta bir kez çekilmiş soru
@@ -150,6 +154,7 @@ async def _ask_question(
                 topic=topic,
                 question_number=question_number,
                 max_questions=max_questions,
+                candidate_context=candidate_context,
             )
         except Exception:
             logger.warning(
@@ -164,7 +169,22 @@ async def _ask_question(
         topic=topic,
         question_number=question_number,
         max_questions=max_questions,
+        candidate_context=candidate_context,
     )
+
+
+async def _candidate_context_for(interview: Dict[str, Any], user_id: str) -> Optional[str]:
+    """Mülakata bağlı CV varsa kişiselleştirme bağlamını üretir. CV silindiyse
+    (interviews.cv_id on delete set null) ya da okunamazsa None döner — mülakat kesilmez."""
+    cv_id = interview.get("cv_id")
+    if not cv_id:
+        return None
+    try:
+        cv = await cv_service.get_cv(user_id, cv_id)
+        return cv_analysis_service.build_candidate_context(cv.get("profile")) if cv else None
+    except Exception:
+        logger.warning("[interview] Aday bağlamı okunamadı (cv_id=%s).", cv_id, exc_info=True)
+        return None
 
 
 # --- Endpoints ---
@@ -189,6 +209,17 @@ async def start_interview(
             except organization_service.QuotaExceededError as e:
                 raise HTTPException(status_code=429, detail=str(e))
 
+        candidate_context = None
+        skills_hint = None
+        if request.cv_id:
+            cv = await cv_service.get_cv(current_user.id, request.cv_id)
+            if not cv:
+                raise HTTPException(status_code=404, detail="CV bulunamadı")
+            if not cv.get("profile"):
+                raise HTTPException(status_code=422, detail="Bu CV henüz analiz edilmemiş. Önce CV analizini çalıştırın.")
+            candidate_context = cv_analysis_service.build_candidate_context(cv["profile"])
+            skills_hint = cv["profile"].get("skills") or None
+
         # Mülakat başlamadan ÖNCE, soru bankasından role+topic(+difficulty) için
         # TEK SEFERDE en iyi eşleşen `max_questions` adet aday çekilir (best-effort
         # — banka boş/yetersizse veya embedding/RPC başarısız olursa boş liste
@@ -198,6 +229,7 @@ async def start_interview(
         question_pool = await question_bank_service.fetch_question_pool(
             role=request.role, topic=request.topic, difficulty=request.difficulty, size=max_questions,
             org_id=request.org_id,
+            skills_hint=skills_hint,
         )
 
         # DB'de mülakat oluştur
@@ -209,6 +241,7 @@ async def start_interview(
             difficulty=request.difficulty,
             question_pool=question_pool,
             org_id=request.org_id,
+            cv_id=request.cv_id,
         )
         interview_id = str(interview_data["id"])
 
@@ -222,6 +255,7 @@ async def start_interview(
             message="Mülakatı başlat.",
             history_dicts=[],
             question_pool=question_pool,
+            candidate_context=candidate_context,
         )
 
         # Kullanıcının ilk mülakatı başlatma isteğini anlık olarak kaydet 
@@ -343,6 +377,7 @@ async def chat_with_ai(
                 message=last_message,
                 history_dicts=history_dicts,
                 question_pool=interview.get("question_pool") or [],
+                candidate_context=await _candidate_context_for(interview, current_user.id),
             )
 
         # AI cevabını anlık kaydet
@@ -418,6 +453,7 @@ async def chat_with_ai_stream(
 
     max_questions = settings.MAX_INTERVIEW_QUESTIONS
     questions_asked = sum(1 for m in history_records if m.get("role") == "model")
+    candidate_context = await _candidate_context_for(interview, current_user.id)
 
     async def event_generator():
         try:
@@ -484,6 +520,7 @@ async def chat_with_ai_stream(
                             topic=topic,
                             question_number=questions_asked + 1,
                             max_questions=max_questions,
+                            candidate_context=candidate_context,
                         ):
                             full_parts.append(delta)
                             yield _sse("chunk", delta)
@@ -501,6 +538,7 @@ async def chat_with_ai_stream(
                             topic=topic,
                             question_number=questions_asked + 1,
                             max_questions=max_questions,
+                            candidate_context=candidate_context,
                         ):
                             full_parts.append(delta)
                             yield _sse("chunk", delta)
@@ -512,6 +550,7 @@ async def chat_with_ai_stream(
                         topic=topic,
                         question_number=questions_asked + 1,
                         max_questions=max_questions,
+                        candidate_context=candidate_context,
                     ):
                         full_parts.append(delta)
                         yield _sse("chunk", delta)

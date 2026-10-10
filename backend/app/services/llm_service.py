@@ -240,6 +240,7 @@ class LLMService:
         topic: str,
         question_number: int,
         max_questions: int | None = None,
+        candidate_context: str | None = None,
     ) -> str:
         """
         `get_next_question`'ın HAFİF sürümü: soruyu sıfırdan üretmek yerine,
@@ -254,7 +255,9 @@ class LLMService:
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
 
-        system_prompt = build_question_delivery_prompt(role, topic, question_number, max_questions, bank_question_text)
+        system_prompt = build_question_delivery_prompt(
+            role, topic, question_number, max_questions, bank_question_text, candidate_context,
+        )
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
         if message:
@@ -402,6 +405,7 @@ class LLMService:
         topic: str,
         question_number: int,
         max_questions: int | None = None,
+        candidate_context: str | None = None,
     ) -> str:
         """
         Sohbetin bir sonraki mülakat sorusunu (düz metin) üretir.
@@ -410,7 +414,7 @@ class LLMService:
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
 
-        system_prompt = build_question_prompt(role, topic, question_number, max_questions)
+        system_prompt = build_question_prompt(role, topic, question_number, max_questions, candidate_context)
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
         if message:
@@ -489,6 +493,7 @@ class LLMService:
         topic: str,
         question_number: int,
         max_questions: int | None = None,
+        candidate_context: str | None = None,
     ):
         """
         `get_next_question` ile aynı işi yapar ama metni token-token (async
@@ -499,7 +504,7 @@ class LLMService:
             str: Model tarafından üretilen art arda metin parçaları.
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
-        system_prompt = build_question_prompt(role, topic, question_number, max_questions)
+        system_prompt = build_question_prompt(role, topic, question_number, max_questions, candidate_context)
         async for delta in self._stream_chat(system_prompt, history, message, max_tokens=1024, purpose="question_stream"):
             yield delta
 
@@ -512,6 +517,7 @@ class LLMService:
         topic: str,
         question_number: int,
         max_questions: int | None = None,
+        candidate_context: str | None = None,
     ):
         """
         `deliver_bank_question`'ın token-token akan sürümü — bkz. `_stream_chat`
@@ -521,7 +527,9 @@ class LLMService:
             str: Model tarafından üretilen art arda metin parçaları.
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
-        system_prompt = build_question_delivery_prompt(role, topic, question_number, max_questions, bank_question_text)
+        system_prompt = build_question_delivery_prompt(
+            role, topic, question_number, max_questions, bank_question_text, candidate_context,
+        )
         async for delta in self._stream_chat(system_prompt, history, message, max_tokens=256, purpose="question_from_bank_stream"):
             yield delta
 

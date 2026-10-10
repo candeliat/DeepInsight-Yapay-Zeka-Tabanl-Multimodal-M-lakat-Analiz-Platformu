@@ -156,3 +156,37 @@ async def latest_analysis(user_id: str, cv_id: str) -> Optional[Dict[str, Any]]:
         "profile_error": None,
         "created_at": row.get("created_at"),
     }
+
+
+def _clean_fragment(value: Any, limit: int = 120) -> str:
+    return " ".join(str(value or "").replace("<", " ").replace(">", " ").split())[:limit]
+
+
+def build_candidate_context(profile: Optional[Dict[str, Any]]) -> Optional[str]:
+    """
+    Mülakat promptuna eklenecek KISA aday özeti (en fazla ~800 karakter).
+    Veri minimizasyonu: ad, e-posta, telefon, konum ve okul adı gibi kimlik
+    bilgileri BİLEREK dahil edilmez; yalnızca soru kişiselleştirmeye yarayan
+    beceri/deneyim/proje bilgisi kullanılır.
+    """
+    if not profile:
+        return None
+
+    lines: List[str] = []
+    if profile.get("seniority"):
+        lines.append(f"Kıdem tahmini: {profile['seniority']}")
+    skills = [_clean_fragment(s, 40) for s in (profile.get("skills") or [])[:12]]
+    if skills:
+        lines.append("Beceriler: " + ", ".join(skills))
+    for exp in (profile.get("experience") or [])[:3]:
+        title, company = _clean_fragment(exp.get("title"), 60), _clean_fragment(exp.get("company"), 60)
+        if title or company:
+            period = " - ".join(p for p in (_clean_fragment(exp.get("start"), 20), _clean_fragment(exp.get("end"), 20)) if p)
+            lines.append(f"Deneyim: {title or '?'} @ {company or '?'}" + (f" ({period})" if period else ""))
+    for proj in (profile.get("projects") or [])[:3]:
+        name = _clean_fragment(proj.get("name"), 60)
+        if name:
+            tech = ", ".join(_clean_fragment(t, 30) for t in (proj.get("tech") or [])[:5] if isinstance(t, str))
+            lines.append(f"Proje: {name}" + (f" ({tech})" if tech else ""))
+
+    return "\n".join(lines)[:800] or None

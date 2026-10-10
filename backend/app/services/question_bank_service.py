@@ -22,6 +22,7 @@ async def fetch_question_pool(
     difficulty: Optional[str],
     size: int,
     org_id: Optional[str] = None,
+    skills_hint: Optional[List[str]] = None,
 ) -> List[Dict[str, Any]]:
     """
     Mülakat başında (yalnızca `/start`'ta) BİR KEZ çağrılır: role+topic
@@ -53,6 +54,9 @@ async def fetch_question_pool(
     # serbest metin olduğu için SQL tarafında tam eşleşme değil, semantik
     # benzerlik aranır (bkz. sql/001_question_bank.sql'deki match_questions).
     query_text = f"{role} pozisyonu için {topic} konusunda teknik mülakat sorusu"
+    if skills_hint:
+        # Adayın CV'sindeki öne çıkan beceriler aramayı o yöne çeker.
+        query_text += f". Adayın becerileri: {', '.join(skills_hint[:8])}"
 
     rpc_name = "match_questions"
     try:

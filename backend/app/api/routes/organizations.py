@@ -16,9 +16,11 @@ from app.api.schemas.organization import (
     SharingRequest,
     UpdateMemberRoleRequest,
 )
+from app.api.schemas.assignment import AssignmentCreate, AssignmentStudentRow, OrgAssignmentItem
 from app.api.schemas.question_bank_admin import QuestionBankCreate, QuestionBankItem, QuestionBankUpdate
 from app.api.schemas.user import UserProfile
 from app.services import organization_service as org_service
+from app.services import assignment_service
 from app.services import org_insights_service as insights
 from app.services import progress_service
 from app.services import question_bank_admin_service as question_service
@@ -267,4 +269,60 @@ async def delete_org_question(
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
     await org_service.log_audit(current_user.id, org_id, "question.delete", "question", question_id)
+    return {"status": "deleted"}
+
+
+# --------------------------------------------------------------------------
+# Ödevler (Faz 4B). Tamamlanma durumu eğitmene görünür (katılım bilgisi);
+# ödev mülakatının skoru yalnızca öğrenci paylaşım rızası verdiyse.
+# --------------------------------------------------------------------------
+
+@router.post("/{org_id}/assignments", response_model=OrgAssignmentItem)
+async def create_assignment(
+    org_id: str,
+    payload: AssignmentCreate,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    try:
+        created = await assignment_service.create_assignment(current_user.id, org_id, payload.model_dump())
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    members = await org_service.list_members(org_id)
+    return {**created, "total_candidates": sum(1 for m in members if m["role"] == "candidate")}
+
+
+@router.get("/{org_id}/assignments", response_model=List[OrgAssignmentItem])
+async def list_assignments(
+    org_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    return await assignment_service.list_org_assignments(org_id, await org_service.list_members(org_id))
+
+
+@router.get("/{org_id}/assignments/{assignment_id}/students", response_model=List[AssignmentStudentRow])
+async def assignment_students(
+    org_id: str,
+    assignment_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    if not await assignment_service.get_org_assignment(org_id, assignment_id):
+        raise HTTPException(status_code=404, detail="Ödev bulunamadı")
+    members = await org_service.list_members(org_id)
+    interviews = assignment_service.assignment_interviews([assignment_id])
+    identities = {str(m["user_id"]): insights.get_identity(str(m["user_id"])) for m in members if m["role"] == "candidate"}
+    return assignment_service.build_assignment_rows(members, interviews, identities)
+
+
+@router.delete("/{org_id}/assignments/{assignment_id}")
+async def delete_assignment(
+    org_id: str,
+    assignment_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    if not await assignment_service.delete_assignment(current_user.id, org_id, assignment_id):
+        raise HTTPException(status_code=404, detail="Ödev bulunamadı")
     return {"status": "deleted"}

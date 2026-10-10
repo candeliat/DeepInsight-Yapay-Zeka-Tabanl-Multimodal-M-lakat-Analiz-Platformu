@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from app.core.config import settings
 from app.services.llm_service import llm_service
-from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching
+from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching, assignment_service
 from app.services.interview_service import (
     create_interview,
     save_message,
@@ -84,6 +84,9 @@ class StartInterviewRequest(BaseModel):
     # Soru seçimi ilanın zorunlu becerilerine yönelir; CV de verilmişse adayda
     # eksik görünen beceriler nazikçe yoklanır.
     job_id: Optional[str] = Field(default=None, max_length=64)
+    # Opsiyonel: kurum ödevi. Verilirse rol/konu/zorluk ve kurum bağlamı ödevden
+    # alınır (istemcinin gönderdiği değerler yok sayılır).
+    assignment_id: Optional[str] = Field(default=None, max_length=64)
 
     @field_validator("role", "topic")
     @classmethod
@@ -223,6 +226,14 @@ async def start_interview(
     try:
         max_questions = settings.MAX_INTERVIEW_QUESTIONS
 
+        if request.assignment_id:
+            assignment = await assignment_service.get_assignment_for_member(current_user.id, request.assignment_id)
+            if not assignment:
+                raise HTTPException(status_code=404, detail="Ödev bulunamadı")
+            request.role, request.topic = assignment["role"], assignment["topic"]
+            request.difficulty = assignment.get("difficulty")
+            request.org_id = assignment["org_id"]
+
         if request.org_id:
             if not await organization_service.get_membership(request.org_id, current_user.id):
                 raise HTTPException(status_code=403, detail="Bu kurumun üyesi değilsiniz.")
@@ -275,6 +286,7 @@ async def start_interview(
             org_id=request.org_id,
             cv_id=request.cv_id,
             job_id=request.job_id,
+            assignment_id=request.assignment_id,
         )
         interview_id = str(interview_data["id"])
 

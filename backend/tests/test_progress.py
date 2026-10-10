@@ -57,6 +57,7 @@ def test_topics_group_case_and_turkish_variants_and_flag_weak():
     assert len(p["topics"]) == 2
     weak = p["topics"][0]
     assert weak["count"] == 2 and weak["average"] == 45 and weak["weak"] is True
+    assert weak["topic"] == "Veri Yapıları"  # en son yazım ("veri yapilari") değil, düzgün yazım
     assert topics["React"]["weak"] is False
     rec = next(r for r in p["recommendations"] if r["id"].startswith("topic:"))
     assert rec["action"]["topic"] == weak["topic"]

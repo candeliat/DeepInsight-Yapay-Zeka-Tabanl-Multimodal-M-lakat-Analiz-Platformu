@@ -102,9 +102,17 @@ def _topics(timeline: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         if not topic:
             continue
         key = " ".join(fold(topic).split())
-        g = groups.setdefault(key, {"topic": topic, "role": p.get("role"), "scores": [], "difficulty": p.get("difficulty")})
-        g["topic"], g["role"], g["difficulty"] = topic, p.get("role"), p.get("difficulty")  # en güncel yazım
+        g = groups.setdefault(key, {"spellings": {}, "role": p.get("role"), "scores": [], "difficulty": p.get("difficulty")})
+        g["role"], g["difficulty"] = p.get("role"), p.get("difficulty")  # pratik önerisi en son bağlamı kullanır
+        g["spellings"][topic] = g["spellings"].get(topic, 0) + 1
         g["scores"].append(p["average"])
+    for g in groups.values():
+        # Gösterilecek yazım: en sık kullanılan; eşitlikte Türkçe karakter/büyük harf içeren
+        # "düzgün" yazım ("Veri Yapıları" > "veri yapilari").
+        g["topic"] = max(
+            g["spellings"],
+            key=lambda s: (g["spellings"][s], any(not ch.isascii() or ch.isupper() for ch in s)),
+        )
     result = [
         {"topic": g["topic"], "role": g["role"], "difficulty": g["difficulty"], "count": len(g["scores"]),
          "average": _mean(g["scores"]), "weak": (_mean(g["scores"]) or 0) < WEAK_TOPIC_THRESHOLD}

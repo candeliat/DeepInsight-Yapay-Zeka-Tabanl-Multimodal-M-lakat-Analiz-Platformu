@@ -34,8 +34,10 @@ export default function LoginPage() {
         password,
       });
       
-      const { access_token } = response.data;
-      setToken(access_token);
+      // refresh_token da saklanmalı: erişim token'ı ~1 saatte doluyor ve
+      // api.ts interceptor'ı onu bununla yeniliyor (aksi halde saatte bir çıkış).
+      const { access_token, refresh_token } = response.data;
+      setToken(access_token, refresh_token);
       await fetchProfile(); // Automatically load the user profile
       
       router.push("/dashboard");

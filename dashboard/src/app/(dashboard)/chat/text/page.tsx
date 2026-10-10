@@ -44,6 +44,10 @@ function TextInterviewContent() {
   const searchParams = useSearchParams();
   const cvId = searchParams.get("cv");
   const jobId = searchParams.get("job");
+  // "Pratik yap" (Gelişimim sayfası) gibi bağlantılardan gelen hazır ayarlar.
+  const roleParam = searchParams.get("role");
+  const topicParam = searchParams.get("topic");
+  const difficultyParam = searchParams.get("difficulty");
 
   const [currentState, setCurrentState] = useState<InterviewState>("SETUP");
 
@@ -72,6 +76,12 @@ function TextInterviewContent() {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
+
+  useEffect(() => {
+    if (roleParam) setRole(roleParam.slice(0, 80));
+    if (topicParam) setTopic(topicParam.slice(0, 120));
+    if (difficultyParam && ["JUNIOR", "ORTA", "UZMAN"].includes(difficultyParam)) setDifficulty(difficultyParam);
+  }, [roleParam, topicParam, difficultyParam]);
 
   // CV ve/veya ilan seçilmişse yükle; rol/konu/zorluğu öner (kullanıcı değiştirebilir).
   // İlan varsa öneriler ilandan, yoksa CV profilinden gelir.

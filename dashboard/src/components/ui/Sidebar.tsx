@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Video, User, MessageSquare, MessageCircle, Database, FileText, Briefcase } from "lucide-react";
+import { LayoutDashboard, Video, User, MessageSquare, MessageCircle, Database, FileText, Briefcase, TrendingUp } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 
 const candidateLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/interviews", label: "Mülakatlarım", icon: Video },
+  { href: "/progress", label: "Gelişimim", icon: TrendingUp },
   { href: "/chat", label: "AI Danışman", icon: MessageSquare },
   { href: "/chat/text", label: "Yazılı Mülakat", icon: MessageCircle },
   { href: "/cv", label: "CV Analizi", icon: FileText },

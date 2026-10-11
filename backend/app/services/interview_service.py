@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
-from app.core.database import supabase, get_auth_client
+from app.core.database import supabase
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ async def create_interview(
     liste olarak kaydedilir — mülakat tamamen LLM'in tam-üretim akışıyla
     devam eder.
     """
-    client = get_auth_client(token) if token else supabase
+    client = supabase
     if not client:
         raise RuntimeError("Supabase client is not initialized")
 
@@ -115,7 +115,7 @@ async def try_claim_interview_finalization(interview_id: str, token: str = None)
     Dönüş: bu çağrı yarışı kazandıysa True, kaybettiyse (veya mülakat zaten
     tamamlanmışsa) False.
     """
-    client = get_auth_client(token) if token else supabase
+    client = supabase
     if not client:
         raise RuntimeError("Supabase client is not initialized")
 
@@ -141,7 +141,7 @@ async def release_interview_finalization_claim(interview_id: str, token: str = N
     bu geri alma da başarısız olursa orijinal hatayı maskelememek için
     yalnızca loglar, tekrar fırlatmaz.
     """
-    client = get_auth_client(token) if token else supabase
+    client = supabase
     if not client:
         return
     try:
@@ -188,7 +188,7 @@ async def finish_interview_and_evaluate(interview_id: str, evaluation_data: Dict
     Mülakatı sonlandırır ve değerlendirme puanlarını günceller.
     evaluation_data: { 'technical_score': int, 'confidence_score': int, 'vocabulary_score': int, 'feedback': str }
     """
-    client = get_auth_client(token) if token else supabase
+    client = supabase
     if not client:
         raise RuntimeError("Supabase client is not initialized")
 
@@ -210,7 +210,7 @@ async def get_interview(interview_id: str, token: str = None) -> dict:
     """
     Mülakat bilgilerini getirir.
     """
-    client = get_auth_client(token) if token else supabase
+    client = supabase
     if not client:
         raise RuntimeError("Supabase client is not initialized")
 
@@ -224,7 +224,7 @@ async def get_user_interviews(user_id: str, token: str = None) -> List[Dict[str,
     """
     Kullanıcının tüm mülakatlarını getirir.
     """
-    client = get_auth_client(token) if token else supabase
+    client = supabase
     if not client:
         raise RuntimeError("Supabase client is not initialized")
 

@@ -131,7 +131,7 @@ def test_chat_uses_bank_delivery_for_matching_pool_index(client, monkeypatch):
     ]
     monkeypatch.setattr(
         interview_route, "get_interview",
-        AsyncMock(return_value={"role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
+        AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
     )
 
     deliver_mock = AsyncMock(return_value="Güzel cevap! İkinci havuz sorusu.")
@@ -162,7 +162,7 @@ def test_chat_falls_back_to_generation_when_pool_exhausted(client, monkeypatch):
     pool = [{"id": "q1", "question_text": "Sadece bir soru.", "similarity": 0.8}]
     monkeypatch.setattr(
         interview_route, "get_interview",
-        AsyncMock(return_value={"role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
+        AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
     )
 
     deliver_mock = AsyncMock(return_value="ASLA ÇAĞRILMAMALI")
@@ -194,7 +194,7 @@ def test_stream_uses_bank_delivery_when_pool_has_candidate(client, monkeypatch):
     ]
     monkeypatch.setattr(
         interview_route, "get_interview",
-        AsyncMock(return_value={"role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
+        AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
     )
 
     async def _fake_bank_stream(*args, **kwargs):
@@ -234,7 +234,7 @@ def test_stream_falls_back_to_generation_when_bank_delivery_fails_before_any_chu
     pool = [{"id": "q1", "question_text": "Birinci havuz sorusu.", "similarity": 0.8}]
     monkeypatch.setattr(
         interview_route, "get_interview",
-        AsyncMock(return_value={"role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
+        AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
     )
 
     async def _fake_bank_stream_fails_immediately(*args, **kwargs):

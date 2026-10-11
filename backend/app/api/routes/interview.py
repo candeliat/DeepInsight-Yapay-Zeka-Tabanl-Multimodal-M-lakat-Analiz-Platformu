@@ -212,6 +212,21 @@ async def _candidate_context_for(interview: Dict[str, Any], user_id: str) -> Opt
         return None
 
 
+async def _owned_interview(interview_id: str, user_id: str) -> Dict[str, Any]:
+    """
+    Mülakatı getirir ve sahibinin istek yapan kullanıcı olduğunu doğrular.
+    Başkasının mülakatı "yok" gibi davranır (404) — varlığı sızdırılmaz.
+    Veritabanı erişimi service_role ile olduğu için bu kontrol tek güvence katmanıdır.
+    """
+    try:
+        interview = await get_interview(interview_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Interview not found")
+    if str(interview.get("user_id")) != str(user_id):
+        raise HTTPException(status_code=404, detail="Interview not found")
+    return interview
+
+
 # --- Endpoints ---
 
 @router.post("/start", response_model=StartInterviewResponse)
@@ -343,12 +358,9 @@ async def chat_with_ai(
     her zaman dolu ve temizlenmiştir.
     """
     try:
-        # Mülakat bilgilerini al (role, topic)
-        try:
-            interview = await get_interview(request.interview_id, token=token)
-        except ValueError:
-            raise HTTPException(status_code=404, detail="Interview not found")
-        
+        # Mülakat bilgilerini al (role, topic) — yalnızca kendi mülakatı
+        interview = await _owned_interview(request.interview_id, current_user.id)
+
         role = interview.get("role", "Yazılım Mühendisi")
         topic = interview.get("topic", "Genel")
         
@@ -482,10 +494,7 @@ async def chat_with_ai_stream(
     404/400 gibi durumlar düzgün HTTP status kodlarıyla döner, akışın
     içine gömülmez.
     """
-    try:
-        interview = await get_interview(request.interview_id, token=token)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Interview not found")
+    interview = await _owned_interview(request.interview_id, current_user.id)
 
     role = interview.get("role", "Yazılım Mühendisi")
     topic = interview.get("topic", "Genel")
@@ -633,13 +642,7 @@ async def finish_interview_early(
     sunucu taraflı soru sayacına bağlı (LLM'e "bitir" mesajı göndermek
     işe yaramaz) — erken sonlandırma için bu ayrı uç nokta gerekir.
     """
-    try:
-        interview = await get_interview(interview_id, token=token)
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Interview not found")
-
-    if interview.get("user_id") != current_user.id:
-        raise HTTPException(status_code=403, detail="Not authorized to access this interview")
+    interview = await _owned_interview(interview_id, current_user.id)
 
     if interview.get("status") == "completed":
         raise HTTPException(status_code=400, detail="Bu mülakat zaten tamamlanmış.")
@@ -795,14 +798,8 @@ async def get_interview_detail(
     Belirli bir mülakatın tüm detaylarını döndür.
     """
     try:
-        try:
-            interview = await get_interview(interview_id, token=token)
-        except ValueError:
-            raise HTTPException(status_code=404, detail="Interview not found")
-            
-        if interview.get("user_id") != current_user.id:
-            raise HTTPException(status_code=403, detail="Not authorized to access this interview")
-            
+        interview = await _owned_interview(interview_id, current_user.id)
+
         messages = await get_interview_history(interview_id, token=token)
         
         detail = dict(interview)

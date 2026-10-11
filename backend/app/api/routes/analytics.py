@@ -35,6 +35,24 @@ ALLOWED_EXTENSIONS = ALLOWED_VIDEO_EXTENSIONS | ALLOWED_AUDIO_EXTENSIONS
 MAX_FILE_SIZE_MB = 500
 
 
+async def _require_own_interview(interview_id: str, user_id: str) -> str:
+    """
+    interview_id'nin geçerli bir UUID olduğunu (dosya adına girdiği için yol
+    enjeksiyonunu da engeller) ve mülakatın istek yapan kullanıcıya ait olduğunu
+    doğrular. Başkasının mülakatı 404 döner — transkript ve duygu analizi kişisel veridir.
+    """
+    try:
+        interview_id = str(uuid.UUID(interview_id))
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Mülakat bulunamadı.")
+    if not supabase:
+        raise HTTPException(status_code=503, detail="Veritabanı bağlantısı yok.")
+    owner = supabase.table("interviews").select("user_id").eq("id", interview_id).execute().data
+    if not owner or str(owner[0].get("user_id")) != str(user_id):
+        raise HTTPException(status_code=404, detail="Mülakat bulunamadı.")
+    return interview_id
+
+
 @router.post("/analyze/{interview_id}", response_model=AnalyticsStartResponse)
 async def start_analysis(
     interview_id: str,
@@ -53,6 +71,7 @@ async def start_analysis(
     Sonucu `GET /status/{interview_id}` ve `GET /results/{interview_id}` ile sorgulayın.
     """
     # --- Validasyonlar ---
+    interview_id = await _require_own_interview(interview_id, current_user.id)
 
     # Dosya uzantısı kontrolü
     file_ext = Path(file.filename or "").suffix.lower()
@@ -136,8 +155,7 @@ async def get_analysis_status(
     - **completed**: Analiz tamamlandı
     - **failed**: Analiz hata verdi
     """
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Veritabanı bağlantısı yok.")
+    interview_id = await _require_own_interview(interview_id, current_user.id)
 
     try:
         result = (
@@ -185,8 +203,7 @@ async def get_analysis_results(
     - **emotion_distribution**: Duygu dağılımı
     - **transcript**: Tam transkript metni
     """
-    if not supabase:
-        raise HTTPException(status_code=503, detail="Veritabanı bağlantısı yok.")
+    interview_id = await _require_own_interview(interview_id, current_user.id)
 
     try:
         result = (

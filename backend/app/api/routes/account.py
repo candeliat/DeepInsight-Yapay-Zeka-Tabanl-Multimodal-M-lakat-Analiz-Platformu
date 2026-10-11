@@ -1,0 +1,50 @@
+import json
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
+from pydantic import BaseModel, Field
+
+from app.api.dependencies.auth import get_current_user, oauth2_scheme
+from app.api.schemas.user import UserProfile
+from app.services import account_service, organization_service
+
+router = APIRouter()
+
+
+class DeleteAccountRequest(BaseModel):
+    # Yanlışlıkla silmeye karşı: kullanıcı kendi e-postasını yazarak onaylar.
+    confirm_email: str = Field(max_length=320)
+
+
+@router.get("/export")
+async def export_my_data(
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """KVKK md. 11: hakkımda işlenen tüm verileri JSON olarak indir."""
+    data = account_service.export_user_data(
+        current_user.id, current_user.email,
+        {"created_at": current_user.created_at, "profile": current_user.user_metadata},
+    )
+    await organization_service.log_audit(current_user.id, None, "account.export", "user", current_user.id)
+    return Response(
+        content=json.dumps(data, ensure_ascii=False, indent=2, default=str).encode("utf-8"),
+        media_type="application/json; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="deepinsight-verilerim.json"'},
+    )
+
+
+@router.delete("")
+async def delete_my_account(
+    payload: DeleteAccountRequest,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """Hesabı ve tüm kişisel veriyi kalıcı olarak siler (geri alınamaz)."""
+    if payload.confirm_email.strip().lower() != (current_user.email or "").strip().lower():
+        raise HTTPException(status_code=422, detail="Onay için hesabınızın e-posta adresini doğru yazın.")
+    try:
+        counts = await account_service.delete_account(current_user.id, current_user.email)
+    except account_service.LastAdminError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    return {"status": "deleted", "deleted": counts}

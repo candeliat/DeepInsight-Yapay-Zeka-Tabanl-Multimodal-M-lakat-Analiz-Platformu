@@ -18,6 +18,7 @@ import {
   Loader2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { DataRightsCard } from "@/components/profile/DataRightsCard";
 
 export default function ProfilePage() {
   const { user, logout } = useAuthStore();
@@ -255,6 +256,8 @@ export default function ProfilePage() {
               </div>
             </CardContent>
           </Card>
+
+          <DataRightsCard email={user.email} />
         </div>
       </div>
     </div>

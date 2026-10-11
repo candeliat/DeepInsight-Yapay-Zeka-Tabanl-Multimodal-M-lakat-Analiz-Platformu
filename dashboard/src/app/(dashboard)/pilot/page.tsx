@@ -23,6 +23,8 @@ export default function PilotPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
+  // Bu oturumda yanıtlanan anketler: kart teşekkür mesajıyla kalır, sayaç azalır.
+  const [answered, setAnswered] = useState<Set<string>>(new Set());
 
   const [sus, setSus] = useState<(number | undefined)[]>(Array(10).fill(undefined));
   const [editSus, setEditSus] = useState(false);
@@ -170,7 +172,7 @@ export default function PilotPage() {
           {status.pending_surveys.length > 0 && (
             <div className="space-y-4">
               <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">
-                Değerlendirilmemiş mülakatlar ({status.pending_surveys.length})
+                Değerlendirilmemiş mülakatlar ({status.pending_surveys.filter((s) => !answered.has(s.id)).length})
               </h2>
               {status.pending_surveys.map((s) => (
                 <PostInterviewSurvey
@@ -178,6 +180,7 @@ export default function PilotPage() {
                   interviewId={s.id}
                   items={status.post_items}
                   title={`${s.role ?? "Mülakat"} · ${s.topic ?? ""} — ${formatDate(s.created_at)}`}
+                  onDone={() => setAnswered((prev) => new Set(prev).add(s.id))}
                 />
               ))}
             </div>

@@ -16,6 +16,8 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { assignmentService, MyAssignment } from "@/services/assignmentService";
+import { pilotService, PilotStatus } from "@/services/pilotService";
+import { PostInterviewSurvey } from "@/components/pilot/PostInterviewSurvey";
 import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -77,6 +79,8 @@ function TextInterviewContent() {
   const [userAnswer, setUserAnswer] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
+  // Pilot katılımcısıysa sonuç ekranında kısa mülakat anketi gösterilir.
+  const [pilot, setPilot] = useState<PilotStatus | null>(null);
 
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -151,6 +155,11 @@ function TextInterviewContent() {
       cancelled = true;
     };
   }, [cvId, jobId]);
+
+  useEffect(() => {
+    if (currentState !== "RESULTS") return;
+    pilotService.status().then(setPilot).catch(() => setPilot(null));
+  }, [currentState]);
 
   useEffect(() => {
     if (currentState === "INTERVIEWING" && !isThinking) {
@@ -513,6 +522,12 @@ function TextInterviewContent() {
               {evaluation.feedback}
             </p>
           </div>
+
+          {pilot?.consent && (
+            <div className="mt-6">
+              <PostInterviewSurvey interviewId={interviewId} items={pilot.post_items} />
+            </div>
+          )}
 
           <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
             <Button variant="outline" onClick={() => { setCurrentState("SETUP"); setMessages([]); setEvaluation(null); }} className="w-full sm:w-auto">

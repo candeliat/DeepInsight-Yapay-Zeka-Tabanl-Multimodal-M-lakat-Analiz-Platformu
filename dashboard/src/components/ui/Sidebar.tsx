@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Video, User, MessageSquare, MessageCircle, Database, FileText, Briefcase, TrendingUp, Building2, ClipboardList } from "lucide-react";
+import { LayoutDashboard, Video, User, MessageSquare, MessageCircle, Database, FileText, Briefcase, TrendingUp, Building2, ClipboardList, FlaskConical } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 
 const candidateLinks = [
@@ -15,6 +15,7 @@ const candidateLinks = [
   { href: "/jobs", label: "İlan Eşleştirme", icon: Briefcase },
   { href: "/assignments", label: "Ödevlerim", icon: ClipboardList },
   { href: "/organizations", label: "Kurumlarım", icon: Building2 },
+  { href: "/pilot", label: "Pilot Çalışma", icon: FlaskConical },
   { href: "/profile", label: "Profil", icon: User },
 ];
 

@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Download, Loader2, ShieldCheck, Trash2, AlertTriangle } from "lucide-react";
-import { accountService } from "@/services/accountService";
+import { accountService, ConsentStatus } from "@/services/accountService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
@@ -69,6 +69,8 @@ export function DataRightsCard({ email }: { email: string | undefined }) {
           </Button>
         </div>
 
+        <VideoConsentRow />
+
         <div className="border-t border-border pt-6">
           <p className="font-semibold text-foreground text-sm">Hesabımı ve tüm verilerimi sil</p>
           <p className="text-sm text-muted-foreground mt-1 max-w-xl">
@@ -101,5 +103,49 @@ export function DataRightsCard({ email }: { email: string | undefined }) {
         {error && <p role="alert" className="text-sm font-semibold text-destructive">{error}</p>}
       </CardContent>
     </Card>
+  );
+}
+
+/** Video analizi onamı: verildiyse geri çekilebilir (video analizi sonuçları silinir). */
+function VideoConsentRow() {
+  const [consent, setConsent] = useState<ConsentStatus | null>(null);
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    accountService.getConsent("video_analysis").then(setConsent).catch(() => setConsent(null));
+  }, []);
+
+  if (!consent) return null;
+  const revoke = async () => {
+    setBusy(true);
+    try {
+      setConsent(await accountService.setConsent("video_analysis", false));
+      setConfirm(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-border pt-6 flex items-start justify-between gap-4 flex-wrap">
+      <div className="text-sm max-w-xl">
+        <p className="font-semibold text-foreground">Video analizi onamı</p>
+        <p className="text-muted-foreground mt-1">
+          {consent.granted
+            ? "Görüntülü mülakat kayıtlarınızın analiz edilmesine onam verdiniz. Geri çekerseniz video analizi sonuçlarınız silinir."
+            : "Onam vermediniz; görüntülü mülakat başlatırken onam istenir."}
+        </p>
+      </div>
+      {consent.granted &&
+        (confirm ? (
+          <span className="text-sm">
+            <button onClick={revoke} disabled={busy} className="font-bold text-destructive hover:underline">Geri çek ve sil</button>
+            <button onClick={() => setConfirm(false)} className="ml-3 text-muted-foreground hover:underline">Vazgeç</button>
+          </span>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => setConfirm(true)}>Onamı geri çek</Button>
+        ))}
+    </div>
   );
 }

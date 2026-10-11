@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/lib/api";
@@ -22,6 +22,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
 
   const [errorStr, setErrorStr] = useState("");
+  // Kayıttan yönlendirildiyse bilgi ver (e-posta doğrulaması gerekebilir).
+  const [registered, setRegistered] = useState(false);
+  useEffect(() => {
+    setRegistered(new URLSearchParams(window.location.search).has("registered"));
+  }, []);
   const { setToken, fetchProfile, isLoading } = useAuthStore();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -54,10 +59,15 @@ export default function LoginPage() {
             Tekrar hoş geldiniz
           </CardTitle>
           <CardDescription>
-            DeepInsight komuta merkezine erişmek için bilgilerinizi girin
+            Hesabınıza giriş yapın
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {registered && !errorStr && (
+            <div role="status" className="mb-4 p-3 bg-success/10 text-success text-sm rounded-xl border border-success/20">
+              Hesabınız oluşturuldu. E-postanıza bir doğrulama bağlantısı geldiyse önce onu onaylayın, sonra giriş yapın.
+            </div>
+          )}
           {errorStr && (
             <div className="mb-4 p-3 bg-destructive/10 text-destructive text-sm rounded-xl border border-destructive/20">
               {errorStr}
@@ -89,7 +99,7 @@ export default function LoginPage() {
                   Şifre
                 </label>
                 <Link
-                  href="#"
+                  href="/forgot-password"
                   className="text-sm font-medium text-primary hover:text-primary-hover transition-colors"
                 >
                   Şifremi unuttum
@@ -119,6 +129,7 @@ export default function LoginPage() {
               Kayıt Ol
             </Link>
           </div>
+          <Link href="/gizlilik" className="text-xs hover:text-foreground hover:underline">Aydınlatma metni</Link>
         </CardFooter>
       </Card>
     </div>

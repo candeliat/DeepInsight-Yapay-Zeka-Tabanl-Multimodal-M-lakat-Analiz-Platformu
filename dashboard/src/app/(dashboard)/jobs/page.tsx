@@ -1,5 +1,7 @@
 "use client";
 
+import { formatScore } from "@/lib/scoreBand";
+
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -361,7 +363,7 @@ export default function JobsPage() {
                                 <div className="flex justify-between text-xs">
                                   <span className="font-semibold text-foreground">{c.label}</span>
                                   <span className="text-muted-foreground">
-                                    {c.earned}/{c.weight}
+                                    {formatScore(c.earned, 1)}/{c.weight}
                                   </span>
                                 </div>
                                 <div className="h-1.5 rounded-full bg-muted mt-1 overflow-hidden">

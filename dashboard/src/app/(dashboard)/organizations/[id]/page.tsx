@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
+import { scoreBand } from "@/lib/scoreBand";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -337,7 +338,7 @@ export default function OrganizationPanelPage() {
                   </span>
                   <span className="text-xs shrink-0">
                     <span className="font-semibold tabular-nums">{t.average?.toFixed(0)}</span>
-                    <span className={`ml-2 ${t.weak ? "text-warning" : "text-muted-foreground"}`}>{t.weak ? "Gelişmeli" : "İyi"}</span>
+                    <span className={`ml-2 ${t.weak ? "text-warning" : "text-muted-foreground"}`}>{scoreBand(t.average)?.label ?? ""}</span>
                   </span>
                 </li>
               ))}

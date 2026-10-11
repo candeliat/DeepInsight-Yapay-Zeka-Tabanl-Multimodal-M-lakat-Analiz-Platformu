@@ -21,8 +21,9 @@ import { PostInterviewSurvey } from "@/components/pilot/PostInterviewSurvey";
 import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { cvService, CVDetail } from "@/services/cvService";
-import { jobService, JobDetail } from "@/services/jobService";
+import { cvService, CVDetail, CVItem } from "@/services/cvService";
+import { jobService, JobDetail, JobItem } from "@/services/jobService";
+import { useAuthStore } from "@/store/useAuthStore";
 import { orgService, MyOrganization } from "@/services/orgService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -54,6 +55,9 @@ function TextInterviewContent() {
   const topicParam = searchParams.get("topic");
   const difficultyParam = searchParams.get("difficulty");
   const assignmentParam = searchParams.get("assignment");
+  // Yarıda kalmış bir mülakata kaldığı yerden devam (?resume=<id>).
+  const resumeParam = searchParams.get("resume");
+  const { user } = useAuthStore();
 
   const [currentState, setCurrentState] = useState<InterviewState>("SETUP");
 
@@ -72,6 +76,10 @@ function TextInterviewContent() {
   // Kurum ödevi (opsiyonel, ?assignment=<id>): rol/konu/zorluk ve kurum ödevden gelir, değiştirilemez.
   const [assignment, setAssignment] = useState<MyAssignment | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
+  // Kurulumdaki CV / ilan seçicileri için listeler (seçim URL parametresine yazılır).
+  const [myCvs, setMyCvs] = useState<CVItem[]>([]);
+  const [myJobs, setMyJobs] = useState<JobItem[]>([]);
+  const [resuming, setResuming] = useState(!!resumeParam);
 
   // Mülakat State
   const [interviewId, setInterviewId] = useState("");
@@ -92,7 +100,53 @@ function TextInterviewContent() {
 
   useEffect(() => {
     orgService.myOrganizations().then(setOrgs).catch(() => setOrgs([]));
+    cvService.listCvs().then(setMyCvs).catch(() => setMyCvs([]));
+    jobService.listJobs().then(setMyJobs).catch(() => setMyJobs([]));
   }, []);
+
+  // Profildeki hedef pozisyon, başka bir öneri yoksa rolü önceden doldurur.
+  const target = user?.user_metadata?.target as string | undefined;
+  useEffect(() => {
+    if (target && !roleParam && !cvId && !jobId && !assignmentParam && !resumeParam) setRole(target.slice(0, 80));
+  }, [target, roleParam, cvId, jobId, assignmentParam, resumeParam]);
+
+  // Kaldığı yerden devam: geçmişi yükle ve doğrudan sohbet ekranına geç.
+  useEffect(() => {
+    if (!resumeParam) return;
+    let cancelled = false;
+    chatService
+      .getInterviewDetail(resumeParam)
+      .then((detail) => {
+        if (cancelled) return;
+        if (detail.status === "completed") {
+          router.replace(`/interviews/${resumeParam}`);
+          return;
+        }
+        type Msg = { role: string; content: string };
+        const history = ((detail.messages ?? []) as Msg[]).filter(
+          (m, i) => !(i === 0 && m.role === "user" && m.content === "Mülakatı başlat."),
+        );
+        setRole(detail.role);
+        setTopic(detail.topic);
+        if (detail.difficulty) setDifficulty(detail.difficulty);
+        setInterviewId(resumeParam);
+        setMessages(history.map((m) => ({ role: m.role === "model" ? "ai" : "user", content: m.content })));
+        setCurrentState("INTERVIEWING");
+      })
+      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "Mülakat yüklenemedi."))
+      .finally(() => !cancelled && setResuming(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeParam, router]);
+
+  // CV / ilan seçimi URL'ye yazılır; mevcut yükleme mantığı (öneriler, bağlam bandı) aynen çalışır.
+  const setContextParam = (key: "cv" | "job", value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    router.replace(`/chat/text${params.toString() ? `?${params}` : ""}`);
+  };
 
   useEffect(() => {
     if (roleParam) setRole(roleParam.slice(0, 80));
@@ -249,6 +303,14 @@ function TextInterviewContent() {
   // EKRANLAR (RENDER)
   // ----------------------------------------------------------------------
 
+  if (currentState === "SETUP" && resuming) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="w-6 h-6 animate-spin" />
+      </div>
+    );
+  }
+
   if (currentState === "SETUP") {
     return (
       <div className="flex flex-col min-h-[calc(100vh-8rem)] items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
@@ -349,6 +411,41 @@ function TextInterviewContent() {
                 ))}
               </div>
             </div>
+
+            {!assignment && (myCvs.length > 0 || myJobs.length > 0) && (
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Kişiselleştir (opsiyonel)</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {myCvs.length > 0 && (
+                    <select
+                      aria-label="CV'ye göre kişiselleştir"
+                      value={cvId ?? ""}
+                      onChange={(e) => setContextParam("cv", e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                    >
+                      <option value="">CV kullanma</option>
+                      {myCvs.map((c) => (
+                        <option key={c.id} value={c.id}>CV: {c.original_filename}</option>
+                      ))}
+                    </select>
+                  )}
+                  {myJobs.length > 0 && (
+                    <select
+                      aria-label="İlana göre mülakat"
+                      value={jobId ?? ""}
+                      onChange={(e) => setContextParam("job", e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                    >
+                      <option value="">İlan seçme</option>
+                      {myJobs.map((j) => (
+                        <option key={j.id} value={j.id}>İlan: {[j.title, j.company].filter(Boolean).join(" · ") || "Başlıksız"}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground ml-1">Seçerseniz sorular CV&apos;nize ve/veya ilanın gereksinimlerine göre uyarlanır.</p>
+              </div>
+            )}
 
             {orgs.length > 0 && !assignment && (
               <div className="space-y-2">

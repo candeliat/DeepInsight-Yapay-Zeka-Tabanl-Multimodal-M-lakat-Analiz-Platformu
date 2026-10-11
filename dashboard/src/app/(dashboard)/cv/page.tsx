@@ -317,7 +317,7 @@ export default function CVPage() {
                 </div>
               ) : (
                 <button onClick={() => setConfirmRevoke(true)} className="text-xs text-muted-foreground hover:text-destructive hover:underline">
-                  Rızamı geri çek ve tüm verilerimi sil
+                  Rızamı geri çek ve tüm CV&apos;lerimi sil
                 </button>
               )}
             </div>

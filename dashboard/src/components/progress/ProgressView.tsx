@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { scoreBand } from "@/lib/scoreBand";
 import Link from "next/link";
 import {
   CartesianGrid,
@@ -235,7 +236,7 @@ export function ProgressView({ progress, allowPractice = true }: { progress: Pro
                   </span>
                   <span className="text-xs shrink-0">
                     <span className="font-semibold text-foreground tabular-nums">{t.average?.toFixed(0) ?? "—"}</span>
-                    <span className={`ml-2 ${t.weak ? "text-warning" : "text-muted-foreground"}`}>{t.weak ? "Gelişmeli" : "İyi"}</span>
+                    <span className={`ml-2 ${t.weak ? "text-warning" : "text-muted-foreground"}`}>{scoreBand(t.average)?.label ?? ""}</span>
                   </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-muted mt-1.5 overflow-hidden">

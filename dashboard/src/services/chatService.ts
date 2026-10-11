@@ -210,6 +210,16 @@ export const chatService = {
     }
   },
 
+  /** Yarıda kalmış kendi mülakatını siler (tamamlanmış mülakatlar silinemez). */
+  async deleteInterview(id: string): Promise<void> {
+    try {
+      await api.delete(`/api/v1/interview/${id}`);
+    } catch (error: unknown) {
+      const e = error as { response?: { data?: { detail?: string } }, message?: string };
+      throw new Error(e.response?.data?.detail ?? `API hatası: ${e.message}`);
+    }
+  },
+
   /**
    * Belirli bir mülakatın detaylarını getirir (skorlar, mesajlar, feedback).
    */

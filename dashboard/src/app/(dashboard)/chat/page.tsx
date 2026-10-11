@@ -25,6 +25,9 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import Link from "next/link";
+import { accountService, ConsentStatus } from "@/services/accountService";
+import { useAuthStore } from "@/store/useAuthStore";
 
 // Tarayıcı uyumluluğu için SpeechRecognition türleri
 declare global {
@@ -46,6 +49,21 @@ export default function InterviewRoomPage() {
   const [role, setRole] = useState("Yazılım Mühendisi");
   const [topic, setTopic] = useState("React ve Modern Web Geliştirme");
   const [difficulty, setDifficulty] = useState("ORTA");
+  // Video analizi onamı: kayıt sunucuya yüklenir ve yüz ifadesi analiz edilir — açık onam şart.
+  const [videoConsent, setVideoConsent] = useState<ConsentStatus | null>(null);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [showConsentText, setShowConsentText] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  const { user } = useAuthStore();
+  const target = user?.user_metadata?.target as string | undefined;
+
+  useEffect(() => {
+    accountService.getConsent("video_analysis").then(setVideoConsent).catch(() => setVideoConsent(null));
+  }, []);
+
+  useEffect(() => {
+    if (target) setRole(target.slice(0, 80));
+  }, [target]);
   
   // Mülakat State
   const [interviewId, setInterviewId] = useState("");
@@ -253,9 +271,17 @@ export default function InterviewRoomPage() {
   // ----------------------------------------------------------------------
   const handleStartInterview = async (e: React.FormEvent) => {
     e.preventDefault();
+    setStartError(null);
+    if (!videoConsent?.granted && !consentChecked) {
+      setStartError("Görüntülü mülakat için video analizine onam vermeniz gerekir. Kamerasız devam etmek için Yazılı Mülakat'ı kullanabilirsiniz.");
+      return;
+    }
     setIsThinking(true);
     
     try {
+      if (!videoConsent?.granted) {
+        setVideoConsent(await accountService.setConsent("video_analysis", true));
+      }
       // 1. Backend'e başlatma isteği
       const data = await chatService.startInterview(role, topic, difficulty);
       setInterviewId(data.interview_id);
@@ -273,7 +299,7 @@ export default function InterviewRoomPage() {
       
     } catch (error) {
       console.error("Mülakat başlatılamadı:", error);
-      alert("Mülakat başlatılırken bir hata oluştu.");
+      setStartError(error instanceof Error ? error.message : "Mülakat başlatılırken bir hata oluştu.");
     } finally {
       setIsThinking(false);
     }
@@ -505,14 +531,40 @@ export default function InterviewRoomPage() {
 
             <div className="flex items-center gap-2 bg-muted border border-border p-4 rounded-xl text-xs text-muted-foreground font-semibold mb-2">
               <ShieldCheck className="w-5 h-5 text-success shrink-0" />
-              <span>Görüntü ve ses analizi tamamen cihazınız üzerinden güvenli şekilde yürütülecektir.</span>
+              <span>
+                Kaydınız mülakattan sonra analiz için sunucumuza yüklenir; göz teması, yüz ifadesi (duygu/stres tahmini) ve
+                konuşma ölçümleri çıkarılır, video dosyası analizden sonra silinir.
+              </span>
             </div>
 
-            <Button type="submit" size="lg" disabled={isThinking} className="w-full">
+            <div className="bg-card border border-border p-4 rounded-xl text-xs text-muted-foreground space-y-2">
+              {showConsentText && videoConsent && <p className="leading-relaxed">{videoConsent.text}</p>}
+              <button type="button" onClick={() => setShowConsentText((v) => !v)} className="font-semibold text-primary hover:underline">
+                {showConsentText ? "Onam metnini gizle" : "Onam metnini oku"}
+              </button>
+              {videoConsent?.granted ? (
+                <p className="text-success font-semibold">Video analizine onam verdiniz. Profil → Verilerim&apos;den geri çekebilirsiniz.</p>
+              ) : (
+                <label className="flex items-start gap-2 cursor-pointer text-foreground">
+                  <input type="checkbox" checked={consentChecked} onChange={(e) => setConsentChecked(e.target.checked)} className="mt-0.5 w-4 h-4" />
+                  <span>Video ve ses kaydımın bu amaçla işlenmesine açık rıza veriyorum.</span>
+                </label>
+              )}
+              <p>
+                Kamerasız ya da CV/ilana göre kişiselleştirilmiş mülakat için{" "}
+                <Link href="/chat/text" className="font-semibold text-primary hover:underline">Yazılı Mülakat</Link>.
+              </p>
+            </div>
+
+            {startError && (
+              <p role="alert" className="text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-3">{startError}</p>
+            )}
+
+            <Button type="submit" size="lg" disabled={isThinking || (!videoConsent?.granted && !consentChecked)} className="w-full">
               {isThinking ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Hazırlanıyor...</>
               ) : (
-                <><Play className="w-5 h-5 fill-current" /> Mülakata Başla</>
+                <><Play className="w-5 h-5 fill-current" /> Görüntülü mülakata başla</>
               )}
             </Button>
           </form>

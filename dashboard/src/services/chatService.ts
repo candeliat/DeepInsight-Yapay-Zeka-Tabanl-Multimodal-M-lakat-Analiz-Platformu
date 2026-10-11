@@ -6,6 +6,7 @@ export interface StartInterviewRequest {
   cv_id?: string;
   job_id?: string;
   org_id?: string;
+  assignment_id?: string;
 }
 
 /** Mülakatın opsiyonel bağlamı: kişiselleştirme (CV/ilan) ve kurum (kota, kurum soru bankası, eğitmen görünürlüğü). */
@@ -13,6 +14,8 @@ export interface StartInterviewContext {
   cvId?: string;
   jobId?: string;
   orgId?: string;
+  /** Ödevden başlatılırsa rol/konu/zorluk ve kurum backend'de ödevden alınır. */
+  assignmentId?: string;
 }
 
 export interface StartInterviewResponse {
@@ -61,7 +64,7 @@ export const chatService = {
    */
   async startInterview(role: string, topic: string, difficulty?: string, context: StartInterviewContext = {}): Promise<StartInterviewResponse> {
     try {
-      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, cv_id: context.cvId, job_id: context.jobId, org_id: context.orgId } satisfies StartInterviewRequest);
+      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, cv_id: context.cvId, job_id: context.jobId, org_id: context.orgId, assignment_id: context.assignmentId } satisfies StartInterviewRequest);
       return response.data;
     } catch (error: unknown) {
       const e = error as { response?: { data?: { detail?: string } }, message?: string };

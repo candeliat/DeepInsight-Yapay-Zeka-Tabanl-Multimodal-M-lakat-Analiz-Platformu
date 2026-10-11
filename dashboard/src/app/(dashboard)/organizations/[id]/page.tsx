@@ -21,6 +21,7 @@ import {
 import { orgService, MemberDetail, MyOrganization, OrgOverview, OrganizationDetail, OrgRole, ROLE_LABEL } from "@/services/orgService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { StatTile } from "@/components/progress/ProgressView";
+import { AssignmentsPanel } from "@/components/org/AssignmentsPanel";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
@@ -350,6 +351,8 @@ export default function OrganizationPanelPage() {
           </table>
         </div>
       </div>
+
+      <AssignmentsPanel orgId={orgId} onError={setError} />
 
       {isAdmin && detail && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

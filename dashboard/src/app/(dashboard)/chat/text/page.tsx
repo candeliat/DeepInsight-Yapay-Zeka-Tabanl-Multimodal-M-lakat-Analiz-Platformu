@@ -13,7 +13,9 @@ import {
   KeyRound,
   FileText,
   Briefcase,
+  ClipboardList,
 } from "lucide-react";
+import { assignmentService, MyAssignment } from "@/services/assignmentService";
 import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -49,6 +51,7 @@ function TextInterviewContent() {
   const roleParam = searchParams.get("role");
   const topicParam = searchParams.get("topic");
   const difficultyParam = searchParams.get("difficulty");
+  const assignmentParam = searchParams.get("assignment");
 
   const [currentState, setCurrentState] = useState<InterviewState>("SETUP");
 
@@ -64,6 +67,8 @@ function TextInterviewContent() {
   // Kurum bağlamı (opsiyonel): varsayılan bireysel — mülakatın kuruma görünmesi bilinçli bir seçim olmalı.
   const [orgs, setOrgs] = useState<MyOrganization[]>([]);
   const [orgId, setOrgId] = useState("");
+  // Kurum ödevi (opsiyonel, ?assignment=<id>): rol/konu/zorluk ve kurum ödevden gelir, değiştirilemez.
+  const [assignment, setAssignment] = useState<MyAssignment | null>(null);
   const [startError, setStartError] = useState<string | null>(null);
 
   // Mülakat State
@@ -90,6 +95,33 @@ function TextInterviewContent() {
     if (topicParam) setTopic(topicParam.slice(0, 120));
     if (difficultyParam && ["JUNIOR", "ORTA", "UZMAN"].includes(difficultyParam)) setDifficulty(difficultyParam);
   }, [roleParam, topicParam, difficultyParam]);
+
+  useEffect(() => {
+    if (!assignmentParam) {
+      setAssignment(null);
+      return;
+    }
+    let cancelled = false;
+    assignmentService
+      .mine()
+      .then((items) => {
+        if (cancelled) return;
+        const found = items.find((a) => a.id === assignmentParam);
+        if (!found) {
+          setStartError("Ödev bulunamadı ya da artık bu kurumun öğrencisi değilsiniz.");
+          return;
+        }
+        setAssignment(found);
+        setRole(found.role);
+        setTopic(found.topic);
+        if (found.difficulty) setDifficulty(found.difficulty);
+        setOrgId(found.org_id);
+      })
+      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "Ödev yüklenemedi."));
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentParam]);
 
   // CV ve/veya ilan seçilmişse yükle; rol/konu/zorluğu öner (kullanıcı değiştirebilir).
   // İlan varsa öneriler ilandan, yoksa CV profilinden gelir.
@@ -135,7 +167,7 @@ function TextInterviewContent() {
     setStartError(null);
 
     try {
-      const data = await chatService.startInterview(role, topic, difficulty, { cvId: cv?.id, jobId: job?.id, orgId: orgId || undefined });
+      const data = await chatService.startInterview(role, topic, difficulty, { cvId: cv?.id, jobId: job?.id, orgId: orgId || undefined, assignmentId: assignment?.id });
       setInterviewId(data.interview_id);
       setMessages([{ role: "ai", content: data.first_message }]);
       setCurrentState("INTERVIEWING");
@@ -210,7 +242,7 @@ function TextInterviewContent() {
 
   if (currentState === "SETUP") {
     return (
-      <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex flex-col min-h-[calc(100vh-8rem)] items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
         <div className="max-w-md w-full bg-card border border-border rounded-3xl shadow-lg p-8 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-black via-[#00687a] to-[#57dffe]"></div>
 
@@ -223,6 +255,19 @@ function TextInterviewContent() {
               Rolünüzü ve mülakat konusunu seçin, yapay zeka mülakatçınızla yazışarak ilerleyin.
             </p>
           </div>
+
+          {assignment && (
+            <div className="mb-6 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+              <ClipboardList className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="text-xs flex-1 min-w-0">
+                <p className="font-bold text-foreground">Ödev: {assignment.title}</p>
+                <p className="text-muted-foreground">
+                  {assignment.org_name ?? "Kurum"} · rol, konu ve zorluk eğitmen tarafından belirlendi
+                </p>
+                {assignment.instructions && <p className="text-foreground mt-1.5 whitespace-pre-wrap">{assignment.instructions}</p>}
+              </div>
+            </div>
+          )}
 
           {job && (
             <div className="mb-3 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
@@ -258,6 +303,7 @@ function TextInterviewContent() {
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="Örn: Yazılım Mühendisi"
+                readOnly={!!assignment}
                 required
               />
             </div>
@@ -269,6 +315,7 @@ function TextInterviewContent() {
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="Örn: React ve Modern Web"
+                readOnly={!!assignment}
                 required
               />
             </div>
@@ -281,7 +328,8 @@ function TextInterviewContent() {
                     key={level}
                     type="button"
                     onClick={() => setDifficulty(level)}
-                    className={`flex-1 py-3 rounded-xl border-2 font-bold text-xs tracking-wider transition-all cursor-pointer ${
+                    disabled={!!assignment && difficulty !== level}
+                    className={`flex-1 py-3 rounded-xl border-2 font-bold text-xs tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                       difficulty === level
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border hover:bg-muted text-muted-foreground"
@@ -293,7 +341,7 @@ function TextInterviewContent() {
               </div>
             </div>
 
-            {orgs.length > 0 && (
+            {orgs.length > 0 && !assignment && (
               <div className="space-y-2">
                 <label htmlFor="org-select" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Mülakat bağlamı</label>
                 <select

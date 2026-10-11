@@ -136,10 +136,10 @@ export default function CvListScreen() {
                 <PrimaryButton title="Fotoğraf çek" icon="camera-outline" variant="outline" onPress={takePhoto} disabled={!!busy} style={{ flex: 1 }} />
               )}
             </View>
-            {busy === 'upload' && <Banner kind="info">Yükleniyor ve metin çıkarılıyor… Taranmış CV'de bu 30 saniyeyi bulabilir.</Banner>}
+            {busy === 'upload' && <Banner kind="info">Yükleniyor ve metin çıkarılıyor… Taranmış CV’de bu 30 saniyeyi bulabilir.</Banner>}
           </Card>
 
-          <SectionTitle>CV'lerim ({cvs.length})</SectionTitle>
+          <SectionTitle>CV’lerim ({cvs.length})</SectionTitle>
           {cvs.length === 0 ? (
             <EmptyState icon="document-outline" text="Henüz CV yüklemediniz." />
           ) : (
@@ -165,7 +165,7 @@ export default function CvListScreen() {
           <View style={{ marginTop: 16 }}>
             {confirmRevoke ? (
               <Card style={{ borderColor: 'rgba(186,26,26,0.3)' }}>
-                <Text style={typo.body}>Rızayı geri çekerseniz yüklediğiniz tüm CV'ler ve analizleri silinir.</Text>
+                <Text style={typo.body}>Rızayı geri çekerseniz yüklediğiniz tüm CV’ler ve analizleri silinir.</Text>
                 <View style={styles.uploadRow}>
                   <PrimaryButton title="Geri çek ve sil" variant="danger" onPress={revoke} loading={busy === 'revoke'} style={{ flex: 1 }} />
                   <PrimaryButton title="Vazgeç" variant="outline" onPress={() => setConfirmRevoke(false)} style={{ flex: 1 }} />

@@ -54,6 +54,11 @@ export default function InterviewRoomPage() {
   const [consentChecked, setConsentChecked] = useState(false);
   const [showConsentText, setShowConsentText] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
+  // Kamera izni penceresi beklenirken düğmede ayrı mesaj (önceden yalnızca "Hazırlanıyor...").
+  const [waitingCamera, setWaitingCamera] = useState(false);
+  // Mülakat sırasındaki hatalar alert() yerine satır içinde gösterilir.
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const { user } = useAuthStore();
   const target = user?.user_metadata?.target as string | undefined;
 
@@ -282,13 +287,16 @@ export default function InterviewRoomPage() {
       if (!videoConsent?.granted) {
         setVideoConsent(await accountService.setConsent("video_analysis", true));
       }
-      // 1. Backend'e başlatma isteği
+      // 1. Önce kamera izni: izin penceresi açıkken sunucuda boş bir "yarıda kalan"
+      // mülakat oluşmasın. İzin verilmezse mülakat analizsiz devam eder (mediaError bandı).
+      setWaitingCamera(true);
+      await setupCamera();
+      setWaitingCamera(false);
+
+      // 2. Backend'e başlatma isteği
       const data = await chatService.startInterview(role, topic, difficulty);
       setInterviewId(data.interview_id);
       setCurrentQuestion(data.first_message);
-      
-      // 2. Kamera aç
-      await setupCamera();
       
       // 3. Arka plan video/ses kaydını başlat
       startRecording();
@@ -300,7 +308,9 @@ export default function InterviewRoomPage() {
     } catch (error) {
       console.error("Mülakat başlatılamadı:", error);
       setStartError(error instanceof Error ? error.message : "Mülakat başlatılırken bir hata oluştu.");
+      stopCamera();
     } finally {
+      setWaitingCamera(false);
       setIsThinking(false);
     }
   };
@@ -354,7 +364,9 @@ export default function InterviewRoomPage() {
     }
 
     const currentAnswer = userAnswer;
+    const previousQuestion = currentQuestion;
     setUserAnswer("");
+    setChatError(null);
     setIsThinking(true);
     // Yeni cevap gönderilirken ekranı temizle — chunk'lar geldikçe burası
     // token-token dolacak (typewriter efekti).
@@ -377,16 +389,23 @@ export default function InterviewRoomPage() {
         },
         onError: (detail, partialSaved) => {
           console.error("Stream hatası:", detail, "kısmi metin kaydedildi mi:", partialSaved);
-          alert(
+          if (!partialSaved) {
+            // Cevap kaybolmasın: kutuya geri konur, soru da eski haline döner.
+            setUserAnswer(currentAnswer);
+            if (!streamedText) setCurrentQuestion(previousQuestion);
+          }
+          setChatError(
             partialSaved
               ? "Yanıt üretimi yarıda kesildi, ama o ana kadarki kısım kaydedildi. Lütfen tekrar deneyin."
-              : "Bağlantı hatası oluştu. Lütfen tekrar deneyin."
+              : "Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz."
           );
         },
       });
     } catch (error) {
       console.error("Cevap gönderilemedi:", error);
-      alert("Bağlantı hatası oluştu.");
+      setUserAnswer(currentAnswer);
+      if (!streamedText) setCurrentQuestion(previousQuestion);
+      setChatError("Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz.");
     } finally {
       setIsThinking(false);
     }
@@ -402,6 +421,8 @@ export default function InterviewRoomPage() {
       setIsListening(false);
     }
 
+    setConfirmEnd(false);
+    setChatError(null);
     setIsThinking(true);
     try {
       // Soru sayısına bakmaksızın o ana kadarki cevaplarla nihai
@@ -410,7 +431,7 @@ export default function InterviewRoomPage() {
       finalizeInterview(response.evaluation ?? null);
     } catch (e) {
       console.error("Mülakatı bitirme hatası:", e);
-      alert("Mülakat sonlandırılamadı.");
+      setChatError("Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.");
     } finally {
       setIsThinking(false);
     }
@@ -561,7 +582,9 @@ export default function InterviewRoomPage() {
             )}
 
             <Button type="submit" size="lg" disabled={isThinking || (!videoConsent?.granted && !consentChecked)} className="w-full">
-              {isThinking ? (
+              {waitingCamera ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Tarayıcının kamera/mikrofon izin penceresini onaylayın...</>
+              ) : isThinking ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Hazırlanıyor...</>
               ) : (
                 <><Play className="w-5 h-5 fill-current" /> Görüntülü mülakata başla</>
@@ -604,17 +627,36 @@ export default function InterviewRoomPage() {
               className="w-full h-full object-cover transform -scale-x-100 flex-1"
             />
             <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[10px] text-white font-bold">
-              <UserCameraIcon /> Kaydediliyor
+              <UserCameraIcon /> {mediaError ? "Kayıt yok" : "Kaydediliyor"}
             </div>
           </div>
           
-          <button
-            onClick={handleEndInterviewManual}
-            disabled={isThinking}
-            className="ml-4 px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50"
-          >
-            Mülakatı Bitir
-          </button>
+          {confirmEnd ? (
+            <div className="ml-4 flex items-center gap-2" role="group" aria-label="Mülakatı bitirme onayı">
+              <span className="text-xs text-muted-foreground max-w-[12rem]">Şimdiye kadarki cevaplarla değerlendirilsin mi?</span>
+              <button
+                onClick={handleEndInterviewManual}
+                disabled={isThinking}
+                className="px-3 py-2 bg-destructive text-white rounded-xl font-semibold text-xs disabled:opacity-50"
+              >
+                Bitir
+              </button>
+              <button
+                onClick={() => setConfirmEnd(false)}
+                className="px-3 py-2 bg-background border border-border rounded-xl font-semibold text-xs"
+              >
+                Vazgeç
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmEnd(true)}
+              disabled={isThinking}
+              className="ml-4 px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50"
+            >
+              Mülakatı Bitir
+            </button>
+          )}
         </div>
 
         {/* Orta Kısım: Soru ve AI Durumu */}
@@ -644,6 +686,11 @@ export default function InterviewRoomPage() {
 
         {/* Alt Kısım: Cevap Girişi */}
         <div className="p-6 bg-background/50 backdrop-blur-xl border-t border-border mt-auto relative z-20">
+          {chatError && (
+            <p role="alert" className="max-w-4xl mx-auto mb-3 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-2.5">
+              {chatError}
+            </p>
+          )}
           <div className="max-w-4xl mx-auto flex items-end gap-3">
             
             {/* Sesle Cevap Butonu */}

@@ -165,6 +165,7 @@ export default function InterviewRoomScreen() {
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // AppState takibi — arka plana geçince kaydı durdur
   const appStateRef = useRef(AppState.currentState);
@@ -231,6 +232,7 @@ export default function InterviewRoomScreen() {
     Speech.stop();
     const answer = userAnswer;
     setUserAnswer('');
+    setSendError(null);
     try {
       const finished = await sendMessageStream(answer);
       if (finished) {
@@ -246,12 +248,10 @@ export default function InterviewRoomScreen() {
       } else {
         speakText(useInterviewStore.getState().currentQuestion);
       }
-    } catch (err: any) {
-      Alert.alert(
-        'Bağlantı Hatası',
-        err?.message || 'Yanıt gönderilirken bir hata oluştu. Lütfen tekrar deneyin.',
-        [{ text: 'Tamam' }]
-      );
+    } catch {
+      // Alert web'de görünmez ve cevap kaybolurdu: metin kutuya geri konur, hata satır içinde.
+      setUserAnswer(answer);
+      setSendError('Yanıt gönderilemedi. Cevabınız kutuda duruyor; bağlantınızı kontrol edip tekrar gönderin.');
     }
   }, [userAnswer, isThinking, sendMessageStream, speakText, router, isRecordingVideo]);
 
@@ -473,6 +473,10 @@ export default function InterviewRoomScreen() {
           recordingVideo={isRecordingVideo}
         />
 
+        {sendError && (
+          <Text style={styles.sendError} accessibilityRole="alert">{sendError}</Text>
+        )}
+
         {/* Metin Girişi */}
         <View style={styles.inputContainer}>
           <TextInput
@@ -549,6 +553,21 @@ export default function InterviewRoomScreen() {
                 {ending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.confirmEndText}>Bitir ve değerlendir</Text>}
               </TouchableOpacity>
             </View>
+            {textMode && (
+              // Yarıda kalan mülakat Raporlar'dan ya da ana sayfadaki banttan sürdürülebilir.
+              <TouchableOpacity
+                style={styles.leaveLink}
+                onPress={() => {
+                  Speech.stop();
+                  setConfirmingEnd(false);
+                  router.replace('/(tabs)/home');
+                }}
+                disabled={ending}
+                accessibilityRole="button"
+              >
+                <Text style={styles.leaveLinkText}>Şimdilik çık, sonra kaldığım yerden devam ederim</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       )}
@@ -620,6 +639,12 @@ const styles = StyleSheet.create({
   confirmCancelText: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
   confirmEnd: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: Colors.error },
   confirmEndText: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: '#fff' },
+  leaveLink: { marginTop: 14, alignItems: 'center', paddingVertical: 6 },
+  leaveLinkText: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.secondary, textAlign: 'center' },
+  sendError: {
+    marginHorizontal: 16, marginBottom: 6, fontSize: 12, fontFamily: FontFamilies.sansSemibold,
+    color: '#fca5a5', textAlign: 'center',
+  },
 
   cameraSection: {
     flex: 1, marginHorizontal: 16, marginVertical: 8,

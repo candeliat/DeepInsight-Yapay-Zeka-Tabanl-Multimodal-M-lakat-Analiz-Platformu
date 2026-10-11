@@ -101,7 +101,7 @@ export default function CvDetailScreen() {
             <View style={{ flex: 1 }}>
               <Text style={typo.cardTitle}>ATS uyumluluk skoru</Text>
               <Text style={[typo.small, { marginTop: 4 }]}>
-                Gerçek bir şirketin ATS'i değil; yaygın ayrıştırıcıların zorlandığı noktaları ölçen açıklanabilir bir tahmin.
+                Gerçek bir şirketin ATS’i değil; yaygın ayrıştırıcıların zorlandığı noktaları ölçen açıklanabilir bir tahmin.
               </Text>
               <PrimaryButton title="Yeniden analiz" variant="outline" onPress={analyze} loading={analyzing} style={{ marginTop: 10, paddingVertical: 9 }} />
             </View>

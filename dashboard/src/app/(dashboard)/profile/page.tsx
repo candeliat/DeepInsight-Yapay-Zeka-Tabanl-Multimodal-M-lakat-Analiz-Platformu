@@ -173,7 +173,7 @@ export default function ProfilePage() {
                       Ort. Başarı Puanı
                     </p>
                     <p className="font-serif text-2xl text-foreground">
-                      {loadingStats ? "-" : `%${avgScore}`}
+                      {loadingStats ? "-" : completedInterviews.length ? avgScore : "–"}
                     </p>
                   </div>
                   <div className="p-2 bg-success/10 rounded-xl text-success">

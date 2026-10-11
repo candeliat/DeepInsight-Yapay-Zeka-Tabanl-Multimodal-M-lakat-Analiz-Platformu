@@ -64,7 +64,7 @@ function ScoreBar({ label, value, color = Colors.secondary }: { label: string; v
     <View style={{ marginBottom: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
         <Text style={{ fontSize: 12, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface, letterSpacing: 0.3 }}>{label}</Text>
-        <Text style={{ fontSize: 12, fontFamily: FontFamilies.sansBold, color }}>{value}%</Text>
+        <Text style={{ fontSize: 12, fontFamily: FontFamilies.sansBold, color }}>{value}</Text>
       </View>
       <View style={{ height: 8, backgroundColor: Colors.surfaceContainerHigh, borderRadius: 4, overflow: 'hidden' }}>
         <View style={{ height: 8, width: `${value}%`, backgroundColor: color, borderRadius: 4 }} />
@@ -201,7 +201,7 @@ export default function ReportsScreen() {
                 <View style={styles.mainScoreCard}>
                   <View style={styles.aiInsightBadge}>
                     <Ionicons name="sparkles" size={12} color={Colors.secondary} />
-                    <Text style={styles.aiInsightText}>YZ ÖNGÖRÜSÜ</Text>
+                    <Text style={styles.aiInsightText}>SON MÜLAKAT</Text>
                   </View>
 
                   <View style={styles.mainScoreContent}>
@@ -259,7 +259,7 @@ export default function ReportsScreen() {
                   </View>
                   <TouchableOpacity
                     style={styles.ctaBtn}
-                    onPress={() => router.push('/(tabs)/prepare')}
+                    onPress={() => router.push({ pathname: '/(tabs)/prepare', params: { role: selected.role ?? undefined, topic: selected.topic ?? undefined } })}
                     activeOpacity={0.85}
                   >
                     <Ionicons name="arrow-forward" size={18} color="#fff" />

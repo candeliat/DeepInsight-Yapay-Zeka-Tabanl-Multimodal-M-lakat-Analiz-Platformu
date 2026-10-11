@@ -94,6 +94,11 @@ export function PasswordCard() {
     e.preventDefault();
     setError(null);
     setDone(false);
+    // Sunucunun 422 doğrulama mesajı İngilizce; uzunluk burada Türkçe mesajla denetlenir.
+    if (next.length < 8) {
+      setError("Yeni şifre en az 8 karakter olmalı.");
+      return;
+    }
     if (next !== confirm) {
       setError("Yeni şifreler eşleşmiyor.");
       return;

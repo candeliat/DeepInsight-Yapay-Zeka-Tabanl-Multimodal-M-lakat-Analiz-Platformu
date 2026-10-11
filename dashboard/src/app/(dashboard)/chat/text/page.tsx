@@ -80,6 +80,9 @@ function TextInterviewContent() {
   const [myCvs, setMyCvs] = useState<CVItem[]>([]);
   const [myJobs, setMyJobs] = useState<JobItem[]>([]);
   const [resuming, setResuming] = useState(!!resumeParam);
+  // Mülakat sırasındaki hatalar alert() yerine satır içinde; bitirme onayı da satır içinde.
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [confirmEnd, setConfirmEnd] = useState(false);
 
   // Mülakat State
   const [interviewId, setInterviewId] = useState("");
@@ -247,6 +250,7 @@ function TextInterviewContent() {
 
     const currentAnswer = userAnswer.trim();
     setUserAnswer("");
+    setChatError(null);
     setIsThinking(true);
     setMessages((prev) => [...prev, { role: "user", content: currentAnswer }, { role: "ai", content: "" }]);
 
@@ -270,22 +274,33 @@ function TextInterviewContent() {
         },
         onError: (detail, partialSaved) => {
           console.error("Stream hatası:", detail, "kısmi metin kaydedildi mi:", partialSaved);
-          alert(
+          if (!partialSaved) restoreAnswer(currentAnswer, streamedText);
+          setChatError(
             partialSaved
               ? "Yanıt üretimi yarıda kesildi, ama o ana kadarki kısım kaydedildi. Lütfen tekrar deneyin."
-              : "Bağlantı hatası oluştu. Lütfen tekrar deneyin."
+              : "Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz."
           );
         },
       });
     } catch (error) {
       console.error("Cevap gönderilemedi:", error);
-      alert("Bağlantı hatası oluştu.");
+      restoreAnswer(currentAnswer, streamedText);
+      setChatError("Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz.");
     } finally {
       setIsThinking(false);
     }
   };
 
+  // Gönderim başarısızsa cevap kaybolmasın: eklenen iki baloncuk geri alınır, metin kutuya döner.
+  const restoreAnswer = (answer: string, streamed: string) => {
+    if (streamed) return;
+    setMessages((prev) => prev.slice(0, -2));
+    setUserAnswer(answer);
+  };
+
   const handleEndInterviewManual = async () => {
+    setConfirmEnd(false);
+    setChatError(null);
     setIsThinking(true);
     try {
       const response = await chatService.finishInterviewEarly(interviewId);
@@ -293,7 +308,7 @@ function TextInterviewContent() {
       setCurrentState("RESULTS");
     } catch (e) {
       console.error("Mülakatı bitirme hatası:", e);
-      alert("Mülakat sonlandırılamadı.");
+      setChatError("Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.");
     } finally {
       setIsThinking(false);
     }
@@ -508,13 +523,29 @@ function TextInterviewContent() {
             </span>
           </div>
 
-          <button
-            onClick={handleEndInterviewManual}
-            disabled={isThinking}
-            className="px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50 shrink-0"
-          >
-            Mülakatı Bitir
-          </button>
+          {confirmEnd ? (
+            <div className="flex items-center gap-2 shrink-0" role="group" aria-label="Mülakatı bitirme onayı">
+              <span className="hidden sm:inline text-xs text-muted-foreground">Şimdiye kadarki cevaplarla değerlendirilsin mi?</span>
+              <button
+                onClick={handleEndInterviewManual}
+                disabled={isThinking}
+                className="px-3 py-2 bg-destructive text-white rounded-xl font-semibold text-xs disabled:opacity-50"
+              >
+                Bitir
+              </button>
+              <button onClick={() => setConfirmEnd(false)} className="px-3 py-2 bg-background border border-border rounded-xl font-semibold text-xs">
+                Vazgeç
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmEnd(true)}
+              disabled={isThinking}
+              className="px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50 shrink-0"
+            >
+              Mülakatı Bitir
+            </button>
+          )}
         </div>
 
         {/* Orta Kısım: Transkript */}
@@ -552,6 +583,11 @@ function TextInterviewContent() {
 
         {/* Alt Kısım: Cevap Girişi */}
         <div className="p-6 bg-background/50 border-t border-border">
+          {chatError && (
+            <p role="alert" className="max-w-2xl mx-auto mb-3 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-2.5">
+              {chatError}
+            </p>
+          )}
           <div className="max-w-2xl mx-auto flex items-end gap-3">
             <div className="relative flex-1">
               <Textarea

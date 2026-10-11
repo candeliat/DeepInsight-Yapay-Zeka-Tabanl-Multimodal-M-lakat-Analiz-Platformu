@@ -90,7 +90,7 @@ export default function InterviewsPage() {
                       {interview.status === "completed" && (
                         <div className="flex items-center gap-1 text-primary font-bold bg-primary/10 px-2 py-1 rounded-md text-sm">
                           <BarChart className="w-4 h-4" />
-                          %{avgScore}
+                          {avgScore}
                         </div>
                       )}
                     </div>

@@ -37,7 +37,7 @@ function SkillBar({ label, value }: { label: string; value: number }) {
     <View style={skillBarStyles.container}>
       <View style={skillBarStyles.row}>
         <Text style={skillBarStyles.label}>{label}</Text>
-        <Text style={skillBarStyles.value}>{value}%</Text>
+        <Text style={skillBarStyles.value}>{value}</Text>
       </View>
       <View style={skillBarStyles.track}>
         <View style={[skillBarStyles.fill, { width: `${value}%` }]} />
@@ -153,6 +153,9 @@ export default function HomeScreen() {
     ? Math.round(recentScores.reduce((a, b) => a + b, 0) / recentScores.length)
     : null;
 
+  // Web'deki gibi: en son yarıda kalan mülakat varsa kaldığı yerden devam bandı gösterilir.
+  const ongoing = interviews.find((iv) => iv.status !== 'completed');
+
   const formatDate = (dateStr: string) => {
     try {
       const d = new Date(dateStr);
@@ -200,11 +203,29 @@ export default function HomeScreen() {
             <View style={styles.aiBadge}>
               <Ionicons name="sparkles" size={14} color={Colors.secondary} />
               <Text style={styles.aiBadgeText}>
-                YZ Hazırlık Skoru: {overallScore}%
+                Son {recentScores.length} mülakat ortalaması: {overallScore}
               </Text>
             </View>
           )}
         </View>
+
+        {ongoing && (
+          <TouchableOpacity
+            style={styles.resumeCard}
+            onPress={() => router.push({ pathname: '/interview-result', params: { id: ongoing.id } })}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+          >
+            <Ionicons name="play-circle-outline" size={26} color={Colors.secondary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.resumeTitle}>Yarıda kalan bir mülakatın var</Text>
+              <Text style={styles.resumeSub} numberOfLines={1}>
+                {ongoing.role} · {ongoing.topic}
+              </Text>
+            </View>
+            <Text style={styles.resumeAction}>Devam et</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Ana Aksiyon Kartı */}
         <TouchableOpacity
@@ -260,7 +281,7 @@ export default function HomeScreen() {
             <Ionicons name="bulb-outline" size={14} color={Colors.secondary} />
             <Text style={styles.insightText}>
               {skillData[2].value > 0
-                ? `YZ Öngörüsü: Özgüven ortalamanız %${skillData[2].value}, İletişim %${skillData[0].value}.`
+                ? `Tamamlanan mülakatlarınızda özgüven ortalamanız ${skillData[2].value}, iletişim ${skillData[0].value} (100 üzerinden).`
                 : 'Mülakat tamamladıktan sonra kişiselleştirilmiş öngörüler burada görünecek.'}
             </Text>
           </View>
@@ -360,6 +381,13 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  resumeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16, marginBottom: 16, borderRadius: 16,
+    backgroundColor: 'rgba(0,104,122,0.07)', borderWidth: 1, borderColor: 'rgba(0,104,122,0.25)',
+  },
+  resumeTitle: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
+  resumeSub: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, marginTop: 2 },
+  resumeAction: { fontSize: 13, fontFamily: FontFamilies.sansBold, color: Colors.secondary },
   safeArea: { flex: 1, backgroundColor: Colors.background },
   quickRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   quickBtn: {

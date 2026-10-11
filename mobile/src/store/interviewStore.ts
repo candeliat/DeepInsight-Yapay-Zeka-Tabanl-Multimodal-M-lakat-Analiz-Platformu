@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api, API_URL } from '../config/api';
+import { api, API_URL, refreshAccessToken } from '../config/api';
 import { getStorageItemAsync } from '../utils/storage';
 
 export interface EvaluationData {
@@ -26,14 +26,14 @@ interface InterviewState {
   // Aksiyonlar
   setRoleTopic: (role: string, topic: string, difficulty?: string | null) => void;
   startInterview: () => Promise<void>;
-  sendMessage: (message: string) => Promise<boolean>; // Bitti mi (true/false) döner
-  /** `sendMessage` ile aynı sözleşme, ama soruyu token-token akıtır (currentQuestion
-   * her parçada güncellenir — typewriter efekti). SSE'yi XMLHttpRequest ile tüketir
-   * (React Native'in fetch+ReadableStream desteği tutarsız olduğu için). */
+  sendMessage: (message: string) => Promise<boolean>; // Bitti mi (true/false) dÃ¶ner
+  /** `sendMessage` ile aynÄ± sÃ¶zleÅŸme, ama soruyu token-token akÄ±tÄ±r (currentQuestion
+   * her parÃ§ada gÃ¼ncellenir â€” typewriter efekti). SSE'yi XMLHttpRequest ile tÃ¼ketir
+   * (React Native'in fetch+ReadableStream desteÄŸi tutarsÄ±z olduÄŸu iÃ§in). */
   sendMessageStream: (message: string) => Promise<boolean>;
-  /** Aday, MAX_INTERVIEW_QUESTIONS'a ulaşılmadan mülakatı erken bitirmek istediğinde.
-   * Not: LLM'e "bitir" mesajı göndermek işe yaramaz — bitiş sunucu taraflı soru
-   * sayacına bağlı, bu yüzden ayrı bir uç nokta (POST /interview/{id}/finish) gerekir. */
+  /** Aday, MAX_INTERVIEW_QUESTIONS'a ulaÅŸÄ±lmadan mÃ¼lakatÄ± erken bitirmek istediÄŸinde.
+   * Not: LLM'e "bitir" mesajÄ± gÃ¶ndermek iÅŸe yaramaz â€” bitiÅŸ sunucu taraflÄ± soru
+   * sayacÄ±na baÄŸlÄ±, bu yÃ¼zden ayrÄ± bir uÃ§ nokta (POST /interview/{id}/finish) gerekir. */
   finishInterviewEarly: () => Promise<void>;
   toggleMic: () => void;
   toggleCamera: () => void;
@@ -43,7 +43,7 @@ interface InterviewState {
 
 export const useInterviewStore = create<InterviewState>((set, get) => ({
   interviewId: null,
-  role: 'Yazılım Mühendisi',
+  role: 'YazÄ±lÄ±m MÃ¼hendisi',
   topic: 'Genel',
   difficulty: null,
   currentQuestion: '',
@@ -80,7 +80,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     set({ isThinking: true });
     try {
       const { interviewId } = get();
-      if (!interviewId) throw new Error("Mülakat ID bulunamadı.");
+      if (!interviewId) throw new Error("MÃ¼lakat ID bulunamadÄ±.");
 
       const response = await api.post('/api/v1/interview/chat', {
         interview_id: interviewId,
@@ -92,7 +92,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
           evaluation: response.data.evaluation,
           isThinking: false
         });
-        return true; // Mülakat bitti
+        return true; // MÃ¼lakat bitti
       } else {
         set({ 
           currentQuestion: response.data.response,
@@ -111,11 +111,81 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     const { interviewId } = get();
     if (!interviewId) {
       set({ isThinking: false });
-      throw new Error('Mülakat ID bulunamadı.');
+      throw new Error('MÃ¼lakat ID bulunamadÄ±.');
     }
 
     const token = await getStorageItemAsync('token');
+    try {
+      return await streamOnce(interviewId, message, token, set);
+    } catch (error: any) {
+      // XHR axios interceptor'Ä±ndan geÃ§mez: token mÃ¼lakat ortasÄ±nda dolduysa
+      // (401) bir kez yenileyip aynÄ± mesajÄ± tekrar gÃ¶nder. Sunucu 401'de mesajÄ±
+      // kaydetmeden dÃ¶ndÃ¼ÄŸÃ¼ iÃ§in tekrar gÃ¶ndermek Ã§ift kayÄ±t oluÅŸturmaz.
+      if (error?.status !== 401) throw error;
+      const fresh = await refreshAccessToken().catch(() => null);
+      if (!fresh) throw new Error('Oturumunuzun sÃ¼resi doldu. LÃ¼tfen tekrar giriÅŸ yapÄ±n.');
+      set({ isThinking: true, currentQuestion: '' });
+      return await streamOnce(interviewId, message, fresh, set);
+    }
+  },
 
+  finishInterviewEarly: async () => {
+    set({ isThinking: true });
+    try {
+      const { interviewId } = get();
+      if (!interviewId) throw new Error('MÃ¼lakat ID bulunamadÄ±.');
+
+      const response = await api.post(`/api/v1/interview/${interviewId}/finish`);
+
+      set({
+        evaluation: response.data.evaluation ?? null,
+        isThinking: false,
+      });
+    } catch (error) {
+      set({ isThinking: false });
+      throw error;
+    }
+  },
+
+  toggleMic: () => set((state) => ({ micOn: !state.micOn })),
+
+  toggleCamera: () => set((state) => ({ cameraOn: !state.cameraOn })),
+
+  resetInterview: () => set({
+    interviewId: null,
+    currentQuestion: '',
+    evaluation: null,
+    micOn: true,
+    cameraOn: true,
+    isThinking: false
+  }),
+
+  transcribeAudio: async (uri: string) => {
+    try {
+      const formData = new FormData();
+      formData.append('file', {
+        uri: uri,
+        name: 'audio.m4a',
+        type: 'audio/m4a',
+      } as any);
+
+      const response = await api.post('/api/v1/interview/transcribe', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return response.data.text || '';
+    } catch (error) {
+      throw error;
+    }
+  }
+}));
+
+type SetState = (partial: Partial<InterviewState>) => void;
+
+/** /chat/stream SSE akÄ±ÅŸÄ±nÄ± XHR ile tÃ¼ketir (React Native'in fetch+ReadableStream desteÄŸi tutarsÄ±z). */
+function streamOnce(interviewId: string, message: string, token: string | null, set: SetState): Promise<boolean> {
     return new Promise<boolean>((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${API_URL}/api/v1/interview/chat/stream`);
@@ -158,13 +228,13 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         } else if (eventType === 'error') {
           settled = true;
           set({ isThinking: false });
-          reject(new Error(parsed.detail || 'Yanıt üretimi sırasında bir hata oluştu.'));
+          reject(new Error(parsed.detail || 'YanÄ±t Ã¼retimi sÄ±rasÄ±nda bir hata oluÅŸtu.'));
         }
       };
 
-      // XHR'ın o ana kadar aldığı TÜM gövdeyi responseText'te tutması (RN'in
-      // networking katmanının davranışı) üzerinden ilerliyoruz: her progress
-      // tetiklendiğinde sadece son okumadan bu yana eklenen kısmı işliyoruz.
+      // XHR'Ä±n o ana kadar aldÄ±ÄŸÄ± TÃœM gÃ¶vdeyi responseText'te tutmasÄ± (RN'in
+      // networking katmanÄ±nÄ±n davranÄ±ÅŸÄ±) Ã¼zerinden ilerliyoruz: her progress
+      // tetiklendiÄŸinde sadece son okumadan bu yana eklenen kÄ±smÄ± iÅŸliyoruz.
       const processIncoming = () => {
         const full = xhr.responseText || '';
         if (full.length <= processedLength) return;
@@ -186,73 +256,20 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
           if (settled) return;
           set({ isThinking: false });
           if (xhr.status >= 200 && xhr.status < 300) {
-            // Akış done/error event'i olmadan bitti — beklenmedik ama en azından
-            // arayüzü kilitli bırakmayalım.
+            // AkÄ±ÅŸ done/error event'i olmadan bitti â€” beklenmedik ama en azÄ±ndan
+            // arayÃ¼zÃ¼ kilitli bÄ±rakmayalÄ±m.
             resolve(false);
           } else {
-            reject(new Error(`API hatası: HTTP ${xhr.status}`));
+            reject(Object.assign(new Error(`API hatasÄ±: HTTP ${xhr.status}`), { status: xhr.status }));
           }
         }
       };
       xhr.onerror = () => {
         if (settled) return;
         set({ isThinking: false });
-        reject(new Error('Bağlantı kurulamadı.'));
+        reject(new Error('BaÄŸlantÄ± kurulamadÄ±.'));
       };
 
       xhr.send(JSON.stringify({ interview_id: interviewId, message }));
     });
-  },
-
-  finishInterviewEarly: async () => {
-    set({ isThinking: true });
-    try {
-      const { interviewId } = get();
-      if (!interviewId) throw new Error('Mülakat ID bulunamadı.');
-
-      const response = await api.post(`/api/v1/interview/${interviewId}/finish`);
-
-      set({
-        evaluation: response.data.evaluation ?? null,
-        isThinking: false,
-      });
-    } catch (error) {
-      set({ isThinking: false });
-      throw error;
-    }
-  },
-
-  toggleMic: () => set((state) => ({ micOn: !state.micOn })),
-  
-  toggleCamera: () => set((state) => ({ cameraOn: !state.cameraOn })),
-
-  resetInterview: () => set({
-    interviewId: null,
-    currentQuestion: '',
-    evaluation: null,
-    micOn: true,
-    cameraOn: true,
-    isThinking: false
-  }),
-
-  transcribeAudio: async (uri: string) => {
-    try {
-      const formData = new FormData();
-      formData.append('file', {
-        uri: uri,
-        name: 'audio.m4a',
-        type: 'audio/m4a',
-      } as any);
-
-      const response = await api.post('/api/v1/interview/transcribe', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      return response.data.text || '';
-    } catch (error) {
-      throw error;
-    }
-  }
-}));
+}

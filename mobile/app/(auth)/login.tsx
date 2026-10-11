@@ -36,12 +36,14 @@ export default function LoginScreen() {
     setIsLoading(true);
     try {
       const response = await api.post('/api/v1/auth/login', { email, password });
-      const { access_token } = response.data;
+      const { access_token, refresh_token } = response.data;
       if (!access_token) {
         setErrorText('Sunucudan geçerli bir token alınamadı.');
         return;
       }
-      await setToken(access_token);
+      // refresh_token saklanmazsa access token ~1 saatte dolunca oturum yenilenemez
+      // ve kullanıcı uygulamadan atılır (dashboard'da da aynı hata vardı).
+      await setToken(access_token, refresh_token);
       await fetchProfile(access_token);
       router.replace('/(tabs)/home');
     } catch (error: any) {

@@ -1,115 +1,92 @@
-# DeepInsight — Yapay Zeka Tabanlı Multimodal Mülakat Analiz Platformu
+# DeepInsight — Yapay Zeka Tabanlı Kariyer ve Mülakat Hazırlık Platformu
 
-DeepInsight, adayların iş mülakatlarındaki performanslarını yapay zeka yardımıyla analiz eden multimodal (çok modlu) bir mülakat analiz platformudur. Platform; adayın video ve ses kayıtlarını analiz ederek göz teması, duygu durumu, stres düzeyi, konuşma hızı, duraksamalar ve dolgu kelime kullanımı gibi kritik metrikleri ölçer ve adaya kapsamlı bir özgüven/performans raporu sunar.
+DeepInsight, adayların iş mülakatlarına hazırlanmasını uçtan uca destekleyen, birden fazla
+kurumun (üniversite kariyer merkezi, bootcamp) birlikte kullanabildiği çok kiracılı bir
+platformdur. Mülakat öncesinde CV'yi ve hedef ilanı analiz eder, mülakat sırasında yazılı,
+sesli ya da görüntülü yapay zeka mülakatı yürütür, sonrasında gelişimi raporlar. Kurumlar
+öğrencilerine ödev atayabilir ve öğrencinin rızası ölçüsünde ilerlemeyi izleyebilir.
 
----
+## Özellikler
 
-## 🏗️ Proje Mimarısı (Monorepo)
+**Aday**
+- **Yapay zeka mülakatı:** yazılı (token token akış), sesli ve görüntülü; rol, konu ve zorluğa
+  göre RAG destekli soru bankası ve sunucu tarafında belirlenen mülakat sonu.
+- **Multimodal analiz:** göz teması, duygu/stres, konuşma hızı, duraksama, dolgu kelime
+  (Whisper, DeepFace, MediaPipe, librosa).
+- **CV analizi:** PDF/DOCX/fotoğraf → metin ya da OCR → açıklanabilir ATS uyumluluk skoru →
+  yapılandırılmış profil → **CV'ye özel mülakat**.
+- **İlan eşleştirme:** ilan gereksinimleri, deterministik uyum skoru, eksik beceriler, öğrenme
+  yol haritası, **ilana göre mülakat**.
+- **Gelişimim:** zaman serisi, zayıf konular, kurala dayalı öneriler, PDF rapor.
+- **Ödevlerim, Kurumlarım, Pilot Çalışma**, KVKK kapsamında **verilerimi indir / hesabımı sil**.
 
-Proje üç ana bileşenden oluşmaktadır:
+**Kurum (yönetici, eğitmen)**
+- Kurum paneli: katılım, rızaya bağlı öğrenci skorları, en az 3 öğrencilik toplu istatistik.
+- Gruplar (kohort), gruba göre görünüm, **ödev atama** ve teslim takibi.
+- Davet kodu ve CSV ile **toplu davet** (kişi kendisi kabul eder), kurum soru bankası, aylık
+  kota, **değerlendirme rubriği**, üye ve ödev sonuçları için CSV dışa aktarma.
 
-1. **[Backend](file:///c:/Users/apode/Desktop/DeepInsight/backend)**: Analiz motorunu barındıran, FastAPI tabanlı merkezi Python sunucusu.
-2. **[Dashboard (Web)](file:///c:/Users/apode/Desktop/DeepInsight/dashboard)**: IK yöneticileri veya adayların mülakat sonuçlarını detaylı grafiklerle inceleyebileceği Next.js web arayüzü.
-3. **[Mobile App](file:///c:/Users/apode/Desktop/DeepInsight/mobile)**: Adayların mülakatları gerçekleştirdiği, kamera ve ses kaydı alan Expo (React Native) mobil uygulaması.
+**Platform**
+- Kimliksiz pilot raporu (önce/sonra, t-testi, Wilcoxon, etki büyüklüğü, SUS) ve akademik
+  ölçüm betikleri.
 
----
+## Monorepo
 
-## 🧠 Yapay Zeka ve Analiz Pipeline'ı
+| Dizin | Teknoloji | Açıklama |
+|---|---|---|
+| [`backend/`](backend/) | FastAPI, Supabase, OpenAI-uyumlu LLM | API, yetki, iş kuralları, analiz hattı |
+| [`dashboard/`](dashboard/) | Next.js, Tailwind, Recharts | Web arayüzü (aday + kurum + admin) |
+| [`mobile/`](mobile/) | Expo (React Native) | Aday mobil uygulaması |
+| [`docs/`](docs/) | — | Mimari, API, güvenlik/KVKK, pilot protokolü, değerlendirme |
 
-Backend tarafındaki Python tabanlı analiz motoru, açık kaynak kodlu ve modern yapay zeka modellerini bir araya getirir:
+## Dokümantasyon
 
-### 📹 Görüntü Analizi (`VideoAnalyzer`)
-*   **Duygu Analizi (Emotion Detection)**: `DeepFace` kullanılarak adayın yüz ifadelerinden anlık duygu durumları (mutlu, nötr, üzgün, kızgın, korku vb.) analiz edilir.
-*   **Stres Ölçümü**: Korku, kızgınlık, üzüntü ve iğrenme duygularının ağırlıklı ortalamasıyla adayın anlık stres düzeyi hesaplanır.
-*   **Göz Teması & Bakış Takibi (Gaze Tracking)**: `MediaPipe FaceMesh` kullanılarak adayın göz irisi ve göz çerçevesi koordinatları tespit edilir. Adayın doğrudan kameraya bakıp bakmadığı (göz teması oranı) ölçülür.
-*   **Göz Kırpma Tespiti (Blink Detection)**: EAR (Eye Aspect Ratio - Göz En Boy Oranı) formülü kullanılarak mülakat sırasındaki toplam göz kırpma sayısı hesaplanır.
+- [Mimari ve veri modeli](docs/ARCHITECTURE.md)
+- [API uç noktaları](docs/API.md) (koddan üretilir: `python -m scripts.generate_api_doc`)
+- [Güvenlik ve KVKK tasarımı](docs/SECURITY_AND_KVKK.md)
+- [Pilot çalışma protokolü](docs/PILOT_PROTOCOL.md)
+- [Akademik değerlendirme sonuçları](docs/evaluation/README.md)
 
-### 🔊 Ses ve Dil Analizi (`AudioAnalyzer`)
-*   **Metne Dönüştürme (Transkripsiyon)**: `OpenAI Whisper` modeli kullanılarak Türkçe ses kayıtları yüksek doğrulukla metne dönüştürülür.
-*   **Dolgu Kelime Tespiti (Filler Words)**: Regex pattern'leri ile konuşma metnindeki Türkçe dolgu kelimeleri ("ee", "ııı", "şey", "yani", "hani", "işte", "aslında") tespit edilerek sayılır ve raporlanır.
-*   **Sessizlik ve Duraksama Tespiti (Pause Detection)**: `Librosa` ses analiz kütüphanesi kullanılarak konuşma aralarındaki 1.5 saniyeden uzun sessizlikler ve duraksamalar algılanır.
-*   **Konuşma Hızı (Speech Rate - WPM)**: Toplam kelime sayısı ile ses süresi oranlanarak dakikadaki kelime hızı (Words Per Minute) hesaplanır.
+## Hızlı başlangıç
 
-### 📊 Özgüven Skoru Formülü
-Adayın genel özgüven performansı, aşağıdaki ağırlıklarla hesaplanan **0-100** arası bir skorla belirlenir:
-*   **%30** Göz Teması Oranı
-*   **%25** Düşük Stres Düzeyi (100 - Stres Yüzdesi)
-*   **%20** İdeal Konuşma Hızı (120-160 WPM arası ideal kabul edilir)
-*   **%15** Az Dolgu Kelime Kullanımı (Dolgu kelime başına ceza puanı düşülür)
-*   **%10** Akıcılık / Az Duraksama (Uzun duraksama başına ceza puanı düşülür)
+**Gereksinimler:** Node.js 18+, Python 3.10+, FFmpeg (PATH'te), bir Supabase projesi, bir
+OpenAI-uyumlu LLM API anahtarı (varsayılan: NVIDIA build.nvidia.com).
 
----
-
-## ⚡ Hızlı Başlangıç
-
-### 1. Gereksinimler
-*   [Node.js](https://nodejs.org/) (v18+)
-*   [Python](https://www.python.org/) (v3.10+)
-*   [FFmpeg](https://ffmpeg.org/) (Ses işleme ve video çıkarma işlemleri için sisteminizde yüklü ve PATH'e ekli olmalıdır)
-*   [Supabase](https://supabase.com/) Hesabı (Veritabanı ve Auth işlemleri için)
-
-### 2. Backend Kurulumu
-1. `backend` klasörüne geçin:
+1. **Veritabanı:** `backend/sql/001…015` dosyalarını sırayla Supabase SQL Editor'de çalıştırın.
+2. **Backend:**
    ```bash
    cd backend
-   ```
-2. Python sanal ortamı oluşturun ve aktif edin:
-   ```bash
-   python -m venv venv
-   # Windows için:
-   .\venv\Scripts\activate
-   ```
-3. Gerekli kütüphaneleri yükleyin:
-   ```bash
+   python -m venv venv && .\venv\Scripts\activate   # macOS/Linux: source venv/bin/activate
    pip install -r requirements.txt
+   # .env: SUPABASE_URL, SUPABASE_KEY (service_role), LLM_API_KEY, LLM_BASE_URL — bkz. backend/README.md
+   uvicorn app.main:app --reload --port 8000
    ```
-4. `.env` dosyasını oluşturun ve gerekli Supabase URL/API Key ile OpenRouter API Key bilgilerinizi ekleyin (bkz. `backend/README.md`).
-5. Sunucuyu başlatın:
+3. **Dashboard:**
    ```bash
-   uvicorn app.main:app --reload
-   ```
-
-### 3. Dashboard (Web) Kurulumu
-1. `dashboard` klasörüne geçin:
-   ```bash
-   cd ../dashboard
-   ```
-2. Bağımlılıkları yükleyin:
-   ```bash
+   cd dashboard
    npm install
-   ```
-3. `.env.local` dosyasını oluşturup Supabase bağlantı bilgilerini ekleyin.
-4. Geliştirme sunucusunu başlatın:
-   ```bash
+   # .env.local: NEXT_PUBLIC_API_URL=http://localhost:8000
    npm run dev
    ```
+4. **Mobil:** `cd mobile && npm install && npx expo start` (API adresi `mobile/src/config/api.ts`).
+5. İlk platform yöneticisi: `cd backend && python scripts/set_admin_role.py <e-posta>`.
 
-### 4. Mobil Uygulama Kurulumu
-1. `mobile` klasörüne geçin:
-   ```bash
-   cd ../mobile
-   ```
-2. Bağımlılıkları yükleyin:
-   ```bash
-   npm install
-   ```
-3. Uygulamayı başlatın:
-   ```bash
-   npx expo start
-   ```
+## Test
 
----
+```bash
+cd backend && pytest tests -q            # 306 test, Supabase/LLM mock'lu
+cd dashboard && npx tsc --noEmit && npx eslint src
+```
 
-## 📦 Veritabanı Şeması
-Platform, analiz sonuçlarını Supabase üzerindeki `interview_analytics` tablosunda saklar. Tablo yapısı şunları içerir:
-*   `interview_id`: Benzersiz mülakat ID'si (UUID)
-*   `confidence_pct`: Genel özgüven yüzdesi
-*   `eye_contact_pct`: Göz teması yüzdesi
-*   `pause_count`: Toplam uzun duraksama sayısı
-*   `filler_word_count`: Toplam dolgu kelime sayısı
-*   `filler_words_detail`: Hangi dolgu kelimesinin kaç kez kullanıldığının detayı (JSON)
-*   `speech_rate_wpm`: Konuşma hızı (WPM)
-*   `dominant_emotion`: Baskın duygu durumu
-*   `emotion_distribution`: Tüm duyguların yüzdesel dağılımı (JSON)
-*   `transcript`: Whisper tarafından çıkarılan Türkçe transkripsiyon metni
-*   `analysis_status`: Analiz durumu (`processing`, `completed`, `failed`)
+## Yapay zeka analiz hattı (video/ses)
+
+- **Duygu ve stres:** DeepFace ile karelerden duygu dağılımı; korku, kızgınlık, üzüntü ve
+  iğrenmenin ağırlıklı ortalamasıyla stres düzeyi.
+- **Göz teması ve göz kırpma:** MediaPipe FaceMesh ile iris konumu; EAR (göz en-boy oranı)
+  ile göz kırpma sayısı.
+- **Transkripsiyon:** Whisper ile Türkçe konuşmadan metne.
+- **Dolgu kelime, duraksama, hız:** Türkçe dolgu kelime kalıpları ("ee", "şey", "yani"…),
+  librosa ile 1,5 saniyeden uzun sessizlikler, dakikadaki kelime sayısı.
+- **Özgüven skoru (0–100):** %30 göz teması, %25 düşük stres, %20 ideal konuşma hızı
+  (120–160 kelime/dk), %15 az dolgu kelime, %10 akıcılık. Video analizi varsa gelişim ve kurum
+  raporlarında LLM'in metinden tahmin ettiği özgüven yerine bu objektif ölçüm kullanılır.

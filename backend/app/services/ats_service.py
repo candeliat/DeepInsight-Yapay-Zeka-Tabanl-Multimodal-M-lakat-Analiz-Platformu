@@ -13,7 +13,12 @@ LLM kullanılmaz: aynı CV her zaman aynı skoru alır (tekrarlanabilir, test ed
 import re
 from typing import Any, Dict, List
 
-_EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+# OCR noktaların ve @'in çevresine boşluk ekleyebiliyor ("ad .soyad@ornek. com");
+# bu yüzden ayraçların yanında tek bir boşluğa izin verilir. Aksi halde taranmış
+# CV'de e-posta hem "bulunamadı" sayılır hem de LLM'e maskelenmeden gider.
+# Alan adında boşluk toleransı yalnızca son uzantıda (com, tr, edu...) — cümle sonu
+# noktasından sonraki kelime ("...com. Teşekkürler") e-postaya katılmasın diye.
+_EMAIL_RE = re.compile(r"[\w+-]+(?:\s?\.\s?[\w+-]+)*\s?@\s?[\w-]+(?:\.[\w-]+)*\s?\.\s?[a-z]{2,6}\b")
 _PHONE_RE = re.compile(r"(?<!\d)(\+?\d[\d\s().-]{8,}\d)(?!\d)")
 _PRIVATE_USE_RE = re.compile(r"[-]")
 
@@ -29,8 +34,10 @@ SECTION_KEYWORDS = {
 }
 REQUIRED_SECTIONS = ("experience", "education", "skills")
 
+# Ayraç (tire/eğik çizgi) yoksa yalnızca boşluk da kabul edilir: OCR tireleri
+# sıklıkla düşürür ("2021 – 2023" -> "2021 2023").
 _YEAR_RANGE_RE = re.compile(
-    r"(19|20)\d{2}\s*[-–—/]\s*((19|20)\d{2}|devam|present|halen|gunumuz|bugun|now|current)"
+    r"(19|20)\d{2}(?:\s*[-–—/]\s*|\s+)((19|20)\d{2}|devam|present|halen|gunumuz|bugun|now|current)"
 )
 _QUANT_RE = re.compile(r"\d+\s?%|%\s?\d+|\d+\s?(?:x|k|m|bin|milyon|kullanici|users?|ms|sn|saat|gun|ay|kisi)\b")
 
@@ -43,7 +50,7 @@ def fold(text: str) -> str:
 def find_contact(text: str) -> Dict[str, Any]:
     email = _EMAIL_RE.search(text)
     phone = next((m.group(1) for m in _PHONE_RE.finditer(text) if sum(c.isdigit() for c in m.group(1)) >= 10), None)
-    return {"email": email.group(0) if email else None, "phone": phone}
+    return {"email": re.sub(r"\s+", "", email.group(0)) if email else None, "phone": phone}
 
 
 def mask_contact(text: str) -> str:

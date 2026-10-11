@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
+import { scoreBand } from '../../src/utils/scoreBand';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
 import { ProgressSection } from '../../src/components/ProgressSection';
@@ -27,15 +28,16 @@ interface Interview {
   technical_score?: number;
   confidence_score?: number;
   vocabulary_score?: number;
+  average_score?: number | null;
   feedback?: string;
 }
 
 function CircularScore({ value }: { value: number }) {
-  const color = value >= 75 ? Colors.secondary : value >= 50 ? '#d97706' : Colors.error;
+  const color = scoreBand(value)?.color ?? Colors.outline;
   return (
     <View style={circleStyles.container}>
       <View style={[circleStyles.ring, { borderColor: color }]}>
-        <Text style={[circleStyles.value, { color }]}>{value}%</Text>
+        <Text style={[circleStyles.value, { color }]}>{value}</Text>
         <Text style={circleStyles.label}>GENEL</Text>
       </View>
     </View>
@@ -105,12 +107,15 @@ export default function ReportsScreen() {
     fetchHistory();
   };
 
+  // Sunucunun ortalaması (kurum rubriği ağırlıklarını içerir) esas alınır; web ile aynı sayı.
   const avg = (iv: Interview) =>
-    iv.status === 'completed' && iv.technical_score !== undefined
-      ? Math.round(
-          ((iv.technical_score || 0) + (iv.confidence_score || 0) + (iv.vocabulary_score || 0)) / 3
-        )
-      : null;
+    iv.status !== 'completed'
+      ? null
+      : iv.average_score != null
+        ? Math.round(iv.average_score)
+        : iv.technical_score !== undefined
+          ? Math.round(((iv.technical_score || 0) + (iv.confidence_score || 0) + (iv.vocabulary_score || 0)) / 3)
+          : null;
 
   const formatDate = (str: string) => {
     try {
@@ -203,7 +208,7 @@ export default function ReportsScreen() {
                     <CircularScore value={avg(selected) || 0} />
                     <View style={styles.mainScoreInfo}>
                       <Text style={styles.mainScoreTitle}>
-                        {(avg(selected) || 0) >= 75 ? 'Güçlü Aday' : (avg(selected) || 0) >= 50 ? 'Gelişiyor' : 'Geliştirmeli'}
+                        {scoreBand(avg(selected) || 0)?.label}
                       </Text>
                       <Text style={styles.mainScoreRole} numberOfLines={2}>
                         {selected.role}
@@ -328,13 +333,13 @@ export default function ReportsScreen() {
                                 <Text
                                   style={[
                                     styles.historyScore,
-                                    { color: score >= 75 ? Colors.secondary : '#d97706' },
+                                    { color: scoreBand(score)?.color ?? Colors.outline },
                                   ]}
                                 >
-                                  {score}%
+                                  {score}
                                 </Text>
                               ) : (
-                                <Text style={styles.historyPending}>{iv.status === 'completed' ? '—' : 'Devam ediyor'}</Text>
+                                <Text style={styles.historyPending}>{iv.status === 'completed' ? '—' : 'Yarıda kaldı'}</Text>
                               )}
                             </View>
                             <Ionicons

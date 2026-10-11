@@ -6,7 +6,6 @@ import {
   SafeAreaView,
   TouchableOpacity,
   ScrollView,
-  Alert,
   ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -15,7 +14,7 @@ import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
-import { CareerMenu, DataRightsSection } from '../../src/components/ProfileSections';
+import { CareerMenu, DataRightsSection, PasswordSection, ProfileEditSection } from '../../src/components/ProfileSections';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -23,6 +22,8 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [interviews, setInterviews] = useState<any[]>([]);
   const [statsLoading, setStatsLoading] = useState(false);
+  // Alert.alert web'de çalışmadığı için çıkış onayı satır içinde alınır.
+  const [confirmLogout, setConfirmLogout] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -56,21 +57,8 @@ export default function ProfileScreen() {
   }, []);
 
   const handleLogout = async () => {
-    Alert.alert(
-      "Çıkış Yap",
-      "Hesabınızdan çıkış yapmak istediğinize emin misiniz?",
-      [
-        { text: "İptal", style: "cancel" },
-        { 
-          text: "Çıkış Yap", 
-          style: "destructive",
-          onPress: async () => {
-            await logout();
-            router.replace('/(auth)/login');
-          }
-        }
-      ]
-    );
+    await logout();
+    router.replace('/(auth)/login');
   };
 
   const getInitials = (first?: string, last?: string) => {
@@ -165,7 +153,7 @@ export default function ProfileScreen() {
                 <View style={[styles.statIconBox, { backgroundColor: 'rgba(16,185,129,0.08)' }]}>
                   <Ionicons name="ribbon-outline" size={18} color={Colors.success} />
                 </View>
-                <Text style={styles.statVal}>%{avgScore}</Text>
+                <Text style={styles.statVal}>{completedInterviews.length ? avgScore : '–'}</Text>
                 <Text style={styles.statLbl}>Ort. Başarı</Text>
               </View>
 
@@ -182,38 +170,8 @@ export default function ProfileScreen() {
 
         <CareerMenu />
 
-        {/* Kişisel Bilgiler */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Kişisel Bilgiler</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ad</Text>
-            <View style={styles.inputBox}>
-              <Text style={styles.inputText}>{user?.user_metadata?.first_name || '-'}</Text>
-            </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Soyad</Text>
-            <View style={styles.inputBox}>
-              <Text style={styles.inputText}>{user?.user_metadata?.last_name || '-'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Hedef Pozisyon</Text>
-            <View style={styles.inputBox}>
-              <Text style={styles.inputText}>{user?.user_metadata?.target || '-'}</Text>
-            </View>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>E-posta Adresi</Text>
-            <View style={styles.inputBox}>
-              <Text style={styles.inputText}>{user?.email || '-'}</Text>
-            </View>
-          </View>
-        </View>
+        <ProfileEditSection />
+        <PasswordSection />
 
         {/* Hesap Bilgileri */}
         <View style={styles.section}>
@@ -232,10 +190,24 @@ export default function ProfileScreen() {
         {/* Ayarlar & Çıkış */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Hesap Ayarları</Text>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout} activeOpacity={0.85}>
-            <Ionicons name="log-out-outline" size={20} color={Colors.error} />
-            <Text style={styles.logoutText}>Çıkış Yap</Text>
-          </TouchableOpacity>
+          {confirmLogout ? (
+            <View style={styles.logoutConfirm}>
+              <Text style={styles.inputText}>Hesabınızdan çıkış yapılsın mı?</Text>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                <TouchableOpacity style={[styles.logoutButton, { flex: 1 }]} onPress={() => setConfirmLogout(false)}>
+                  <Text style={[styles.logoutText, { color: Colors.onSurface }]}>Vazgeç</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.logoutButton, { flex: 1 }]} onPress={handleLogout}>
+                  <Text style={styles.logoutText}>Çıkış yap</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.logoutButton} onPress={() => setConfirmLogout(true)} activeOpacity={0.85}>
+              <Ionicons name="log-out-outline" size={20} color={Colors.error} />
+              <Text style={styles.logoutText}>Çıkış Yap</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
       </ScrollView>
@@ -245,6 +217,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  logoutConfirm: { padding: 14, borderRadius: 14, backgroundColor: 'rgba(186,26,26,0.05)' },
   centerContent: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 12, color: Colors.onSurfaceVariant, fontSize: 14, fontFamily: FontFamilies.sansRegular },
   scrollContent: { paddingHorizontal: 20, paddingTop: 40, paddingBottom: 50 },

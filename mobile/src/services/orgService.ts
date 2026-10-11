@@ -97,7 +97,22 @@ export const pilotService = {
 
 // --- KVKK veri hakları ---
 
+export interface AccountConsent {
+  consent_type: string;
+  version: string;
+  text: string;
+  granted: boolean;
+}
+
 export const accountService = {
+  /** Video analizi onamı: kayıt sunucuya yüklenmeden önce alınır, Profil'den geri çekilebilir. */
+  getVideoConsent: () => call<AccountConsent>(api.get('/api/v1/account/consents/video_analysis')),
+  setVideoConsent: (granted: boolean) =>
+    call<AccountConsent>(api.put('/api/v1/account/consents/video_analysis', { granted })),
+  updateProfile: (payload: { first_name?: string; last_name?: string; target?: string }) =>
+    call<unknown>(api.patch('/api/v1/users/me', payload)),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    call<unknown>(api.post('/api/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword })),
   /** Tüm verileri JSON olarak indirir ve paylaşım sayfasını açar. */
   exportMyData: () => downloadAndShare('/api/v1/account/export', 'deepinsight-verilerim.json', 'application/json'),
   /** Hesabı ve tüm kişisel veriyi kalıcı olarak siler (onay: kendi e-postası). */

@@ -20,6 +20,7 @@ import { api } from '../src/config/api';
 import { useInterviewStore } from '../src/store/interviewStore';
 import { analyticsService } from '../src/services/analyticsService';
 import { ConversationCard, PilotSurveyCard } from '../src/components/ResultExtras';
+import { scoreBand } from '../src/utils/scoreBand';
 
 function SkeletonLoader() {
   const pulseAnim = useRef(new Animated.Value(0.5)).current;
@@ -165,7 +166,10 @@ export default function InterviewResultScreen() {
   const [data, setData] = useState<any>(null);
   const [analyticsData, setAnalyticsData] = useState<any>(null);
   const [error, setError] = useState('');
-  
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
 
@@ -229,10 +233,51 @@ export default function InterviewResultScreen() {
 
   const isCompleted = data.status === 'completed';
   const avgScore = Math.round(data.average_score || 0);
+  const band = isCompleted ? scoreBand(data.average_score) : null;
 
   const handleGoHome = () => {
     useInterviewStore.getState().resetInterview();
     router.replace('/(tabs)/home');
+  };
+
+  // Yarıda kalan mülakat: son mülakatçı sorusundan devam edilir (yazılı modda — kayıt başlatılmaz).
+  const handleResume = () => {
+    const msgs: { role: string; content: string }[] = data.messages ?? [];
+    const lastQuestion = [...msgs].reverse().find((m) => m.role === 'model')?.content ?? '';
+    useInterviewStore.setState({
+      interviewId: String(id),
+      role: data.role ?? 'Genel',
+      topic: data.topic ?? 'Genel',
+      difficulty: data.difficulty ?? null,
+      context: {},
+      currentQuestion: lastQuestion,
+      evaluation: null,
+      isThinking: false,
+      cameraOn: false,
+      micOn: false,
+    });
+    router.replace('/interview-room');
+  };
+
+  const handleDelete = async () => {
+    setActionBusy(true);
+    setActionError(null);
+    try {
+      await api.delete(`/api/v1/interview/${id}`);
+      useInterviewStore.getState().resetInterview();
+      router.replace('/(tabs)/reports');
+    } catch (e: any) {
+      setActionError(e?.response?.data?.detail || 'Mülakat silinemedi. Tekrar deneyin.');
+      setActionBusy(false);
+    }
+  };
+
+  const handlePracticeAgain = () => {
+    useInterviewStore.getState().resetInterview();
+    router.replace({
+      pathname: '/(tabs)/prepare',
+      params: { role: data.role ?? undefined, topic: data.topic ?? undefined, difficulty: data.difficulty ?? undefined },
+    });
   };
 
   // Veri Hazırlıkları
@@ -273,25 +318,65 @@ export default function InterviewResultScreen() {
       <ScrollView contentContainerStyle={styles.resultsScroll} showsVerticalScrollIndicator={false}>
         
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }], alignItems: 'center', width: '100%' }}>
-          {/* Başarı Simgesi */}
+          <TouchableOpacity
+            style={styles.backRow}
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/reports'))}
+            accessibilityRole="button"
+            accessibilityLabel="Geri"
+          >
+            <Ionicons name="arrow-back" size={20} color={Colors.onSurface} />
+            <Text style={styles.backText}>Geri</Text>
+          </TouchableOpacity>
+
+          {/* Durum Simgesi */}
           <View style={styles.trophyCircle}>
-            <Ionicons name={avgScore >= 70 ? "trophy" : "ribbon"} size={48} color="#FBBF24" />
+            <Ionicons
+              name={!isCompleted ? 'pause-circle-outline' : band?.tone === 'good' ? 'trophy' : 'ribbon'}
+              size={48}
+              color={isCompleted ? '#FBBF24' : Colors.outline}
+            />
           </View>
 
-          <Text style={styles.resultsTitle}>
-            {!isCompleted ? 'Mülakat tamamlanmadı' : avgScore >= 80 ? 'Mükemmel!' : avgScore >= 60 ? 'Tebrikler!' : 'Tamamlandı!'}
-          </Text>
+          <Text style={styles.resultsTitle}>{isCompleted ? 'Mülakat tamamlandı' : 'Yarıda kaldı'}</Text>
           <Text style={styles.resultsDesc}>
             {isCompleted
-              ? 'Mülakatı bitirdiniz. İşte performansınızın detaylı yapay zeka analizi:'
-              : 'Bu mülakat yarıda kaldığı için puanlanmadı. Aşağıda o ana kadarki dökümü görebilirsiniz.'}
+              ? 'Aşağıda performansınızın yapay zeka değerlendirmesini görebilirsiniz.'
+              : 'Bu mülakat yarıda kaldığı için puanlanmadı. Kaldığınız sorudan devam edebilir ya da silebilirsiniz.'}
           </Text>
+
+          {!isCompleted && (
+            <View style={styles.ongoingBox}>
+              <TouchableOpacity style={styles.homeButton} onPress={handleResume} activeOpacity={0.85} accessibilityRole="button">
+                <Text style={styles.homeButtonText}>Kaldığım yerden devam et</Text>
+                <Ionicons name="play" size={18} color="#fff" />
+              </TouchableOpacity>
+              {confirmDelete ? (
+                <View style={styles.deleteConfirm}>
+                  <Text style={styles.deleteConfirmText}>Bu mülakat ve dökümü kalıcı olarak silinsin mi?</Text>
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <TouchableOpacity style={styles.secondaryBtn} onPress={() => setConfirmDelete(false)} disabled={actionBusy}>
+                      <Text style={styles.secondaryBtnText}>Vazgeç</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={[styles.secondaryBtn, styles.dangerBtn]} onPress={handleDelete} disabled={actionBusy}>
+                      <Text style={[styles.secondaryBtnText, { color: '#fff' }]}>{actionBusy ? 'Siliniyor…' : 'Evet, sil'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.secondaryBtn} onPress={() => setConfirmDelete(true)} accessibilityRole="button">
+                  <Ionicons name="trash-outline" size={16} color={Colors.error} />
+                  <Text style={[styles.secondaryBtnText, { color: Colors.error }]}>Mülakatı sil</Text>
+                </TouchableOpacity>
+              )}
+              {actionError && <Text style={styles.actionError} accessibilityRole="alert">{actionError}</Text>}
+            </View>
+          )}
 
           {/* Genel Puan */}
           {isCompleted && (
-            <View style={styles.avgScoreRing}>
-              <Text style={styles.avgScoreNum}>{avgScore}%</Text>
-              <Text style={styles.avgScoreLabel}>GENEL BAŞARI</Text>
+            <View style={[styles.avgScoreRing, band && { borderColor: band.color }]}>
+              <Text style={[styles.avgScoreNum, band && { color: band.color }]}>{avgScore}</Text>
+              <Text style={styles.avgScoreLabel}>{(band?.label ?? 'Genel puan').toLocaleUpperCase('tr-TR')}</Text>
             </View>
           )}
 
@@ -316,7 +401,7 @@ export default function InterviewResultScreen() {
           )}
 
           {/* Performans Barları (Radar Grafiği Yerine) */}
-          <View style={styles.cardBox}>
+          {isCompleted && <View style={styles.cardBox}>
             <View style={styles.cardHeader}>
               <Ionicons name="trending-up" size={20} color="#3B82F6" />
               <Text style={styles.cardTitle}>Bütünsel Performans</Text>
@@ -330,7 +415,7 @@ export default function InterviewResultScreen() {
                 <ProgressBar label="Stres Yönetimi" value={Math.max(0, 100 - stressScore)} color="#EF4444" />
               </>
             )}
-          </View>
+          </View>}
 
           {/* Duygu Dağılımı (Stacked Bar) */}
           {analyticsData?.emotion_distribution && (
@@ -370,28 +455,36 @@ export default function InterviewResultScreen() {
               </View>
               <View style={styles.transcriptBox}>
                 <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }}>
-                  <Text style={styles.transcriptText}>"{analyticsData.transcript}"</Text>
+                  <Text style={styles.transcriptText}>{`“${analyticsData.transcript}”`}</Text>
                 </ScrollView>
               </View>
             </View>
           )}
 
           {/* AI Geri Bildirimi */}
-          <View style={styles.cardBox}>
-            <View style={styles.cardHeader}>
-              <Ionicons name="sparkles" size={20} color="#8B5CF6" />
-              <Text style={styles.cardTitle}>AI Değerlendirmesi</Text>
+          {isCompleted && (
+            <View style={styles.cardBox}>
+              <View style={styles.cardHeader}>
+                <Ionicons name="sparkles" size={20} color="#8B5CF6" />
+                <Text style={styles.cardTitle}>YZ Değerlendirmesi</Text>
+              </View>
+              <Text style={styles.feedbackText}>
+                {data.feedback ? data.feedback : 'Değerlendirme metni bulunamadı.'}
+              </Text>
             </View>
-            <Text style={styles.feedbackText}>
-              {data.feedback ? data.feedback : "Mülakat analiziniz henüz tamamlanmamış olabilir."}
-            </Text>
-          </View>
+          )}
 
           <ConversationCard messages={data.messages} />
-          <PilotSurveyCard interviewId={String(id)} />
+          {isCompleted && <PilotSurveyCard interviewId={String(id)} />}
 
-          {/* Buton */}
+          {/* Butonlar */}
           <View style={styles.buttonContainer}>
+            {isCompleted && (
+              <TouchableOpacity style={[styles.secondaryBtn, { marginBottom: 10, paddingVertical: 14 }]} onPress={handlePracticeAgain} accessibilityRole="button">
+                <Ionicons name="refresh" size={16} color={Colors.secondary} />
+                <Text style={[styles.secondaryBtnText, { color: Colors.secondary }]}>Aynı konuda tekrar pratik yap</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.homeButton} onPress={handleGoHome} activeOpacity={0.85}>
               <Text style={styles.homeButtonText}>Ana Sayfaya Dön</Text>
               <Ionicons name="home" size={18} color="#fff" />
@@ -485,6 +578,19 @@ const styles = StyleSheet.create({
   feedbackText: { fontSize: 15, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 24 },
 
   buttonContainer: { width: '100%', marginTop: 10 },
+  backRow: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12, paddingVertical: 4 },
+  backText: { fontSize: 14, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface },
+  ongoingBox: { width: '100%', gap: 10, marginBottom: 24 },
+  secondaryBtn: {
+    flexGrow: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 12, borderRadius: 14, borderWidth: 1, borderColor: Colors.outlineVariant,
+    backgroundColor: Colors.surfaceContainerLowest,
+  },
+  secondaryBtnText: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
+  dangerBtn: { backgroundColor: Colors.error, borderColor: Colors.error },
+  deleteConfirm: { gap: 10, padding: 14, borderRadius: 14, backgroundColor: 'rgba(186,26,26,0.06)' },
+  deleteConfirmText: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface },
+  actionError: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.error },
   homeButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.primary, width: '100%', paddingVertical: 18, borderRadius: 16 },
   homeButtonText: { color: '#fff', fontSize: 17, fontFamily: FontFamilies.sansBold },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20, gap: 16 },

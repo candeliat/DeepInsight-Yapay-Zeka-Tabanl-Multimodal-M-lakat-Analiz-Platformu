@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 import { Colors } from '../constants/Colors';
+import { scoreBand } from '../utils/scoreBand';
 import { FontFamilies } from '../constants/Fonts';
 import { METRIC_LABEL, MetricKey, Progress, progressService } from '../services/careerService';
 import { Banner, Card, Chip, PrimaryButton, SectionTitle, typo } from './ui';
@@ -190,7 +191,7 @@ export function ProgressSection() {
               <Ionicons name={t.weak ? 'warning-outline' : 'checkmark-circle-outline'} size={16} color={t.weak ? Colors.warning : Colors.success} />
               <Text style={[typo.body, { flex: 1, color: Colors.onSurface }]} numberOfLines={1}>{t.topic}</Text>
               <Text style={typo.bodyStrong}>{t.average != null ? Math.round(t.average) : '—'}</Text>
-              <Chip tone={t.weak ? 'warn' : 'good'} label={t.weak ? 'Gelişmeli' : 'İyi'} />
+              <Chip tone={t.weak ? 'warn' : 'good'} label={scoreBand(t.average)?.label ?? '—'} />
             </View>
           ))}
         </Card>

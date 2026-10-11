@@ -16,6 +16,7 @@ import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
 import { assignmentService } from '../../src/services/orgService';
+import { scoreBand } from '../../src/utils/scoreBand';
 
 interface Interview {
   id: string;
@@ -63,18 +64,21 @@ const skillBarStyles = StyleSheet.create({
   },
 });
 
+// Web ile aynı tek ölçek (Güçlü / Gelişiyor / Geliştirilmeli); "Geçti/Kaldı" gibi
+// sınav dili kullanılmaz — mülakat pratiğinde eşik yok.
 function ScoreChip({ score }: { score: number }) {
-  const passed = score >= 75;
+  const band = scoreBand(score);
+  if (!band) return null;
   return (
     <Text
       style={{
         fontSize: 10,
         fontFamily: FontFamilies.sansBold,
         letterSpacing: 0.5,
-        color: passed ? '#059669' : '#d97706',
+        color: band.color,
       }}
     >
-      {passed ? 'GEÇTİ' : 'ORTALAMA'}
+      {band.label.toLocaleUpperCase('tr-TR')}
     </Text>
   );
 }
@@ -326,7 +330,7 @@ export default function HomeScreen() {
                         <ScoreChip score={avg} />
                       </>
                     ) : (
-                      <Text style={styles.resultScorePending}>{iv.status === 'completed' ? 'Bekleniyor' : 'Devam ediyor'}</Text>
+                      <Text style={styles.resultScorePending}>{iv.status === 'completed' ? 'Bekleniyor' : 'Yarıda kaldı'}</Text>
                     )}
                   </View>
                   <Ionicons

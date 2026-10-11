@@ -78,12 +78,25 @@ const waveStyles = StyleSheet.create({
 
 // ─── Kamera Alanı (React.memo — sadece cameraOn/micOn değişince render alır) ─
 const CameraPanel = React.memo(function CameraPanel({
-  cameraOn, micOn, cameraPermission, onToggleMic, onToggleCamera, onEnd, cameraRef, onCameraReady
+  cameraOn, micOn, cameraPermission, onToggleMic, onToggleCamera, onEnd, cameraRef, onCameraReady, textMode, recordingVideo
 }: {
   cameraOn: boolean; micOn: boolean; cameraPermission: any;
   onToggleMic: () => void; onToggleCamera: () => void; onEnd: () => void;
   cameraRef: any; onCameraReady: () => void;
+  /** Yazılı mülakat: kamera/kayıt yok (video onamı da alınmadı), yalnızca bitir düğmesi. */
+  textMode: boolean; recordingVideo: boolean;
 }) {
+  if (textMode) {
+    return (
+      <View style={styles.textModeBar}>
+        <Ionicons name="chatbubble-ellipses-outline" size={16} color="rgba(255,255,255,0.6)" />
+        <Text style={styles.textModeLabel}>Yazılı mülakat · kayıt yapılmıyor</Text>
+        <TouchableOpacity style={styles.endButton} onPress={onEnd} activeOpacity={0.85}>
+          <Text style={styles.endButtonText}>Mülakatı Bitir</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
   return (
     <View style={styles.cameraSection}>
       {cameraOn && cameraPermission?.granted ? (
@@ -96,11 +109,13 @@ const CameraPanel = React.memo(function CameraPanel({
       )}
 
       <View style={styles.cameraOverlayTop}>
-        <View style={styles.liveChip}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>CANLI</Text>
-        </View>
-        {!micOn && (
+        {cameraOn && recordingVideo && (
+          <View style={styles.liveChip}>
+            <View style={styles.liveDot} />
+            <Text style={styles.liveText}>KAYIT</Text>
+          </View>
+        )}
+        {cameraOn && !micOn && (
           <View style={styles.mutedChip}>
             <Ionicons name="mic-off" size={12} color="#fff" />
             <Text style={styles.mutedText}>SESİ KAPALI</Text>
@@ -144,6 +159,12 @@ export default function InterviewRoomScreen() {
     micOn, cameraOn, isThinking, currentQuestion,
     sendMessageStream, finishInterviewEarly, toggleMic, toggleCamera, resetInterview, transcribeAudio,
   } = useInterviewStore();
+  // Mod, hazırlık ekranında kameranın açık/kapalı başlatılmasıyla belirlenir (yazılı = kapalı).
+  const [textMode] = useState(() => !useInterviewStore.getState().cameraOn);
+  // Alert.alert web'de çalışmadığı için bitirme onayı uygulama içi kartla alınır.
+  const [confirmingEnd, setConfirmingEnd] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [endError, setEndError] = useState<string | null>(null);
 
   // AppState takibi — arka plana geçince kaydı durdur
   const appStateRef = useRef(AppState.currentState);
@@ -236,37 +257,34 @@ export default function InterviewRoomScreen() {
 
   // Mülakatı bitir
   const handleEndInterview = useCallback(() => {
-    Alert.alert(
-      'Mülakatı Bitir',
-      'Mülakatı sonlandırmak istediğinize emin misiniz?',
-      [
-        { text: 'Vazgeç', style: 'cancel' },
-        {
-          text: 'Evet, Bitir',
-          style: 'destructive',
-          onPress: async () => {
-            Speech.stop();
-            try {
-              // Soru sayısına bakmaksızın o ana kadarki cevaplarla nihai
-              // değerlendirmeyi zorlayan uç nokta (LLM'e "bitir" mesajı göndermek
-              // artık işe yaramıyor — bitiş sunucu taraflı soru sayacına bağlı).
-              await finishInterviewEarly();
-              if (cameraRef.current && isRecordingVideo) {
-                cameraRef.current.stopRecording();
-              } else {
-                router.replace({
-                  pathname: '/interview-result',
-                  params: { id: useInterviewStore.getState().interviewId as string },
-                });
-              }
-            } catch (err) {
-              Alert.alert('Hata', 'Mülakat sonlandırılırken bir sorun oluştu.');
-              router.replace('/(tabs)/home');
-            }
-          },
-        },
-      ]
-    );
+    setEndError(null);
+    setConfirmingEnd(true);
+  }, []);
+
+  const confirmEndInterview = useCallback(async () => {
+    Speech.stop();
+    setEnding(true);
+    setEndError(null);
+    try {
+      // Soru sayısına bakmaksızın o ana kadarki cevaplarla nihai
+      // değerlendirmeyi zorlayan uç nokta (LLM'e "bitir" mesajı göndermek
+      // artık işe yaramıyor — bitiş sunucu taraflı soru sayacına bağlı).
+      await finishInterviewEarly();
+      setConfirmingEnd(false);
+      if (cameraRef.current && isRecordingVideo) {
+        cameraRef.current.stopRecording();
+      } else {
+        router.replace({
+          pathname: '/interview-result',
+          params: { id: useInterviewStore.getState().interviewId as string },
+        });
+      }
+    } catch (err) {
+      // Mülakat kaybolmaz: yarıda kalan olarak kalır, Raporlar'dan devam edilebilir.
+      setEndError('Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.');
+    } finally {
+      setEnding(false);
+    }
   }, [router, isRecordingVideo, finishInterviewEarly]);
 
   // Video Yükleme ve Analiz Sorgulama
@@ -451,6 +469,8 @@ export default function InterviewRoomScreen() {
           onEnd={handleEndInterview}
           cameraRef={cameraRef}
           onCameraReady={handleCameraReady}
+          textMode={textMode}
+          recordingVideo={isRecordingVideo}
         />
 
         {/* Metin Girişi */}
@@ -502,6 +522,36 @@ export default function InterviewRoomScreen() {
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {confirmingEnd && (
+        <View style={styles.confirmOverlay} accessibilityViewIsModal>
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>Mülakatı bitir</Text>
+            <Text style={styles.confirmText}>
+              Şimdiye kadar verdiğiniz cevaplarla değerlendirme yapılacak. Cevaplanmamış sorular puana katılmaz.
+            </Text>
+            {endError && <Text style={styles.confirmError} accessibilityRole="alert">{endError}</Text>}
+            <View style={styles.confirmActions}>
+              <TouchableOpacity
+                style={styles.confirmCancel}
+                onPress={() => setConfirmingEnd(false)}
+                disabled={ending}
+                accessibilityRole="button"
+              >
+                <Text style={styles.confirmCancelText}>Devam et</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.confirmEnd, ending && { opacity: 0.6 }]}
+                onPress={confirmEndInterview}
+                disabled={ending}
+                accessibilityRole="button"
+              >
+                {ending ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.confirmEndText}>Bitir ve değerlendir</Text>}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -548,6 +598,28 @@ const styles = StyleSheet.create({
   thinkingContainer: { alignItems: 'center', paddingVertical: 20, gap: 12 },
   thinkingText: { color: Colors.secondary, fontSize: 14, fontFamily: FontFamilies.sansSemibold },
   listeningHint: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 12 },
+
+  textModeBar: {
+    marginTop: 'auto', marginHorizontal: 16, marginVertical: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
+  textModeLabel: { flex: 1, fontSize: 12, fontFamily: FontFamilies.sansRegular, color: 'rgba(255,255,255,0.6)' },
+  confirmOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', padding: 24,
+  },
+  confirmCard: { backgroundColor: '#fff', borderRadius: 18, padding: 20 },
+  confirmTitle: { fontSize: 18, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
+  confirmText: { marginTop: 8, fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 20 },
+  confirmError: { marginTop: 10, fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.error },
+  confirmActions: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  confirmCancel: {
+    flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center',
+    borderWidth: 1, borderColor: Colors.outlineVariant,
+  },
+  confirmCancelText: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
+  confirmEnd: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', backgroundColor: Colors.error },
+  confirmEndText: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: '#fff' },
 
   cameraSection: {
     flex: 1, marginHorizontal: 16, marginVertical: 8,

@@ -2,8 +2,8 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, Loader2, XCircle, LogIn, Plus, ArrowRight, ShieldCheck, CheckCircle2 } from "lucide-react";
-import { orgService, MyOrganization, ROLE_LABEL } from "@/services/orgService";
+import { Building2, Loader2, XCircle, LogIn, Plus, ArrowRight, ShieldCheck, CheckCircle2, MailOpen } from "lucide-react";
+import { orgService, MyInvite, MyOrganization, ROLE_LABEL } from "@/services/orgService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -20,6 +20,8 @@ export default function OrganizationsPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [joining, setJoining] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [invites, setInvites] = useState<MyInvite[]>([]);
+  const [respondingId, setRespondingId] = useState<string | null>(null);
 
   const [newName, setNewName] = useState("");
   const [newAdminEmail, setNewAdminEmail] = useState("");
@@ -28,7 +30,9 @@ export default function OrganizationsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setOrgs(await orgService.myOrganizations());
+      const [mine, pending] = await Promise.all([orgService.myOrganizations(), orgService.myInvites()]);
+      setOrgs(mine);
+      setInvites(pending);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Yüklenemedi.");
     } finally {
@@ -55,6 +59,21 @@ export default function OrganizationsPage() {
       setError(err instanceof Error ? err.message : "Katılınamadı.");
     } finally {
       setJoining(false);
+    }
+  };
+
+  const handleRespond = async (invite: MyInvite, accept: boolean) => {
+    setRespondingId(invite.id);
+    setError(null);
+    setNotice(null);
+    try {
+      await orgService.respondInvite(invite.id, accept);
+      setNotice(accept ? `"${invite.org_name ?? "Kurum"}" kurumuna katıldınız.` : "Davet reddedildi.");
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Davet yanıtlanamadı.");
+    } finally {
+      setRespondingId(null);
     }
   };
 
@@ -111,6 +130,32 @@ export default function OrganizationsPage() {
         <div role="status" className="mb-4 flex items-start gap-3 bg-success/10 border border-success/20 text-success rounded-2xl px-4 py-3 text-sm font-semibold">
           <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
           <span className="flex-1">{notice}</span>
+        </div>
+      )}
+
+      {invites.length > 0 && (
+        <div className="mb-6 space-y-3">
+          {invites.map((inv) => (
+            <div key={inv.id} className="bg-primary/5 border border-primary/20 rounded-3xl p-5 flex items-start gap-3 flex-wrap">
+              <MailOpen className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0 text-sm">
+                <p className="font-semibold text-foreground">
+                  {inv.org_name ?? "Bir kurum"} sizi {ROLE_LABEL[inv.role].toLocaleLowerCase("tr")} olarak davet etti
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Kabul ederseniz kurum adına yaptığınız mülakatlara katılımınızı eğitmenler görür; skor paylaşımı ayrıca sizin izninize bağlıdır.
+                </p>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button size="sm" variant="outline" onClick={() => handleRespond(inv, false)} disabled={respondingId === inv.id}>
+                  Reddet
+                </Button>
+                <Button size="sm" onClick={() => handleRespond(inv, true)} disabled={respondingId === inv.id}>
+                  {respondingId === inv.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Kabul et
+                </Button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

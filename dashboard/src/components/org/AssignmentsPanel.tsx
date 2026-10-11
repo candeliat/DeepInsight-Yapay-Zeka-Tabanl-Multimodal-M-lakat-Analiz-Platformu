@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { ClipboardList, Plus, Loader2, ChevronDown, ChevronUp, Trash2, CheckCircle2, Clock, Circle, Lock, CalendarClock } from "lucide-react";
+import { ClipboardList, Plus, Loader2, ChevronDown, ChevronUp, Trash2, CheckCircle2, Clock, Circle, Lock, CalendarClock, Layers, Download } from "lucide-react";
 import { assignmentService, AssignmentStatus, AssignmentStudentRow, OrgAssignment, STATUS_LABEL } from "@/services/assignmentService";
+import { orgService, OrgGroup } from "@/services/orgService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -25,7 +26,7 @@ export function formatDue(iso: string | null) {
     : null;
 }
 
-export function AssignmentsPanel({ orgId, onError }: { orgId: string; onError: (message: string) => void }) {
+export function AssignmentsPanel({ orgId, groups, onError }: { orgId: string; groups: OrgGroup[]; onError: (message: string) => void }) {
   const [items, setItems] = useState<OrgAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -40,6 +41,7 @@ export function AssignmentsPanel({ orgId, onError }: { orgId: string; onError: (
   const [difficulty, setDifficulty] = useState<string>("ORTA");
   const [dueAt, setDueAt] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [groupId, setGroupId] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -67,6 +69,7 @@ export function AssignmentsPanel({ orgId, onError }: { orgId: string; onError: (
         instructions: instructions.trim() || undefined,
         // datetime-local yerel saattir; ISO'ya çevrilip saat dilimiyle gönderilir.
         due_at: dueAt ? new Date(dueAt).toISOString() : undefined,
+        group_id: groupId || undefined,
       });
       setItems((prev) => [{ ...created, completed_count: 0, in_progress_count: 0 }, ...prev]);
       setTitle("");
@@ -74,6 +77,7 @@ export function AssignmentsPanel({ orgId, onError }: { orgId: string; onError: (
       setTopic("");
       setDueAt("");
       setInstructions("");
+      setGroupId("");
       setShowForm(false);
     } catch (err) {
       onError(err instanceof Error ? err.message : "Ödev oluşturulamadı.");
@@ -95,6 +99,14 @@ export function AssignmentsPanel({ orgId, onError }: { orgId: string; onError: (
       } catch (e) {
         onError(e instanceof Error ? e.message : "Öğrenci durumu yüklenemedi.");
       }
+    }
+  };
+
+  const handleExport = async (a: OrgAssignment) => {
+    try {
+      await orgService.downloadCsv(`${orgId}/assignments/${a.id}/export.csv`, `odev-${a.title}.csv`);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Dışa aktarılamadı.");
     }
   };
 
@@ -145,6 +157,19 @@ export function AssignmentsPanel({ orgId, onError }: { orgId: string; onError: (
             </div>
             <Input type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} aria-label="Son tarih (opsiyonel)" />
           </div>
+          {groups.length > 0 && (
+            <select
+              value={groupId}
+              onChange={(e) => setGroupId(e.target.value)}
+              className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm"
+              aria-label="Hedef grup"
+            >
+              <option value="">Tüm öğrenciler</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>Yalnızca grup: {g.name}</option>
+              ))}
+            </select>
+          )}
           <Textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} placeholder="Öğrencilere not (opsiyonel)" maxLength={1000} className="min-h-[70px] text-sm" aria-label="Açıklama" />
           <Button type="submit" size="sm" disabled={saving}>
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Ödevi ata
@@ -172,11 +197,18 @@ export function AssignmentsPanel({ orgId, onError }: { orgId: string; onError: (
                       {a.role} · {a.topic}
                       {a.difficulty && ` · ${a.difficulty}`}
                     </p>
-                    {due && (
-                      <p className="text-xs text-muted-foreground mt-1 inline-flex items-center gap-1">
-                        <CalendarClock className="w-3.5 h-3.5" /> Son tarih: {due}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-3 flex-wrap mt-1 text-xs text-muted-foreground">
+                      {due && (
+                        <span className="inline-flex items-center gap-1">
+                          <CalendarClock className="w-3.5 h-3.5" /> Son tarih: {due}
+                        </span>
+                      )}
+                      {a.group_id && (
+                        <span className="inline-flex items-center gap-1">
+                          <Layers className="w-3.5 h-3.5" /> {groups.find((g) => g.id === a.group_id)?.name ?? "Silinmiş grup"}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     {confirmDelete === a.id ? (
@@ -204,9 +236,14 @@ export function AssignmentsPanel({ orgId, onError }: { orgId: string; onError: (
                   </div>
                 </div>
 
-                <button onClick={() => toggleStudents(a.id)} className="mt-3 text-xs font-semibold text-primary inline-flex items-center gap-1 hover:underline" aria-expanded={openId === a.id}>
-                  Öğrenci durumu {openId === a.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
+                <div className="mt-3 flex items-center gap-4">
+                  <button onClick={() => toggleStudents(a.id)} className="text-xs font-semibold text-primary inline-flex items-center gap-1 hover:underline" aria-expanded={openId === a.id}>
+                    Öğrenci durumu {openId === a.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                  <button onClick={() => handleExport(a)} className="text-xs font-semibold text-muted-foreground inline-flex items-center gap-1 hover:text-foreground hover:underline">
+                    <Download className="w-3.5 h-3.5" /> CSV
+                  </button>
+                </div>
 
                 {openId === a.id && (
                   <div className="mt-3 overflow-x-auto">

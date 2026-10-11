@@ -17,15 +17,23 @@ import {
   CheckCircle2,
   Settings,
   Trash2,
+  Download,
 } from "lucide-react";
-import { orgService, MemberDetail, MyOrganization, OrgOverview, OrganizationDetail, OrgRole, ROLE_LABEL } from "@/services/orgService";
+import { orgService, MemberDetail, MyOrganization, OrgGroup, OrgOverview, OrganizationDetail, OrgRole, ROLE_LABEL } from "@/services/orgService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { StatTile } from "@/components/progress/ProgressView";
 import { AssignmentsPanel } from "@/components/org/AssignmentsPanel";
+import { GroupsPanel } from "@/components/org/GroupsPanel";
+import { InvitePanel } from "@/components/org/InvitePanel";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
 const BAR = "#2a78d6";
+const RUBRIC_FIELDS = [
+  ["technical", "Teknik"],
+  ["confidence", "Özgüven"],
+  ["vocabulary", "İletişim"],
+] as const;
 const AXIS = "#898781";
 const GRID = "#e1e0d9";
 
@@ -55,6 +63,12 @@ export default function OrganizationPanelPage() {
   const [settingsName, setSettingsName] = useState("");
   const [settingsQuota, setSettingsQuota] = useState("");
   const [savingSettings, setSavingSettings] = useState(false);
+  const [rubric, setRubric] = useState({ technical: "", confidence: "", vocabulary: "" });
+
+  const [groups, setGroups] = useState<OrgGroup[]>([]);
+  // Panel görünümü: "" = tüm kurum, aksi halde bir grup (kohort).
+  const [groupFilter, setGroupFilter] = useState("");
+  const [exporting, setExporting] = useState(false);
 
   const isAdmin = myRole === "org_admin" || user?.app_metadata?.role === "admin";
 
@@ -65,11 +79,18 @@ export default function OrganizationPanelPage() {
       const mine: MyOrganization[] = await orgService.myOrganizations();
       const role = mine.find((o) => o.id === orgId)?.role ?? null;
       setMyRole(role);
-      const [ov, mem] = await Promise.all([orgService.overview(orgId), orgService.members(orgId)]);
+      const [ov, mem, grp] = await Promise.all([
+        orgService.overview(orgId, groupFilter),
+        orgService.members(orgId, groupFilter),
+        orgService.groups(orgId),
+      ]);
       setOverview(ov);
       setMembers(mem);
+      setGroups(grp);
       setSettingsName(ov.org.name);
       setSettingsQuota(ov.org.monthly_interview_quota ? String(ov.org.monthly_interview_quota) : "");
+      const r = ov.org.rubric;
+      setRubric(r ? { technical: String(r.technical), confidence: String(r.confidence), vocabulary: String(r.vocabulary) } : { technical: "", confidence: "", vocabulary: "" });
       if (role === "org_admin" || user?.app_metadata?.role === "admin") {
         setDetail(await orgService.get(orgId));
       }
@@ -78,7 +99,15 @@ export default function OrganizationPanelPage() {
     } finally {
       setLoading(false);
     }
-  }, [orgId, user?.app_metadata?.role]);
+  }, [orgId, user?.app_metadata?.role, groupFilter]);
+
+  const reloadGroups = useCallback(async () => {
+    try {
+      setGroups(await orgService.groups(orgId));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Gruplar yüklenemedi.");
+    }
+  }, [orgId]);
 
   useEffect(() => {
     load();
@@ -107,6 +136,31 @@ export default function OrganizationPanelPage() {
       setConfirmRemove(null);
     }, "Üye çıkarılamadı.");
 
+  const handleGroupChange = (m: MemberDetail, groupId: string) =>
+    run(async () => {
+      await orgService.setMemberGroup(orgId, m.user_id, groupId || null);
+      setMembers((prev) =>
+        prev
+          .map((x) => (x.user_id === m.user_id ? { ...x, group_id: groupId || null } : x))
+          // Bir grubun görünümündeyken başka gruba taşınan üye listeden çıkar.
+          .filter((x) => !groupFilter || x.group_id === groupFilter),
+      );
+      await reloadGroups();
+    }, "Grup değiştirilemedi.");
+
+  const handleExport = () =>
+    run(async () => {
+      setExporting(true);
+      try {
+        const group = groups.find((g) => g.id === groupFilter);
+        await orgService.downloadCsv(`${orgId}/export/members.csv`, `uyeler${group ? `-${group.name}` : ""}.csv`, {
+          group_id: groupFilter || undefined,
+        });
+      } finally {
+        setExporting(false);
+      }
+    }, "Dışa aktarılamadı.");
+
   const handleRotate = () =>
     run(async () => {
       const { invite_code } = await orgService.rotateInviteCode(orgId);
@@ -127,19 +181,24 @@ export default function OrganizationPanelPage() {
     setSavingSettings(true);
     await run(async () => {
       const quota = settingsQuota.trim() ? Number(settingsQuota) : undefined;
+      const rubricSet = RUBRIC_FIELDS.some(([key]) => rubric[key].trim());
       const updated = await orgService.updateSettings(orgId, {
         name: settingsName.trim() || undefined,
         monthly_interview_quota: quota,
         clear_quota: !settingsQuota.trim(),
+        rubric: rubricSet
+          ? { technical: Number(rubric.technical) || 0, confidence: Number(rubric.confidence) || 0, vocabulary: Number(rubric.vocabulary) || 0 }
+          : undefined,
+        clear_rubric: !rubricSet,
       });
       setDetail(updated);
-      setOverview((o) => (o ? { ...o, org: { ...o.org, name: updated.name, monthly_interview_quota: updated.monthly_interview_quota } } : o));
+      await load(); // rubrik değiştiyse ortalamalar yeniden hesaplanır
       setNotice("Ayarlar kaydedildi.");
     }, "Ayarlar kaydedilemedi.");
     setSavingSettings(false);
   };
 
-  if (loading) {
+  if (loading && !overview) {
     return (
       <div className="flex items-center justify-center py-24 text-muted-foreground">
         <Loader2 className="w-6 h-6 animate-spin" />
@@ -171,6 +230,28 @@ export default function OrganizationPanelPage() {
           {myRole && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">{ROLE_LABEL[myRole]}</span>}
         </div>
         <p className="text-sm text-muted-foreground mt-1">Yalnızca kurum adına yapılan mülakatlar sayılır; öğrencinin bireysel mülakatları burada görünmez.</p>
+        {groups.length > 0 && (
+          <div className="mt-4 flex items-center gap-2">
+            <label htmlFor="group-filter" className="text-xs font-semibold text-muted-foreground">Görünüm</label>
+            <select
+              id="group-filter"
+              value={groupFilter}
+              onChange={(e) => setGroupFilter(e.target.value)}
+              className="h-9 px-3 rounded-xl border border-border bg-background text-sm"
+            >
+              <option value="">Tüm kurum</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+            {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+          </div>
+        )}
+        {overview.org.rubric && (
+          <p className="text-xs text-muted-foreground mt-2">
+            Skorlar kurum rubriğiyle hesaplanır: teknik %{overview.org.rubric.technical} · özgüven %{overview.org.rubric.confidence} · iletişim %{overview.org.rubric.vocabulary}
+          </p>
+        )}
       </div>
 
       {error && (
@@ -267,15 +348,21 @@ export default function OrganizationPanelPage() {
 
       {/* Üyeler */}
       <div className="bg-card border border-border rounded-3xl shadow-sm p-6">
-        <h2 className="font-bold text-foreground text-sm mb-4 flex items-center gap-2">
-          <Users className="w-4 h-4 text-primary" /> Üyeler ({members.length})
-        </h2>
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <h2 className="font-bold text-foreground text-sm flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary" /> Üyeler ({members.length})
+          </h2>
+          <Button size="sm" variant="outline" onClick={handleExport} disabled={exporting} title="Skor sütunu yalnızca paylaşım izni veren öğrenciler için dolu">
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />} CSV indir
+          </Button>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-muted-foreground border-b border-border">
                 <th className="py-2 pr-3 font-semibold">Kişi</th>
                 <th className="py-2 pr-3 font-semibold">Rol</th>
+                {groups.length > 0 && <th className="py-2 pr-3 font-semibold">Grup</th>}
                 <th className="py-2 pr-3 font-semibold text-right">Mülakat</th>
                 <th className="py-2 pr-3 font-semibold">Son mülakat</th>
                 <th className="py-2 pr-3 font-semibold text-right">Ortalama</th>
@@ -307,6 +394,21 @@ export default function OrganizationPanelPage() {
                         <span className="text-xs">{ROLE_LABEL[m.role]}</span>
                       )}
                     </td>
+                    {groups.length > 0 && (
+                      <td className="py-2.5 pr-3">
+                        <select
+                          aria-label={`${m.name ?? m.email} grubu`}
+                          value={m.group_id ?? ""}
+                          onChange={(e) => handleGroupChange(m, e.target.value)}
+                          className="h-8 px-2 rounded-lg border border-border bg-background text-xs max-w-[10rem]"
+                        >
+                          <option value="">—</option>
+                          {groups.map((g) => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                          ))}
+                        </select>
+                      </td>
+                    )}
                     <td className="py-2.5 pr-3 text-right tabular-nums">{m.interview_count}</td>
                     <td className="py-2.5 pr-3 text-muted-foreground whitespace-nowrap">{formatDate(m.last_interview_at)}</td>
                     <td className="py-2.5 pr-3 text-right">
@@ -352,7 +454,12 @@ export default function OrganizationPanelPage() {
         </div>
       </div>
 
-      <AssignmentsPanel orgId={orgId} onError={setError} />
+      <AssignmentsPanel orgId={orgId} groups={groups} onError={setError} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <GroupsPanel orgId={orgId} groups={groups} onChanged={load} onError={setError} />
+        <InvitePanel orgId={orgId} groups={groups} canInviteInstructors={isAdmin} onInvited={reloadGroups} onError={setError} />
+      </div>
 
       {isAdmin && detail && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -399,6 +506,27 @@ export default function OrganizationPanelPage() {
                 placeholder="Boş bırakılırsa sınırsız"
               />
             </div>
+            <fieldset className="space-y-1.5">
+              <legend className="text-xs font-semibold text-muted-foreground">Değerlendirme rubriği (ağırlık %, toplam 100)</legend>
+              <div className="grid grid-cols-3 gap-2">
+                {RUBRIC_FIELDS.map(([key, label]) => (
+                  <label key={key} className="text-[11px] text-muted-foreground space-y-1">
+                    <span>{label}</span>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={rubric[key]}
+                      onChange={(e) => setRubric((r) => ({ ...r, [key]: e.target.value }))}
+                      placeholder="Eşit"
+                    />
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Boş bırakılırsa üç metrik eşit ağırlıklıdır. Rubrik yalnızca kurum panelindeki skorları etkiler; öğrencinin kendi gelişim sayfası değişmez.
+              </p>
+            </fieldset>
             <Button type="submit" size="sm" disabled={savingSettings}>
               {savingSettings && <Loader2 className="w-3.5 h-3.5 animate-spin" />} Kaydet
             </Button>

@@ -17,6 +17,8 @@ export interface Assignment {
   difficulty: "JUNIOR" | "ORTA" | "UZMAN" | null;
   instructions: string | null;
   due_at: string | null;
+  /** Doluysa ödev yalnızca bu grubun öğrencilerine atanmıştır. */
+  group_id: string | null;
   created_at: string | null;
 }
 
@@ -52,6 +54,7 @@ export interface AssignmentCreatePayload {
   difficulty?: string;
   instructions?: string;
   due_at?: string;
+  group_id?: string;
 }
 
 function extractErrorMessage(error: unknown): string {

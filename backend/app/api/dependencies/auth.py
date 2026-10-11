@@ -10,10 +10,26 @@ from app.services import organization_service
 # We will create /api/v1/auth/swagger-login for Swagger UI to fetch the token
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/swagger-login")
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
+_TRANSIENT = (httpx.TransportError, AuthRetryableError, TimeoutError, OSError)
+
+
+def _get_user(token: str):
+    try:
+        return supabase.auth.get_user(token)
+    except _TRANSIENT:
+        # Boşta kalan havuz bağlantısını sunucu kapatmış olabilir (ReadError/ConnectionReset);
+        # bir kez yeni bağlantıyla denemek çoğu geçici hatayı kullanıcıya yansıtmadan çözer.
+        return supabase.auth.get_user(token)
+
+
+async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
     """
     Validate the token from the Authorization header and return the user profile.
     Raises HTTPException if the token is invalid or user is not found.
+
+    async tanımlıdır: sync dependency'ler FastAPI'de iş parçacığı havuzunda çalışır ve
+    paralel isteklerde paylaşılan Supabase (HTTP/2) istemcisini aynı anda birden çok
+    iş parçacığından kullanır — bu bağlantıyı koparıyordu (ReadError -> 503).
     """
     if not supabase:
         raise HTTPException(
@@ -23,7 +39,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
 
     try:
         # Supabase get_user verifies the JWT token string
-        user_response = supabase.auth.get_user(token)
+        user_response = _get_user(token)
         
         if hasattr(user_response, 'user') and user_response.user:
             user = user_response.user
@@ -41,7 +57,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
         )
     except HTTPException:
         raise
-    except (httpx.TransportError, AuthRetryableError, TimeoutError, OSError) as e:
+    except _TRANSIENT as e:
         # Supabase'e ulaşılamadı/zaman aşımı: token geçersiz DEĞİL. 401 dönülürse
         # istemci oturumu kapatır (dashboard'daki api.ts 401'de token'ı siler) —
         # geçici bir ağ yavaşlığı kullanıcıyı sistemden atmamalı.

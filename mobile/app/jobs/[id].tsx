@@ -120,7 +120,7 @@ export default function JobDetailScreen() {
             </View>
             {!!reqs?.nice_to_have_skills.length && (
               <>
-                <Text style={[typo.label, { marginTop: 12, marginBottom: 8 }]}>TERCİH SEBEBİ</Text>
+                <Text style={[typo.label, { marginTop: 12, marginBottom: 8 }]}>TERCİH EDİLEN</Text>
                 <View style={styles.chips}>
                   {reqs.nice_to_have_skills.map((s) => <Chip key={s} label={s} />)}
                 </View>

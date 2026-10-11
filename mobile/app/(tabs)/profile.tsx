@@ -140,7 +140,7 @@ export default function ProfileScreen() {
           </Text>
           <Text style={styles.emailText}>{user?.email}</Text>
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{user?.app_metadata?.role === 'admin' ? 'Yönetici' : 'Aday'}</Text>
+            <Text style={styles.roleText}>{(user?.app_metadata?.role === 'admin' ? 'Yönetici' : 'Aday').toLocaleUpperCase('tr-TR')}</Text>
           </View>
         </View>
 
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,104,122,0.08)',
     borderRadius: 12,
   },
-  roleText: { fontSize: 12, fontFamily: FontFamilies.sansBold, color: Colors.secondary, textTransform: 'uppercase' },
+  roleText: { fontSize: 12, fontFamily: FontFamilies.sansBold, color: Colors.secondary },
 
   section: { marginBottom: 24 },
   sectionTitle: { fontSize: 16, fontFamily: FontFamilies.sansBold, color: Colors.onSurface, marginBottom: 12 },

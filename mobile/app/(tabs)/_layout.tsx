@@ -7,6 +7,9 @@ import { useUserStore } from '../../src/store/userStore';
 
 export default function TabLayout() {
   const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const hydrated = useUserStore((s) => s.hydrated);
+  // Kayıtlı oturum okunana kadar bekle (kök layout initialize eder).
+  if (!hydrated) return null;
   // Oturum yenilenemezse (refresh token geçersiz) store temizlenir -> giriş ekranı.
   if (!isAuthenticated) {
     return <Redirect href="/(auth)/login" />;

@@ -19,6 +19,7 @@ import { FontFamilies } from '../src/constants/Fonts';
 import { api } from '../src/config/api';
 import { useInterviewStore } from '../src/store/interviewStore';
 import { analyticsService } from '../src/services/analyticsService';
+import { ConversationCard, PilotSurveyCard } from '../src/components/ResultExtras';
 
 function SkeletonLoader() {
   const pulseAnim = useRef(new Animated.Value(0.5)).current;
@@ -226,6 +227,7 @@ export default function InterviewResultScreen() {
     );
   }
 
+  const isCompleted = data.status === 'completed';
   const avgScore = Math.round(data.average_score || 0);
 
   const handleGoHome = () => {
@@ -260,7 +262,7 @@ export default function InterviewResultScreen() {
 
   const fillerWordsData = analyticsData?.filler_words_detail
     ? Object.entries(analyticsData.filler_words_detail).map(([name, count]: any) => ({
-        name: name.toUpperCase(),
+        name: name.toLocaleUpperCase('tr-TR'),
         count: count
       }))
     : [];
@@ -277,17 +279,21 @@ export default function InterviewResultScreen() {
           </View>
 
           <Text style={styles.resultsTitle}>
-            {avgScore >= 80 ? 'Mükemmel!' : avgScore >= 60 ? 'Tebrikler!' : 'Tamamlandı!'}
+            {!isCompleted ? 'Mülakat tamamlanmadı' : avgScore >= 80 ? 'Mükemmel!' : avgScore >= 60 ? 'Tebrikler!' : 'Tamamlandı!'}
           </Text>
           <Text style={styles.resultsDesc}>
-            Mülakatı bitirdiniz. İşte performansınızın detaylı yapay zeka analizi:
+            {isCompleted
+              ? 'Mülakatı bitirdiniz. İşte performansınızın detaylı yapay zeka analizi:'
+              : 'Bu mülakat yarıda kaldığı için puanlanmadı. Aşağıda o ana kadarki dökümü görebilirsiniz.'}
           </Text>
 
           {/* Genel Puan */}
-          <View style={styles.avgScoreRing}>
-            <Text style={styles.avgScoreNum}>{avgScore}%</Text>
-            <Text style={styles.avgScoreLabel}>GENEL BAŞARI</Text>
-          </View>
+          {isCompleted && (
+            <View style={styles.avgScoreRing}>
+              <Text style={styles.avgScoreNum}>{avgScore}%</Text>
+              <Text style={styles.avgScoreLabel}>GENEL BAŞARI</Text>
+            </View>
+          )}
 
           {/* AI GÖRSEL METRİKLER (Grid) */}
           {analyticsData && (
@@ -334,13 +340,11 @@ export default function InterviewResultScreen() {
                 <Text style={styles.cardTitle}>Duygu Durum Dağılımı</Text>
               </View>
               <Text style={styles.dominantText}>
-                Baskın Duygu: <Text style={styles.dominantTextHighlight}>{
-                  analyticsData.dominant_emotion === 'happy' ? 'Mutlu' :
+                Baskın Duygu: <Text style={styles.dominantTextHighlight}>{(analyticsData.dominant_emotion === 'happy' ? 'Mutlu' :
                   analyticsData.dominant_emotion === 'sad' ? 'Üzgün' :
                   analyticsData.dominant_emotion === 'fear' ? 'Korku' :
                   analyticsData.dominant_emotion === 'angry' ? 'Öfkeli' :
-                  analyticsData.dominant_emotion === 'surprise' ? 'Şaşkın' : 'Nötr'
-                }</Text>
+                  analyticsData.dominant_emotion === 'surprise' ? 'Şaşkın' : 'Nötr').toLocaleUpperCase('tr-TR')}</Text>
               </Text>
               <StackedBarChart data={emotionData} />
             </View>
@@ -382,6 +386,9 @@ export default function InterviewResultScreen() {
               {data.feedback ? data.feedback : "Mülakat analiziniz henüz tamamlanmamış olabilir."}
             </Text>
           </View>
+
+          <ConversationCard messages={data.messages} />
+          <PilotSurveyCard interviewId={String(id)} />
 
           {/* Buton */}
           <View style={styles.buttonContainer}>
@@ -453,7 +460,7 @@ const styles = StyleSheet.create({
 
   // Stacked Bar (Pie yerine)
   dominantText: { fontSize: 13, color: Colors.onSurfaceVariant, marginBottom: 12, fontFamily: FontFamilies.sansMedium },
-  dominantTextHighlight: { fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, textTransform: 'uppercase' },
+  dominantTextHighlight: { fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface },
   stackedContainer: { marginTop: 8 },
   stackedBar: { height: 24, flexDirection: 'row', width: '100%', borderRadius: 8, overflow: 'hidden', marginBottom: 16 },
   stackedSegment: { height: '100%' },
@@ -468,7 +475,7 @@ const styles = StyleSheet.create({
   vBarCount: { fontSize: 12, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, marginBottom: 4 },
   vBarTrack: { width: 24, height: 100, backgroundColor: Colors.surfaceContainerHighest, borderRadius: 6, justifyContent: 'flex-end', overflow: 'hidden', marginBottom: 8 },
   vBarFill: { width: '100%', backgroundColor: '#F59E0B', borderRadius: 6 },
-  vBarLabel: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, textTransform: 'uppercase' },
+  vBarLabel: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant },
 
   // Transcript
   transcriptBox: { backgroundColor: Colors.surfaceContainerLow, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.outlineVariant },

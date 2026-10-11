@@ -174,7 +174,11 @@ export default function PilotPage() {
               <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">
                 Değerlendirilmemiş mülakatlar ({status.pending_surveys.filter((s) => !answered.has(s.id)).length})
               </h2>
-              {status.pending_surveys.map((s) => (
+              {/* Tek seferde bir anket: yanıtlananlar teşekkür mesajıyla kalır, sıradaki yanıtlanmamış gösterilir. */}
+              {[
+                ...status.pending_surveys.filter((s) => answered.has(s.id)),
+                ...status.pending_surveys.filter((s) => !answered.has(s.id)).slice(0, 1),
+              ].map((s) => (
                 <PostInterviewSurvey
                   key={s.id}
                   interviewId={s.id}

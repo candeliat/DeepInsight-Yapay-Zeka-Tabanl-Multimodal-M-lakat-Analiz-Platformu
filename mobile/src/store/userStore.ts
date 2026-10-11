@@ -21,6 +21,9 @@ interface UserState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** Kayıtlı oturum depodan okundu mu? Okunmadan oturum koruması karar vermemeli
+   * (web'de sayfa yenileme/derin bağlantı kullanıcıyı yanlışlıkla girişe atardı). */
+  hydrated: boolean;
   setToken: (token: string, refresh?: string) => Promise<void>;
   setUser: (user: UserProfile | null) => void;
   logout: () => Promise<void>;
@@ -39,6 +42,7 @@ export const useUserStore = create<UserState>((set, get) => ({
   refreshToken: null,
   isAuthenticated: false,
   isLoading: false,
+  hydrated: false,
 
   setToken: async (token: string, refresh?: string) => {
     await setStorageItemAsync('token', token);
@@ -91,18 +95,28 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   initialize: async () => {
-    try {
-      const token = await getStorageItemAsync('token');
-      const refresh = await getStorageItemAsync('refresh_token');
-      if (token) {
-        set({ token, refreshToken: refresh || null, isAuthenticated: true });
-        await get().fetchProfile(token);
-      }
-    } catch {
-      // Başlangıç hatası — kullanıcı giriş ekranına yönlendirilir
+    // Kök layout ve karşılama ekranı birlikte çağırabilir: tek sefer çalışır.
+    if (!initializing) {
+      initializing = (async () => {
+        try {
+          const token = await getStorageItemAsync('token');
+          const refresh = await getStorageItemAsync('refresh_token');
+          if (token) {
+            set({ token, refreshToken: refresh || null, isAuthenticated: true });
+            await get().fetchProfile(token);
+          }
+        } catch {
+          // Başlangıç hatası — kullanıcı giriş ekranına yönlendirilir
+        } finally {
+          set({ hydrated: true });
+        }
+      })();
     }
+    return initializing;
   }
 }));
+
+let initializing: Promise<void> | null = null;
 
 // Yenileme reddedilirse (refresh token geçersiz) store da temizlenir; ekranlar
 // isAuthenticated=false görünce giriş ekranına yönlenir.

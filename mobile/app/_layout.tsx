@@ -12,6 +12,7 @@ import {
   Manrope_700Bold,
   Manrope_800ExtraBold,
 } from '../src/constants/Fonts';
+import { useUserStore } from '../src/store/userStore';
 
 SplashScreen.preventAutoHideAsync().catch(() => {
   // Zaten gizlenmişse (Fast Refresh vb.) sessizce geç
@@ -28,6 +29,11 @@ export default function RootLayout() {
     Manrope_700Bold,
     Manrope_800ExtraBold,
   });
+
+  // Kayıtlı oturum hangi ekrandan açılırsa açılsın (web yenileme, derin bağlantı) okunur.
+  useEffect(() => {
+    useUserStore.getState().initialize();
+  }, []);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

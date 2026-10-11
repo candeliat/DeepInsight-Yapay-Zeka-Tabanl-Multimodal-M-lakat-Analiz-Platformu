@@ -772,6 +772,11 @@ async def get_my_interviews(
         for inv in interviews:
             objective_conf = confidence_map.get(inv["id"])
             inv["objective_confidence_pct"] = objective_conf
+            if inv.get("status") != "completed":
+                # Devam eden mülakatın skor kolonları henüz 0/boş: ortalaması "0/100"
+                # gibi görünmemeli — istemciler None'u "devam ediyor" olarak gösterir.
+                inv["average_score"] = None
+                continue
             conf_value = objective_conf if objective_conf is not None else inv.get("confidence_score")
 
             scores = [
@@ -816,10 +821,10 @@ async def get_interview_detail(
             detail.get("vocabulary_score")
         ]
         valid_scores = [s for s in scores if s is not None and isinstance(s, (int, float))]
-        if valid_scores:
+        if valid_scores and detail.get("status") == "completed":
             detail["average_score"] = round(sum(valid_scores) / len(valid_scores), 1)
         else:
-            detail["average_score"] = None
+            detail["average_score"] = None  # devam eden mülakat henüz puanlanmadı
 
         return detail
     except HTTPException:

@@ -15,6 +15,7 @@ import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
+import { assignmentService } from '../../src/services/orgService';
 
 interface Interview {
   id: string;
@@ -81,8 +82,8 @@ function ScoreChip({ score }: { score: number }) {
 export default function HomeScreen() {
   const router = useRouter();
   const user = useUserStore((s) => s.user);
-  const { logout } = useUserStore();
   const [interviews, setInterviews] = useState<Interview[]>([]);
+  const [pendingAssignments, setPendingAssignments] = useState(0);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [skillData, setSkillData] = useState([
     { label: 'İletişim', value: 0, color: Colors.secondary },
@@ -97,6 +98,10 @@ export default function HomeScreen() {
 
   useEffect(() => {
     fetchHistory();
+    assignmentService
+      .mine()
+      .then((items) => setPendingAssignments(items.filter((a) => a.status !== 'completed').length))
+      .catch(() => setPendingAssignments(0));
   }, []);
 
   const fetchHistory = async () => {
@@ -106,10 +111,13 @@ export default function HomeScreen() {
       const data = res.data || [];
       setInterviews(data);
 
-      if (data.length > 0) {
+      // Yalnızca tamamlanmış (puanlanmış) mülakatlar: devam edenlerin skor kolonları 0'dır
+      // ve ortalamayı haksız yere düşürür.
+      const completed = data.filter((iv: Interview) => iv.status === 'completed');
+      if (completed.length > 0) {
         let techSum = 0, confSum = 0, vocabSum = 0;
         let count = 0;
-        data.forEach((iv: any) => {
+        completed.forEach((iv: any) => {
           if (iv.technical_score !== undefined && iv.technical_score !== null) {
             techSum += iv.technical_score || 0;
             confSum += iv.confidence_score || 0;
@@ -132,10 +140,14 @@ export default function HomeScreen() {
     }
   };
 
-  const overallScore =
-    interviews.length > 0 && interviews[0].average_score != null
-      ? Math.round(interviews[0].average_score)
-      : null;
+  // Hazırlık skoru: son 5 tamamlanmış mülakatın ortalaması (tek bir mülakata bağlı kalmasın).
+  const recentScores = interviews
+    .filter((iv) => iv.status === 'completed' && iv.average_score != null)
+    .slice(0, 5)
+    .map((iv) => iv.average_score as number);
+  const overallScore = recentScores.length
+    ? Math.round(recentScores.reduce((a, b) => a + b, 0) / recentScores.length)
+    : null;
 
   const formatDate = (dateStr: string) => {
     try {
@@ -161,7 +173,7 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.logoText}>DeepInsight</Text>
         </View>
-        <TouchableOpacity style={styles.avatarBtn} onPress={logout}>
+        <TouchableOpacity style={styles.avatarBtn} onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Profil">
           <View style={styles.avatar}>
             <Ionicons name="person" size={18} color={Colors.onSurfaceVariant} />
           </View>
@@ -212,6 +224,27 @@ export default function HomeScreen() {
           {/* Dekoratif arka plan */}
           <View style={styles.actionCardDecor} />
         </TouchableOpacity>
+
+        {/* Hızlı erişim — web'deki CV, İlan Eşleştirme ve Ödevlerim sayfalarının karşılıkları */}
+        <View style={styles.quickRow}>
+          {([
+            ['/cv', 'document-text-outline', 'CV Analizi'],
+            ['/jobs', 'briefcase-outline', 'İlanlar'],
+            ['/assignments', 'clipboard-outline', 'Ödevler'],
+          ] as const).map(([href, icon, label]) => (
+            <TouchableOpacity key={href} style={styles.quickBtn} onPress={() => router.push(href)} activeOpacity={0.8} accessibilityRole="button">
+              <View style={styles.quickIcon}>
+                <Ionicons name={icon} size={20} color={Colors.secondary} />
+                {href === '/assignments' && pendingAssignments > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{pendingAssignments}</Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.quickLabel}>{label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         {/* Beceri Analizi */}
         <View style={styles.card}>
@@ -265,7 +298,7 @@ export default function HomeScreen() {
                 <TouchableOpacity
                   key={iv.id}
                   style={styles.resultItem}
-                  onPress={() => router.push('/(tabs)/reports')}
+                  onPress={() => router.push({ pathname: '/interview-result', params: { id: iv.id } })}
                   activeOpacity={0.7}
                 >
                   <View style={styles.resultIcon}>
@@ -293,7 +326,7 @@ export default function HomeScreen() {
                         <ScoreChip score={avg} />
                       </>
                     ) : (
-                      <Text style={styles.resultScorePending}>Bekleniyor</Text>
+                      <Text style={styles.resultScorePending}>{iv.status === 'completed' ? 'Bekleniyor' : 'Devam ediyor'}</Text>
                     )}
                   </View>
                   <Ionicons
@@ -324,6 +357,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: Colors.background },
+  quickRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  quickBtn: {
+    flex: 1, alignItems: 'center', gap: 8, paddingVertical: 14, borderRadius: 16,
+    backgroundColor: Colors.surfaceContainerLowest, borderWidth: 1, borderColor: 'rgba(0,0,0,0.05)',
+  },
+  quickIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(0,104,122,0.08)', alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { fontSize: 12, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface },
+  badge: {
+    position: 'absolute', top: -5, right: -7, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+    backgroundColor: Colors.error, alignItems: 'center', justifyContent: 'center',
+  },
+  badgeText: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: '#fff' },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',

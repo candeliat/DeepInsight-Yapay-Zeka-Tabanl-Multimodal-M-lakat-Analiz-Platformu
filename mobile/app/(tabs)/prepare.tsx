@@ -66,6 +66,10 @@ export default function PrepareScreen() {
   const [orgId, setOrgId] = useState<string | null>(null);
   const [contextError, setContextError] = useState<string | null>(null);
   const locked = !!assignment; // ödevde rol/konu/zorluğu eğitmen belirler
+  // Görüntülü: kamera + mikrofon, video analizi (göz teması, duygu, konuşma hızı).
+  // Yazılı: izin gerekmez (web'deki Yazılı Mülakat'ın karşılığı) — kamerası olmayan
+  // ya da izin vermek istemeyen kullanıcı da mülakat yapabilmeli.
+  const [mode, setMode] = useState<'video' | 'text'>('video');
 
   useEffect(() => {
     orgService.myOrganizations().then(setOrgs).catch(() => setOrgs([]));
@@ -143,8 +147,8 @@ export default function PrepareScreen() {
   };
 
   const handleStart = async () => {
-    // İzin kontrolü
-    if (!cameraPermission?.granted) {
+    // İzin kontrolü (yalnızca görüntülü modda)
+    if (mode === 'video' && !cameraPermission?.granted) {
       const result = await requestCameraPermission();
       if (!result.granted) {
         Alert.alert(
@@ -155,7 +159,7 @@ export default function PrepareScreen() {
         return;
       }
     }
-    if (!micPermission?.granted) {
+    if (mode === 'video' && !micPermission?.granted) {
       const result = await requestMicPermission();
       if (!result.granted) {
         Alert.alert(
@@ -179,6 +183,8 @@ export default function PrepareScreen() {
         orgId: orgId ?? undefined,
       });
       await startInterview();
+      // Yazılı modda kamera kapalı başlar: video kaydı/analizi yapılmaz, sonuç ekranına doğrudan geçilir.
+      useInterviewStore.setState({ cameraOn: mode === 'video', micOn: mode === 'video' });
       router.push('/interview-room');
     } catch (e) {
       // Kota (429), ödev/CV bulunamadı (404) gibi durumlarda sunucunun mesajı gösterilir.
@@ -254,6 +260,28 @@ export default function PrepareScreen() {
           </View>
         )}
 
+        <View style={styles.modeRow} accessibilityRole="radiogroup">
+          {([
+            ['video', 'videocam-outline', 'Görüntülü', 'Kamera + video analizi'],
+            ['text', 'chatbubble-ellipses-outline', 'Yazılı', 'Kamera gerekmez'],
+          ] as const).map(([key, icon, label, sub]) => (
+            <TouchableOpacity
+              key={key}
+              onPress={() => setMode(key)}
+              style={[styles.modeBtn, mode === key && styles.modeBtnActive]}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: mode === key }}
+            >
+              <Ionicons name={icon} size={20} color={mode === key ? Colors.secondary : Colors.outline} />
+              <View>
+                <Text style={[styles.modeLabel, mode === key && { color: Colors.secondary }]}>{label}</Text>
+                <Text style={styles.modeSub}>{sub}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {mode === 'video' && (<>
         {/* Kamera Önizleme */}
         <View style={styles.cameraContainer}>
           {cameraOk ? (
@@ -324,6 +352,8 @@ export default function PrepareScreen() {
             <View style={[styles.statusDot, { backgroundColor: micOk ? Colors.success : Colors.outline }]} />
           </View>
         </View>
+
+        </>)}
 
         {/* Kurulum Kartı */}
         <View style={styles.setupCard}>
@@ -534,6 +564,23 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
   },
   camBtnOff: { backgroundColor: 'rgba(186,26,26,0.25)', borderColor: 'rgba(186,26,26,0.5)' },
+
+  // Mod
+  modeRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
+  modeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.outlineVariant,
+    backgroundColor: Colors.surfaceContainerLowest,
+  },
+  modeBtnActive: { borderColor: Colors.secondary, backgroundColor: 'rgba(0,104,122,0.06)' },
+  modeLabel: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
+  modeSub: { fontSize: 11, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, marginTop: 1 },
 
   // Bağlam
   contextCard: {

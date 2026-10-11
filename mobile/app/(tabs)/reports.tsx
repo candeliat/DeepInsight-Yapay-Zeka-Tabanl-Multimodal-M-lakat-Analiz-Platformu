@@ -88,7 +88,10 @@ export default function ReportsScreen() {
       const res = await api.get(`/api/v1/interview/me`);
       const data: Interview[] = res.data || [];
       setInterviews(data);
-      if (data.length > 0) setSelected(data[0]);
+      // "Son Mülakat" kartı puanlanmış son mülakatı gösterir; devam eden mülakatın
+      // skorları henüz 0'dır ve "0% Geliştirmeli" gibi yanıltıcı görünür.
+      const lastCompleted = data.find((iv) => iv.status === 'completed');
+      setSelected(lastCompleted ?? null);
     } catch (e) {
       // sessizce geç
     } finally {
@@ -103,7 +106,7 @@ export default function ReportsScreen() {
   };
 
   const avg = (iv: Interview) =>
-    iv.technical_score !== undefined
+    iv.status === 'completed' && iv.technical_score !== undefined
       ? Math.round(
           ((iv.technical_score || 0) + (iv.confidence_score || 0) + (iv.vocabulary_score || 0)) / 3
         )
@@ -182,6 +185,11 @@ export default function ReportsScreen() {
 
             <Text style={styles.sectionTitle}>Son Mülakat</Text>
             {/* Seçili Mülakat - Detay Görünümü */}
+            {!selected && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Henüz puanlanmış bir mülakatınız yok. Başladığınız mülakatı tamamladığınızda sonuç burada görünür.</Text>
+              </View>
+            )}
             {selected && (
               <>
                 {/* Skor + Başarı Durumu Kartı */}
@@ -326,7 +334,7 @@ export default function ReportsScreen() {
                                   {score}%
                                 </Text>
                               ) : (
-                                <Text style={styles.historyPending}>—</Text>
+                                <Text style={styles.historyPending}>{iv.status === 'completed' ? '—' : 'Devam ediyor'}</Text>
                               )}
                             </View>
                             <Ionicons

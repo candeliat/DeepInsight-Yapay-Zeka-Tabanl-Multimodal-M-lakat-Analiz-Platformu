@@ -80,9 +80,11 @@ export function Card({ children, style }: { children: React.ReactNode; style?: V
 }
 
 export function SectionTitle({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
+  // textTransform: 'uppercase' Türkçe "i -> İ" kuralını bilmez ("PROFIL"); yerel ayarla çevrilir.
+  const label = typeof children === 'string' ? children.toLocaleUpperCase('tr-TR') : children;
   return (
     <View style={s.sectionRow}>
-      <Text style={s.sectionTitle}>{children}</Text>
+      <Text style={s.sectionTitle}>{label}</Text>
       {right}
     </View>
   );
@@ -260,7 +262,7 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
   },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, marginBottom: 10 },
-  sectionTitle: { fontSize: 12, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionTitle: { fontSize: 12, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.8 },
   banner: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', padding: 12, borderRadius: 14, marginBottom: 12 },
   bannerText: { flex: 1, fontSize: 13, fontFamily: FontFamilies.sansSemibold, lineHeight: 19 },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },

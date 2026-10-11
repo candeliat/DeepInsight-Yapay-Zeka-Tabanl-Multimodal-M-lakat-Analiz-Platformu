@@ -139,7 +139,8 @@ export default function PilotScreen() {
               {status.pending_surveys.length > 0 && (
                 <>
                   <SectionTitle>Değerlendirilmemiş mülakatlar ({status.pending_surveys.length})</SectionTitle>
-                  {status.pending_surveys.map((p) => (
+                  {/* Tek seferde bir anket: beş formu art arda göstermek bunaltıcı ve yarıda bırakılıyor. */}
+                  {status.pending_surveys.slice(0, 1).map((p) => (
                     <PostSurvey
                       key={p.id}
                       interview={p}
@@ -150,6 +151,11 @@ export default function PilotScreen() {
                       }}
                     />
                   ))}
+                  {status.pending_surveys.length > 1 && (
+                    <Text style={[typo.small, { marginBottom: 12, textAlign: 'center' }]}>
+                      Gönderdikten sonra sıradaki mülakat gelir · {status.pending_surveys.length - 1} anket daha
+                    </Text>
+                  )}
                 </>
               )}
 

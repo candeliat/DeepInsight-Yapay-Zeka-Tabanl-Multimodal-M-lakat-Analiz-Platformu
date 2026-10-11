@@ -18,7 +18,7 @@ PASSWORD = "TestSifre!2026"
 client = httpx.Client(timeout=90)
 
 print("=== Kayıt + Giriş ===")
-client.post(f"{BASE}/auth/register", json={"email": EMAIL, "password": PASSWORD})
+client.post(f"{BASE}/auth/register", json={"email": EMAIL, "password": PASSWORD, "privacy_accepted": True})
 r = client.post(f"{BASE}/auth/login", json={"email": EMAIL, "password": PASSWORD})
 token = r.json()["access_token"]
 headers = {"Authorization": f"Bearer {token}"}

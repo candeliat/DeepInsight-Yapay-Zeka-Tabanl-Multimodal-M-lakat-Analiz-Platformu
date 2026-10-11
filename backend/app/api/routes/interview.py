@@ -18,6 +18,7 @@ from app.services.interview_service import (
     try_claim_interview_finalization,
     get_completed_confidence_map,
     release_interview_finalization_claim,
+    delete_ongoing_interview,
 )
 from fastapi import Depends
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
@@ -699,6 +700,23 @@ async def finish_interview_early(
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Bir hata oluştu: {str(e)}")
+
+
+@router.delete("/{interview_id}")
+async def abandon_interview(
+    interview_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """
+    Yarıda kalmış (tamamlanmamış) kendi mülakatını siler. Tamamlanmış mülakatlar
+    gelişim geçmişinin parçasıdır; onlar yalnızca hesap silme ile silinir.
+    """
+    interview = await _owned_interview(interview_id, current_user.id)
+    if interview.get("status") == "completed":
+        raise HTTPException(status_code=409, detail="Tamamlanmış mülakatlar silinemez.")
+    await delete_ongoing_interview(interview_id)
+    return {"status": "deleted"}
 
 
 @router.get("/history/{user_id}", response_model=List[Dict[str, Any]])

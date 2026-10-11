@@ -19,6 +19,7 @@ from app.api.schemas.analytics import (
     AnalyticsStartResponse,
 )
 from app.services.analytics import run_full_analysis
+from app.services import account_service
 from app.core.config import settings
 from app.core.database import supabase
 
@@ -72,6 +73,12 @@ async def start_analysis(
     """
     # --- Validasyonlar ---
     interview_id = await _require_own_interview(interview_id, current_user.id)
+    # Video/ses kaydı ve yüz-ifadesi analizi açık onam gerektirir (bkz. account_service).
+    if not account_service.has_video_consent(current_user.id):
+        raise HTTPException(
+            status_code=403,
+            detail="Video analizi için onam vermediniz. Görüntülü mülakatın kurulum ekranından onam verebilirsiniz.",
+        )
 
     # Dosya uzantısı kontrolü
     file_ext = Path(file.filename or "").suffix.lower()

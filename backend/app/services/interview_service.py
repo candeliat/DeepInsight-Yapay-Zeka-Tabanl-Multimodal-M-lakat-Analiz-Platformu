@@ -220,6 +220,15 @@ async def get_interview(interview_id: str, token: str = None) -> dict:
         
     return result.data[0]
 
+async def delete_ongoing_interview(interview_id: str) -> None:
+    """Yarıda kalmış mülakatı siler. interview_messages FK'si zincirleme değil: önce mesajlar."""
+    client = supabase
+    if not client:
+        raise RuntimeError("Supabase client is not initialized")
+    client.table("interview_messages").delete().eq("interview_id", interview_id).execute()
+    client.table("interviews").delete().eq("id", interview_id).neq("status", "completed").execute()
+
+
 async def get_user_interviews(user_id: str, token: str = None) -> List[Dict[str, Any]]:
     """
     Kullanıcının tüm mülakatlarını getirir.

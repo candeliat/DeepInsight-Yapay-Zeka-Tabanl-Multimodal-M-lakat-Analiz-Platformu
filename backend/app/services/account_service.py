@@ -23,6 +23,22 @@ logger = logging.getLogger(__name__)
 
 EXPORT_VERSION = "1"
 
+# --- Video analizi onamı ---------------------------------------------------
+# Görüntülü mülakatta video sunucuya yüklenir; yüz ifadesinden duygu/stres, göz
+# teması ve konuşma metrikleri çıkarılır. Bu, CV'den daha hassas bir veri olduğu
+# için ayrı ve açık bir onam gerekir. Onam yoksa backend video kabul etmez.
+VIDEO_CONSENT_TYPE = "video_analysis"
+VIDEO_CONSENT_VERSION = "2026-10-v1"
+VIDEO_CONSENT_TEXT = (
+    "Görüntülü mülakatta kameranızın ve mikrofonunuzun kaydı, mülakat bittikten sonra analiz için sunucularımıza "
+    "yüklenir. Kayıttan yüz ifadeleriniz (duygu ve stres tahmini), göz temasınız, konuşma hızınız, duraksamalarınız "
+    "ve dolgu kelimeleriniz çıkarılır. Video dosyası analiz tamamlanınca silinir; yalnızca çıkarılan ölçümler ve "
+    "konuşma dökümü saklanır. Bu sonuçlar, siz paylaşmadıkça bağlı olduğunuz kurum dahil kimseyle paylaşılmaz. "
+    "Onamınızı istediğiniz zaman geri çekebilirsiniz; bu durumda video analizi sonuçlarınız silinir. Onam vermeden "
+    "yazılı ya da sesli (kamerasız) mülakat yapmaya devam edebilirsiniz."
+)
+CONSENTS = {VIDEO_CONSENT_TYPE: (VIDEO_CONSENT_VERSION, VIDEO_CONSENT_TEXT)}
+
 
 class LastAdminError(Exception):
     pass
@@ -82,6 +98,35 @@ def export_user_data(user_id: str, email: str, profile: Dict[str, Any]) -> Dict[
             .order("created_at", desc=True).limit(500).execute().data or []
         ),
     }
+
+
+def consent_status(user_id: str, consent_type: str) -> Dict[str, Any]:
+    version, text = CONSENTS[consent_type]
+    rows = _rows("user_consents", "user_id", user_id, "consent_type, revoked_at")
+    row = next((r for r in rows if r.get("consent_type") == consent_type), None)
+    return {"consent_type": consent_type, "version": version, "text": text,
+            "granted": bool(row) and row.get("revoked_at") is None}
+
+
+def has_video_consent(user_id: str) -> bool:
+    return consent_status(user_id, VIDEO_CONSENT_TYPE)["granted"]
+
+
+def set_consent(user_id: str, consent_type: str, granted: bool) -> Dict[str, Any]:
+    version, _ = CONSENTS[consent_type]
+    now = datetime.now(timezone.utc).isoformat()
+    if granted:
+        _db().table("user_consents").upsert({
+            "user_id": user_id, "consent_type": consent_type, "version": version, "granted_at": now, "revoked_at": None,
+        }, on_conflict="user_id,consent_type").execute()
+    else:
+        if consent_type == VIDEO_CONSENT_TYPE:
+            # Onam geri çekilince video analizinden türetilen tüm sonuçlar silinir.
+            interview_ids = [str(i["id"]) for i in _rows("interviews", "user_id", user_id, "id")]
+            for start in range(0, len(interview_ids), 100):
+                _db().table("interview_analytics").delete().in_("interview_id", interview_ids[start:start + 100]).execute()
+        _db().table("user_consents").update({"revoked_at": now}).eq("user_id", user_id).eq("consent_type", consent_type).execute()
+    return consent_status(user_id, consent_type)
 
 
 async def _ensure_not_last_admin(user_id: str) -> None:

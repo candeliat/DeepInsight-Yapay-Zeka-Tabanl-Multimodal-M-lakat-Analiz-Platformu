@@ -16,6 +16,38 @@ class DeleteAccountRequest(BaseModel):
     confirm_email: str = Field(max_length=320)
 
 
+class ConsentUpdate(BaseModel):
+    granted: bool
+
+
+@router.get("/consents/{consent_type}")
+async def get_consent(
+    consent_type: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """Onam durumu ve onam metni (ör. video_analysis)."""
+    if consent_type not in account_service.CONSENTS:
+        raise HTTPException(status_code=404, detail="Bilinmeyen onam türü")
+    return account_service.consent_status(current_user.id, consent_type)
+
+
+@router.put("/consents/{consent_type}")
+async def update_consent(
+    consent_type: str,
+    payload: ConsentUpdate,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """Onam verir ya da geri çeker. Video onamı geri çekilirse video analizi sonuçları silinir."""
+    if consent_type not in account_service.CONSENTS:
+        raise HTTPException(status_code=404, detail="Bilinmeyen onam türü")
+    status = account_service.set_consent(current_user.id, consent_type, payload.granted)
+    await organization_service.log_audit(current_user.id, None, f"consent.{consent_type}", "user", current_user.id,
+                                         {"granted": payload.granted})
+    return status
+
+
 @router.get("/export")
 async def export_my_data(
     token: str = Depends(oauth2_scheme),

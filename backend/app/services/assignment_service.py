@@ -33,9 +33,18 @@ def _parse(iso: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def _interview_score(interview: Dict[str, Any]) -> Optional[float]:
-    points = progress_service.build_timeline([interview], {})
+def _interview_score(interview: Dict[str, Any], weights: Optional[Dict[str, Any]] = None) -> Optional[float]:
+    points = progress_service.build_timeline([interview], {}, weights)
     return points[0]["average"] if points else None
+
+
+def targets(assignment: Dict[str, Any], memberships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Ödevin hedef öğrencileri: tüm öğrenciler ya da (gruba atandıysa) yalnızca o grubun öğrencileri."""
+    group_id = assignment.get("group_id")
+    return [
+        m for m in memberships
+        if m["role"] == "candidate" and (not group_id or str(m.get("group_id") or "") == str(group_id))
+    ]
 
 
 def _status_by_user(interviews: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -81,10 +90,10 @@ async def list_org_assignments(org_id: str, memberships: List[Dict[str, Any]]) -
     assignments = (
         _db().table("assignments").select("*").eq("org_id", org_id).order("created_at", desc=True).execute().data or []
     )
-    candidates = {str(m["user_id"]) for m in memberships if m["role"] == "candidate"}
     interviews = assignment_interviews([a["id"] for a in assignments])
     out = []
     for a in assignments:
+        candidates = {str(m["user_id"]) for m in targets(a, memberships)}
         statuses = _status_by_user([i for i in interviews if i["assignment_id"] == a["id"] and str(i["user_id"]) in candidates])
         out.append({
             **a,
@@ -101,12 +110,12 @@ async def get_org_assignment(org_id: str, assignment_id: str) -> Optional[Dict[s
 
 
 def build_assignment_rows(memberships: List[Dict[str, Any]], interviews: List[Dict[str, Any]],
-                          identities: Dict[str, Dict[str, Optional[str]]]) -> List[Dict[str, Any]]:
+                          identities: Dict[str, Dict[str, Optional[str]]],
+                          assignment: Optional[Dict[str, Any]] = None,
+                          weights: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     statuses = _status_by_user(interviews)
     rows = []
-    for m in memberships:
-        if m["role"] != "candidate":
-            continue
+    for m in targets(assignment or {}, memberships):
         uid = str(m["user_id"])
         state = statuses.get(uid)
         status = state["status"] if state else "not_started"
@@ -118,7 +127,7 @@ def build_assignment_rows(memberships: List[Dict[str, Any]], interviews: List[Di
             "status": status,
             "completed_at": state["interview"].get("created_at") if status == "completed" else None,
             "share_progress": shared,
-            "score": _interview_score(state["interview"]) if (status == "completed" and shared) else None,
+            "score": _interview_score(state["interview"], weights) if (status == "completed" and shared) else None,
         })
     return sorted(rows, key=lambda r: (-STATUS_ORDER[r["status"]], (r["name"] or r["email"] or "").lower()))
 
@@ -135,12 +144,19 @@ async def delete_assignment(actor_id: str, org_id: str, assignment_id: str) -> b
 
 async def my_assignments(user_id: str, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     now = now or datetime.now(timezone.utc)
-    memberships = _db().table("memberships").select("org_id").eq("user_id", user_id).eq("role", "candidate").execute().data or []
-    org_ids = [m["org_id"] for m in memberships]
+    memberships = (
+        _db().table("memberships").select("org_id, group_id").eq("user_id", user_id).eq("role", "candidate").execute().data or []
+    )
+    my_group = {m["org_id"]: m.get("group_id") for m in memberships}
+    org_ids = list(my_group)
     if not org_ids:
         return []
-    assignments = _db().table("assignments").select("*").in_("org_id", org_ids).execute().data or []
-    orgs = {o["id"]: o["name"] for o in (_db().table("organizations").select("id, name").in_("id", org_ids).execute().data or [])}
+    assignments = [
+        a for a in (_db().table("assignments").select("*").in_("org_id", org_ids).execute().data or [])
+        # Gruba atanmış ödevi yalnızca o grubun öğrencisi görür.
+        if not a.get("group_id") or str(a["group_id"]) == str(my_group.get(a["org_id"]) or "")
+    ]
+    orgs = {o["id"]: o for o in (_db().table("organizations").select("id, name, rubric").in_("id", org_ids).execute().data or [])}
     interviews = assignment_interviews([a["id"] for a in assignments], user_id=user_id)
 
     out = []
@@ -148,11 +164,12 @@ async def my_assignments(user_id: str, now: Optional[datetime] = None) -> List[D
         state = _status_by_user([i for i in interviews if i["assignment_id"] == a["id"]]).get(str(user_id))
         status = state["status"] if state else "not_started"
         due = _parse(a.get("due_at"))
+        org = orgs.get(a["org_id"]) or {}
         out.append({
             **a,
-            "org_name": orgs.get(a["org_id"]),
+            "org_name": org.get("name"),
             "status": status,
-            "my_score": _interview_score(state["interview"]) if status == "completed" else None,
+            "my_score": _interview_score(state["interview"], org.get("rubric")) if status == "completed" else None,
             "interview_id": state["interview"]["id"] if state else None,
             "overdue": bool(due and due < now and status != "completed"),
         })
@@ -166,6 +183,10 @@ async def get_assignment_for_member(user_id: str, assignment_id: str) -> Optiona
     if not result.data:
         return None
     assignment = result.data[0]
-    if not await organization_service.get_membership(assignment["org_id"], user_id):
+    membership = await organization_service.get_membership(assignment["org_id"], user_id)
+    if not membership:
         return None
+    if (membership.get("role") == "candidate" and assignment.get("group_id")
+            and str(assignment["group_id"]) != str(membership.get("group_id") or "")):
+        return None  # başka gruba atanmış ödev
     return assignment

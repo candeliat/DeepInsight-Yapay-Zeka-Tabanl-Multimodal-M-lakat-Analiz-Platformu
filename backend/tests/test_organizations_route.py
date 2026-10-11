@@ -41,6 +41,7 @@ def as_user(monkeypatch):
 
     monkeypatch.setattr(organization_service, "get_membership", _get_membership)
     monkeypatch.setattr(organization_service, "list_members", AsyncMock(return_value=[]))
+    monkeypatch.setattr(organization_service, "get_organization", AsyncMock(return_value={"id": "org", "rubric": None}))
     from app.services import org_insights_service, progress_service
     monkeypatch.setattr(progress_service, "fetch_org_data", lambda org_id: {"interviews": [], "analytics": {}})
     monkeypatch.setattr(org_insights_service, "get_identity", lambda uid: {"email": None, "name": None})

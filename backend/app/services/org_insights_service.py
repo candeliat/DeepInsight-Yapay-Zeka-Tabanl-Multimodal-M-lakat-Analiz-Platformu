@@ -56,10 +56,25 @@ def get_identity(user_id: str) -> Dict[str, Optional[str]]:
     return identity
 
 
+def scope_to_group(memberships: List[Dict[str, Any]], data: Dict[str, Any],
+                   group_id: Optional[str]) -> tuple:
+    """
+    Paneli bir gruba (kohort) daraltır: yalnızca o grubun üyeleri ve onların
+    kurum mülakatları. MIN_COHORT kuralı daraltılmış veriye ayrıca uygulanır,
+    yani küçük bir grupta toplu ortalama yine gizlenir.
+    """
+    if not group_id:
+        return memberships, data
+    scoped = [m for m in memberships if str(m.get("group_id") or "") == str(group_id)]
+    users = {str(m["user_id"]) for m in scoped}
+    interviews = [i for i in data["interviews"] if str(i.get("user_id")) in users]
+    return scoped, {"interviews": interviews, "analytics": data["analytics"]}
+
+
 def build_overview(org: Dict[str, Any], memberships: List[Dict[str, Any]], data: Dict[str, Any],
                    now: Optional[datetime] = None) -> Dict[str, Any]:
     now = now or datetime.now(timezone.utc)
-    timeline = progress_service.build_timeline(data["interviews"], data["analytics"])
+    timeline = progress_service.build_timeline(data["interviews"], data["analytics"], org.get("rubric"))
     owner = {i["id"]: str(i.get("user_id")) for i in data["interviews"]}
 
     role_counts: Dict[str, int] = defaultdict(int)
@@ -73,7 +88,8 @@ def build_overview(org: Dict[str, Any], memberships: List[Dict[str, Any]], data:
     month_count = sum(1 for p in timeline if (_parse(p["date"]) or now) >= month_start)
 
     overview: Dict[str, Any] = {
-        "org": {"id": org["id"], "name": org["name"], "monthly_interview_quota": org.get("monthly_interview_quota")},
+        "org": {"id": org["id"], "name": org["name"], "monthly_interview_quota": org.get("monthly_interview_quota"),
+                "rubric": org.get("rubric")},
         "member_counts": dict(role_counts),
         "completed_count": len(timeline),
         "contributors": len(contributors),
@@ -114,8 +130,9 @@ def build_overview(org: Dict[str, Any], memberships: List[Dict[str, Any]], data:
 
 
 def build_member_rows(memberships: List[Dict[str, Any]], data: Dict[str, Any],
-                      identities: Dict[str, Dict[str, Optional[str]]]) -> List[Dict[str, Any]]:
-    timeline = progress_service.build_timeline(data["interviews"], data["analytics"])
+                      identities: Dict[str, Dict[str, Optional[str]]],
+                      weights: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    timeline = progress_service.build_timeline(data["interviews"], data["analytics"], weights)
     owner = {i["id"]: str(i.get("user_id")) for i in data["interviews"]}
     per_user: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for p in timeline:
@@ -130,6 +147,7 @@ def build_member_rows(memberships: List[Dict[str, Any]], data: Dict[str, Any],
         rows.append({
             "user_id": uid,
             "role": m["role"],
+            "group_id": m.get("group_id"),
             "created_at": m.get("created_at"),
             "email": identity.get("email"),
             "name": identity.get("name"),
@@ -143,11 +161,12 @@ def build_member_rows(memberships: List[Dict[str, Any]], data: Dict[str, Any],
     return sorted(rows, key=lambda r: (role_order.get(r["role"], 3), (r["name"] or r["email"] or "").lower()))
 
 
-def member_progress(memberships: List[Dict[str, Any]], user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
+def member_progress(memberships: List[Dict[str, Any]], user_id: str, data: Dict[str, Any],
+                    weights: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     membership = next((m for m in memberships if str(m["user_id"]) == str(user_id)), None)
     if not membership:
         raise ValueError("Üye bulunamadı")
     if not membership.get("share_progress"):
         raise PermissionError("Bu öğrenci ilerlemesini kurumla paylaşmıyor.")
     own = [i for i in data["interviews"] if str(i.get("user_id")) == str(user_id)]
-    return progress_service.build_progress(own, data["analytics"])
+    return progress_service.build_progress(own, data["analytics"], weights)

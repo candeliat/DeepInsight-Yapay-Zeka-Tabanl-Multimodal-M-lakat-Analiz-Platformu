@@ -108,7 +108,7 @@ async def join_by_invite_code(user_id: str, invite_code: str) -> Dict[str, Any]:
 
 
 async def list_members(org_id: str) -> List[Dict[str, Any]]:
-    result = _db().table("memberships").select("user_id, role, share_progress, created_at").eq("org_id", org_id).execute()
+    result = _db().table("memberships").select("user_id, role, share_progress, group_id, created_at").eq("org_id", org_id).execute()
     return result.data or []
 
 
@@ -121,7 +121,8 @@ async def set_share_progress(org_id: str, user_id: str, share: bool) -> bool:
     return share
 
 
-async def update_settings(actor_id: str, org_id: str, name: Optional[str], quota: Optional[int], clear_quota: bool) -> Dict[str, Any]:
+async def update_settings(actor_id: str, org_id: str, name: Optional[str], quota: Optional[int], clear_quota: bool,
+                          rubric: Optional[Dict[str, int]] = None, clear_rubric: bool = False) -> Dict[str, Any]:
     changes: Dict[str, Any] = {}
     if name is not None:
         changes["name"] = name.strip()
@@ -129,6 +130,10 @@ async def update_settings(actor_id: str, org_id: str, name: Optional[str], quota
         changes["monthly_interview_quota"] = None
     elif quota is not None:
         changes["monthly_interview_quota"] = quota
+    if clear_rubric:
+        changes["rubric"] = None
+    elif rubric is not None:
+        changes["rubric"] = rubric
     if not changes:
         raise ValueError("Güncellenecek alan yok")
     result = _db().table("organizations").update(changes).eq("id", org_id).execute()

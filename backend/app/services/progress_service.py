@@ -71,7 +71,23 @@ def fetch_org_data(org_id: str) -> Dict[str, Any]:
     return _fetch_completed({"org_id": org_id})
 
 
-def build_timeline(interviews: List[Dict[str, Any]], analytics: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+def weighted_average(point: Dict[str, Any], weights: Optional[Dict[str, Any]] = None) -> Optional[float]:
+    """
+    Metriklerin ortalaması. Kurum rubriği (ör. teknik 60, özgüven 20, iletişim 20)
+    verilirse ağırlıklı ortalama; eksik metrik varsa ağırlıklar mevcut metrikler
+    arasında yeniden normalize edilir. Rubrik yoksa eşit ağırlık.
+    """
+    if not weights:
+        return _mean([point[m] for m in METRICS])
+    present = [(point[m], float(weights.get(m) or 0)) for m in METRICS if point[m] is not None]
+    total = sum(w for _, w in present)
+    if not present or total <= 0:
+        return None
+    return round(sum(v * w for v, w in present) / total, 1)
+
+
+def build_timeline(interviews: List[Dict[str, Any]], analytics: Dict[str, Dict[str, Any]],
+                   weights: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
     timeline = []
     for inv in sorted(interviews, key=lambda i: i.get("created_at") or ""):
         video = analytics.get(inv["id"]) or {}
@@ -91,7 +107,7 @@ def build_timeline(interviews: List[Dict[str, Any]], analytics: Dict[str, Dict[s
             "speech_rate_wpm": _num(video.get("speech_rate_wpm")),
             "pause_count": _num(video.get("pause_count")),
         }
-        point["average"] = _mean([point[m] for m in METRICS])
+        point["average"] = weighted_average(point, weights)
         if point["average"] is not None:
             timeline.append(point)
     return timeline
@@ -206,8 +222,9 @@ def _recommendations(timeline, trend, metric_means, topics, video) -> List[Dict[
     return recs[:6]
 
 
-def build_progress(interviews: List[Dict[str, Any]], analytics: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
-    timeline = build_timeline(interviews, analytics)
+def build_progress(interviews: List[Dict[str, Any]], analytics: Dict[str, Dict[str, Any]],
+                   weights: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    timeline = build_timeline(interviews, analytics, weights)
     if not timeline:
         return {"completed_count": 0, "timeline": [], "trend": None, "metric_means": {}, "strongest": None,
                 "weakest": None, "topics": [], "video": None, "recommendations": []}

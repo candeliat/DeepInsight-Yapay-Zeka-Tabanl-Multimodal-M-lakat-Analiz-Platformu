@@ -13,6 +13,7 @@ class AssignmentCreate(BaseModel):
     difficulty: Optional[str] = None
     instructions: Optional[str] = Field(default=None, max_length=1000)
     due_at: Optional[datetime] = None
+    group_id: Optional[str] = None  # verilirse yalnızca o grubun öğrencilerine atanır
 
     @field_validator("title", "role", "topic", "instructions")
     @classmethod
@@ -42,6 +43,7 @@ class AssignmentItem(BaseModel):
     difficulty: Optional[str] = None
     instructions: Optional[str] = None
     due_at: Optional[str] = None
+    group_id: Optional[str] = None
     created_at: Optional[str] = None
 
 

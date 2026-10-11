@@ -167,6 +167,7 @@ def as_user(monkeypatch):
 
     monkeypatch.setattr(organization_service, "get_membership", _get_membership)
     monkeypatch.setattr(organization_service, "list_members", AsyncMock(return_value=MEMBERS))
+    monkeypatch.setattr(organization_service, "get_organization", AsyncMock(return_value={"id": "org-a", "rubric": None}))
     monkeypatch.setattr(organization_service, "log_audit", AsyncMock(return_value=None))
     monkeypatch.setattr(insights, "get_identity", lambda uid: {"email": f"{uid}@x.com", "name": None})
 

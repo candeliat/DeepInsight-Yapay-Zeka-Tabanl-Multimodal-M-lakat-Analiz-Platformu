@@ -98,6 +98,25 @@ api.interceptors.response.use(
   }
 );
 
+/** İsteği bekler, gövdeyi döner; hata olursa kullanıcıya gösterilebilir mesajlı Error fırlatır. */
+export async function call<T>(request: Promise<{ data: T }>): Promise<T> {
+  try {
+    return (await request).data;
+  } catch (error) {
+    throw new Error(errorMessage(error));
+  }
+}
+
+/** 404'ü "henüz yok" olarak null'a çevirir (ör. son analiz/eşleşme). */
+export async function callOrNull<T>(request: Promise<{ data: T }>): Promise<T | null> {
+  try {
+    return (await request).data;
+  } catch (error) {
+    if ((error as AxiosError).response?.status === 404) return null;
+    throw new Error(errorMessage(error));
+  }
+}
+
 /** Backend hata gövdesinden kullanıcıya gösterilecek Türkçe mesaj. */
 export function errorMessage(error: unknown, fallback = 'Bir hata oluştu.'): string {
   const e = error as AxiosError<{ detail?: unknown }>;

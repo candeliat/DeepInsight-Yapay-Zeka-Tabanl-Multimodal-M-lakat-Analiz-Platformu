@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { Colors } from '../../src/constants/Colors';
@@ -18,6 +18,11 @@ import { FontFamilies } from '../../src/constants/Fonts';
 import { useInterviewStore } from '../../src/store/interviewStore';
 import { useUserStore } from '../../src/store/userStore';
 import { CustomInput } from '../../src/components/CustomInput';
+import { errorMessage } from '../../src/config/api';
+import { cvService, jobService } from '../../src/services/careerService';
+import { MyAssignment, MyOrganization, assignmentService, orgService } from '../../src/services/orgService';
+
+type Params = { cv?: string; job?: string; assignment?: string; role?: string; topic?: string; difficulty?: string };
 
 const TOPICS = [
   { id: 'software', label: 'Yazılım Geliştirme' },
@@ -50,6 +55,92 @@ export default function PrepareScreen() {
 
   const { setRoleTopic, startInterview, isThinking } = useInterviewStore();
   const user = useUserStore((s) => s.user);
+  const params = useLocalSearchParams<Params>();
+
+  // Bağlam: CV'ye / ilana göre mülakat, kurum ödevi ve kurum seçimi (varsayılan bireysel —
+  // mülakatın kuruma görünmesi bilinçli bir seçim olmalı).
+  const [cvLabel, setCvLabel] = useState<string | null>(null);
+  const [jobLabel, setJobLabel] = useState<string | null>(null);
+  const [assignment, setAssignment] = useState<MyAssignment | null>(null);
+  const [orgs, setOrgs] = useState<MyOrganization[]>([]);
+  const [orgId, setOrgId] = useState<string | null>(null);
+  const [contextError, setContextError] = useState<string | null>(null);
+  const locked = !!assignment; // ödevde rol/konu/zorluğu eğitmen belirler
+
+  useEffect(() => {
+    orgService.myOrganizations().then(setOrgs).catch(() => setOrgs([]));
+  }, []);
+
+  // "Pratik yap" önerileri gibi bağlantılardan gelen hazır ayarlar.
+  useEffect(() => {
+    if (params.role) setSelectedRole(params.role.slice(0, 80));
+    if (params.topic) setSelectedTopic(params.topic.slice(0, 120));
+    const level = DIFFICULTIES.find((d) => d.label === params.difficulty);
+    if (level) setSelectedDifficulty(level);
+  }, [params.role, params.topic, params.difficulty]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setContextError(null);
+    (async () => {
+      try {
+        const [cv, job] = await Promise.all([
+          params.cv ? cvService.getCv(params.cv) : null,
+          params.job ? jobService.getJob(params.job) : null,
+        ]);
+        if (cancelled) return;
+        setCvLabel(cv ? cv.original_filename : null);
+        setJobLabel(job ? [job.title, job.company].filter(Boolean).join(' · ') || 'İlan' : null);
+        // İlan varsa öneriler ilandan, yoksa CV profilinden (kullanıcı değiştirebilir).
+        const reqs = job?.requirements;
+        const profile = cv?.profile;
+        const role = job?.title || profile?.target_roles?.[0];
+        const skills = reqs?.required_skills?.length ? reqs.required_skills : profile?.skills ?? [];
+        const level = DIFFICULTIES.find((d) => d.label === (reqs?.seniority || profile?.seniority));
+        if (role) setSelectedRole(role);
+        if (skills.length) setSelectedTopic(skills.slice(0, 2).join(' ve '));
+        if (level) setSelectedDifficulty(level);
+        if (cv && !cv.profile) setContextError("Bu CV henüz analiz edilmemiş; CV ekranından analiz edin.");
+      } catch (e) {
+        if (!cancelled) setContextError(errorMessage(e, 'CV veya ilan yüklenemedi.'));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [params.cv, params.job]);
+
+  useEffect(() => {
+    if (!params.assignment) {
+      setAssignment(null);
+      return;
+    }
+    assignmentService
+      .mine()
+      .then((items) => {
+        const found = items.find((a) => a.id === params.assignment);
+        if (!found) {
+          setContextError('Ödev bulunamadı ya da artık bu kurumun öğrencisi değilsiniz.');
+          return;
+        }
+        setAssignment(found);
+        setSelectedRole(found.role);
+        setSelectedTopic(found.topic);
+        const level = DIFFICULTIES.find((d) => d.label === found.difficulty);
+        if (level) setSelectedDifficulty(level);
+        setOrgId(found.org_id);
+      })
+      .catch((e) => setContextError(errorMessage(e, 'Ödev yüklenemedi.')));
+  }, [params.assignment]);
+
+  const clearContext = () => {
+    router.setParams({ cv: undefined, job: undefined, assignment: undefined });
+    setCvLabel(null);
+    setJobLabel(null);
+    setAssignment(null);
+    setOrgId(null);
+    setContextError(null);
+  };
 
   const handleStart = async () => {
     // İzin kontrolü
@@ -81,11 +172,19 @@ export default function PrepareScreen() {
       // girişi ise `role` alanına gönderiliyordu (gerçek bir konu alanı hiç
       // yoktu) — backend'in artık gerçek bir `difficulty` alanı olduğu
       // (bkz. dashboard'daki aynı düzeltme) için burada da düzeltildi.
-      setRoleTopic(selectedRole, selectedTopic, selectedDifficulty.label);
+      setRoleTopic(selectedRole, selectedTopic, selectedDifficulty.label, {
+        cvId: cvLabel ? params.cv : undefined,
+        jobId: jobLabel ? params.job : undefined,
+        assignmentId: assignment?.id,
+        orgId: orgId ?? undefined,
+      });
       await startInterview();
       router.push('/interview-room');
     } catch (e) {
-      Alert.alert('Hata', 'Mülakat başlatılamadı. Bağlantınızı kontrol edin.');
+      // Kota (429), ödev/CV bulunamadı (404) gibi durumlarda sunucunun mesajı gösterilir.
+      const msg = errorMessage(e, 'Mülakat başlatılamadı. Bağlantınızı kontrol edin.');
+      setContextError(msg);
+      Alert.alert('Mülakat başlatılamadı', msg);
     }
   };
 
@@ -122,6 +221,38 @@ export default function PrepareScreen() {
             Konuyu ve zorluk seviyesini seçin, ardından mülakatınızı başlatın.
           </Text>
         </View>
+
+        {(cvLabel || jobLabel || assignment) && (
+          <View style={styles.contextCard}>
+            <Ionicons
+              name={assignment ? 'clipboard-outline' : jobLabel ? 'briefcase-outline' : 'document-text-outline'}
+              size={20}
+              color={Colors.secondary}
+            />
+            <View style={{ flex: 1 }}>
+              {assignment && (
+                <>
+                  <Text style={styles.contextTitle}>Ödev: {assignment.title}</Text>
+                  <Text style={styles.contextSub}>
+                    {assignment.org_name ?? 'Kurum'} · rol, konu ve zorluk eğitmen tarafından belirlendi
+                  </Text>
+                  {assignment.instructions && <Text style={[styles.contextSub, { marginTop: 4 }]}>{assignment.instructions}</Text>}
+                </>
+              )}
+              {jobLabel && <Text style={styles.contextTitle}>Bu ilana göre mülakat: {jobLabel}</Text>}
+              {cvLabel && <Text style={styles.contextSub}>CV'nize göre kişiselleştirilecek: {cvLabel}</Text>}
+            </View>
+            <TouchableOpacity onPress={clearContext} accessibilityLabel="Bağlamı kaldır" hitSlop={10}>
+              <Ionicons name="close" size={18} color={Colors.outline} />
+            </TouchableOpacity>
+          </View>
+        )}
+        {contextError && (
+          <View style={styles.errorBox} accessibilityRole="alert">
+            <Ionicons name="alert-circle" size={16} color={Colors.error} />
+            <Text style={styles.errorText}>{contextError}</Text>
+          </View>
+        )}
 
         {/* Kamera Önizleme */}
         <View style={styles.cameraContainer}>
@@ -205,6 +336,7 @@ export default function PrepareScreen() {
             value={selectedRole}
             onChangeText={setSelectedRole}
             iconName="briefcase-outline"
+            editable={!locked}
           />
 
           {/* Mülakat Konusu */}
@@ -214,6 +346,7 @@ export default function PrepareScreen() {
             value={selectedTopic}
             onChangeText={setSelectedTopic}
             iconName="book-outline"
+            editable={!locked}
           />
 
           {/* Zorluk Seviyesi */}
@@ -227,6 +360,7 @@ export default function PrepareScreen() {
                   selectedDifficulty.id === d.id && styles.diffBtnActive,
                 ]}
                 onPress={() => setSelectedDifficulty(d)}
+                disabled={locked && selectedDifficulty.id !== d.id}
               >
                 <Text
                   style={[
@@ -239,6 +373,30 @@ export default function PrepareScreen() {
               </TouchableOpacity>
             ))}
           </View>
+
+          {orgs.length > 0 && !assignment && (
+            <>
+              <Text style={[styles.fieldLabel, { marginTop: 20 }]}>MÜLAKAT BAĞLAMI</Text>
+              <View style={styles.topicList}>
+                {[{ id: null as string | null, name: 'Bireysel' }, ...orgs.map((o) => ({ id: o.id as string | null, name: o.name }))].map((o) => (
+                  <TouchableOpacity
+                    key={o.id ?? 'self'}
+                    onPress={() => setOrgId(o.id)}
+                    style={[styles.topicChip, orgId === o.id && styles.topicChipActive]}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: orgId === o.id }}
+                  >
+                    <Text style={[styles.topicChipText, orgId === o.id && styles.topicChipTextActive]}>{o.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <Text style={[styles.aiInfoText, { marginTop: 8, color: Colors.onSurfaceVariant, fontSize: 12 }]}>
+                {orgId
+                  ? 'Mülakat kurumun kotasından düşer; eğitmenler katılımınızı görür, skorlarınızı yalnızca paylaşım izni verdiyseniz görür.'
+                  : 'Bireysel mülakatlar hiçbir kuruma görünmez.'}
+              </Text>
+            </>
+          )}
 
           {/* AI Bilgi Kutusu */}
           <View style={styles.aiInfoBox}>
@@ -376,6 +534,31 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.3)',
   },
   camBtnOff: { backgroundColor: 'rgba(186,26,26,0.25)', borderColor: 'rgba(186,26,26,0.5)' },
+
+  // Bağlam
+  contextCard: {
+    flexDirection: 'row',
+    gap: 10,
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(0,104,122,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,104,122,0.2)',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 12,
+  },
+  contextTitle: { fontSize: 13, fontFamily: FontFamilies.sansBold, color: Colors.onSurface },
+  contextSub: { fontSize: 12, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, marginTop: 2, lineHeight: 17 },
+  errorBox: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+    backgroundColor: 'rgba(186,26,26,0.08)',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  errorText: { flex: 1, fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.error },
 
   // Durum Kartları
   statusRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },

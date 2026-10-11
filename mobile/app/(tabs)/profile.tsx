@@ -15,6 +15,7 @@ import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
+import { CareerMenu, DataRightsSection } from '../../src/components/ProfileSections';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -139,7 +140,7 @@ export default function ProfileScreen() {
           </Text>
           <Text style={styles.emailText}>{user?.email}</Text>
           <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{user?.user_metadata?.role === 'admin' ? 'Yönetici' : 'Aday'}</Text>
+            <Text style={styles.roleText}>{user?.app_metadata?.role === 'admin' ? 'Yönetici' : 'Aday'}</Text>
           </View>
         </View>
 
@@ -178,6 +179,8 @@ export default function ProfileScreen() {
             </View>
           )}
         </View>
+
+        <CareerMenu />
 
         {/* Kişisel Bilgiler */}
         <View style={styles.section}>
@@ -223,6 +226,8 @@ export default function ProfileScreen() {
             </View>
           </View>
         </View>
+
+        <DataRightsSection />
 
         {/* Ayarlar & Çıkış */}
         <View style={styles.section}>

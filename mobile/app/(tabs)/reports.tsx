@@ -16,6 +16,7 @@ import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
+import { ProgressSection } from '../../src/components/ProgressSection';
 
 interface Interview {
   id: string;
@@ -177,6 +178,9 @@ export default function ReportsScreen() {
           </View>
         ) : (
           <>
+            <ProgressSection />
+
+            <Text style={styles.sectionTitle}>Son Mülakat</Text>
             {/* Seçili Mülakat - Detay Görünümü */}
             {selected && (
               <>

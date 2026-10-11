@@ -9,12 +9,22 @@ export interface EvaluationData {
   feedback: string;
 }
 
+/** Mülakatın opsiyonel bağlamı: kişiselleştirme (CV/ilan), kurum (kota, kurum soru bankası,
+ * eğitmen görünürlüğü) ve ödev (rol/konu/zorluk ve kurum backend'de ödevden alınır). */
+export interface InterviewContext {
+  cvId?: string;
+  jobId?: string;
+  orgId?: string;
+  assignmentId?: string;
+}
+
 interface InterviewState {
   // Durum
   interviewId: string | null;
   role: string;
   topic: string;
   difficulty: string | null;
+  context: InterviewContext;
   currentQuestion: string;
   evaluation: EvaluationData | null;
   
@@ -24,7 +34,7 @@ interface InterviewState {
   isThinking: boolean;
   
   // Aksiyonlar
-  setRoleTopic: (role: string, topic: string, difficulty?: string | null) => void;
+  setRoleTopic: (role: string, topic: string, difficulty?: string | null, context?: InterviewContext) => void;
   startInterview: () => Promise<void>;
   sendMessage: (message: string) => Promise<boolean>; // Bitti mi (true/false) dÃ¶ner
   /** `sendMessage` ile aynÄ± sÃ¶zleÅŸme, ama soruyu token-token akÄ±tÄ±r (currentQuestion
@@ -46,6 +56,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   role: 'YazÄ±lÄ±m MÃ¼hendisi',
   topic: 'Genel',
   difficulty: null,
+  context: {},
   currentQuestion: '',
   evaluation: null,
 
@@ -53,17 +64,21 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   cameraOn: true,
   isThinking: false,
 
-  setRoleTopic: (role, topic, difficulty = null) => set({ role, topic, difficulty }),
+  setRoleTopic: (role, topic, difficulty = null, context = {}) => set({ role, topic, difficulty, context }),
 
   startInterview: async () => {
     set({ isThinking: true, evaluation: null });
     try {
-      const { role, topic, difficulty } = get();
+      const { role, topic, difficulty, context } = get();
       const response = await api.post('/api/v1/interview/start', {
         role,
         topic,
         difficulty: difficulty ?? undefined,
-      });
+        cv_id: context.cvId,
+        job_id: context.jobId,
+        org_id: context.orgId,
+        assignment_id: context.assignmentId,
+      }, { timeout: 90000 });
       
       set({ 
         interviewId: response.data.interview_id,

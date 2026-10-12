@@ -1,6 +1,17 @@
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import interview, auth, users, analytics, question_bank_admin, organizations, cv, jobs, progress, assignments, pilot, account
+import logging
+import os
+
+# Uygulama logları (app.*) için yapılandırma; router import'larından ÖNCE olmalı ki modüller
+# yüklenirken yazılan loglar da görünsün. Önceden hiç yapılandırılmadığı için tüm
+# logger.info kayıtları (LLM token kullanımı dahil) kayboluyordu. Seviye: LOG_LEVEL (varsayılan INFO).
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO").upper(),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from app.api.routes import interview, auth, users, analytics, question_bank_admin, organizations, cv, jobs, progress, assignments, pilot, account  # noqa: E402
 
 app = FastAPI(
     title="DeepInsight Backend API",

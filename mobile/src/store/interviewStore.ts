@@ -36,8 +36,7 @@ interface InterviewState {
   // Aksiyonlar
   setRoleTopic: (role: string, topic: string, difficulty?: string | null, context?: InterviewContext) => void;
   startInterview: () => Promise<void>;
-  sendMessage: (message: string) => Promise<boolean>; // Bitti mi (true/false) döner
-  /** `sendMessage` ile aynı sözleşme, ama soruyu token-token akıtır (currentQuestion
+  /** Cevabı gönderir, soruyu token-token akıtır; mülakat bittiyse true döner (currentQuestion
    * her parçada güncellenir — typewriter efekti). SSE'yi XMLHttpRequest ile tüketir
    * (React Native'in fetch+ReadableStream desteği tutarsız olduğu için). */
   sendMessageStream: (message: string) => Promise<boolean>;
@@ -85,36 +84,6 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         currentQuestion: response.data.first_message,
         isThinking: false
       });
-    } catch (error) {
-      set({ isThinking: false });
-      throw error;
-    }
-  },
-
-  sendMessage: async (message) => {
-    set({ isThinking: true });
-    try {
-      const { interviewId } = get();
-      if (!interviewId) throw new Error("Mülakat ID bulunamadı.");
-
-      const response = await api.post('/api/v1/interview/chat', {
-        interview_id: interviewId,
-        message
-      });
-
-      if (response.data.interview_complete && response.data.evaluation) {
-        set({ 
-          evaluation: response.data.evaluation,
-          isThinking: false
-        });
-        return true; // Mülakat bitti
-      } else {
-        set({ 
-          currentQuestion: response.data.response,
-          isThinking: false
-        });
-        return false; // Devam ediyor
-      }
     } catch (error) {
       set({ isThinking: false });
       throw error;

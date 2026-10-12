@@ -19,10 +19,9 @@ def _create_supabase_client() -> Client | None:
     URL veya KEY eksikse None döner ve uyarı basar (uygulama yine de ayağa kalkar).
     """
     if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
-        print(
-            "WARNING: SUPABASE_URL veya SUPABASE_KEY .env dosyasında eksik. "
-            "Veritabanı özellikleri devre dışı. "
-            "Supabase değerlerini .env dosyasına ekleyip sunucuyu yeniden başlatın."
+        logger.warning(
+            "SUPABASE_URL veya SUPABASE_KEY eksik: veritabanı özellikleri devre dışı. "
+            "Değerleri .env dosyasına ekleyip sunucuyu yeniden başlatın."
         )
         return None
 

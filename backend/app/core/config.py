@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 logger = logging.getLogger(__name__)
 
 env_path = Path(__file__).resolve().parent.parent.parent / '.env'
-load_dotenv(dotenv_path=env_path, override=True)
+# override=False: ortamda tanımlı değişken (sunucu/CI) .env'den önceliklidir.
+load_dotenv(dotenv_path=env_path, override=False)
 
 
 class Settings:
@@ -87,7 +88,7 @@ class Settings:
 settings = Settings()
 
 if settings.LLM_API_KEY:
-    masked_key = settings.LLM_API_KEY[:5] + "..." + settings.LLM_API_KEY[-3:]
-    logger.info("LLM API Key yüklendi (base_url=%s). (%s, uzunluk: %d)", settings.LLM_BASE_URL, masked_key, len(settings.LLM_API_KEY))
+    # Anahtarın hiçbir parçası loga yazılmaz.
+    logger.info("LLM API anahtarı yüklendi (base_url=%s, uzunluk=%d).", settings.LLM_BASE_URL, len(settings.LLM_API_KEY))
 else:
     logger.warning("LLM_API_KEY eksik veya .env dosyası okunamadı! LLM mülakat motoru çalışmayacak.")

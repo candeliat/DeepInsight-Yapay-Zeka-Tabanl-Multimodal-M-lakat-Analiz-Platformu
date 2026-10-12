@@ -1,21 +1,32 @@
-fastapi
-uvicorn
-openai
-supabase
-python-dotenv
-pydantic
-email-validator
-python-multipart
-deepface
-mediapipe
-openai-whisper
-librosa
-numpy
-opencv-python-headless
-soundfile
-imageio-ffmpeg
-sentence-transformers
-pymupdf
-python-docx
-easyocr
-scipy  # pilot raporu: eşleştirilmiş t-testi / Wilcoxon
+# Sürümler sabittir (çalışan geliştirme ortamından, 2026-10-12): kurulum her makinede ve
+# CI'da aynı sonucu verir. Güncellemek için sürümü burada değiştirip testleri çalıştırın.
+
+# --- API ---
+fastapi==0.141.1
+uvicorn==0.53.0
+pydantic==2.13.5
+email-validator==2.3.0
+python-multipart==0.0.32
+python-dotenv==1.2.3
+httpx==0.28.1
+supabase==2.31.0
+openai==3.14.1
+numpy==2.5.3
+scipy==1.18.1  # pilot raporu: eşleştirilmiş t-testi / Wilcoxon
+
+# --- CV metni ---
+pymupdf==1.28.2
+python-docx==1.2.0
+
+# --- Ağır ML paketleri (video/ses analizi, OCR, yerel embedding) ---
+# Kodda yalnızca kullanıldıkları anda import edilir; CI bunları kurmaz
+# (bkz. .github/workflows/backend.yml).
+deepface==0.0.101
+mediapipe==1.0.1
+openai-whisper==20250625
+librosa==1.0.0
+soundfile==0.14.0
+imageio-ffmpeg==0.6.0
+sentence-transformers==6.0.1
+easyocr==1.7.2
+opencv-python-headless==5.0.0.93

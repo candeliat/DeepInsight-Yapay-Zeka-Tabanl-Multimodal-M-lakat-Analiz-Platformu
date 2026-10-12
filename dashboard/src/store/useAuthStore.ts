@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import Cookies from 'js-cookie';
-import { api } from '@/lib/api';
+import { api, clearSession, saveSession, setSessionExpiredHandler } from '@/lib/api';
 
 interface UserProfile {
   id: string;
@@ -27,8 +27,9 @@ interface AuthState {
   logout: () => void;
   fetchProfile: () => Promise<void>;
   initialize: () => Promise<void>;
-  refreshAccessToken: () => Promise<boolean>;
 }
+
+const PROFILE_RETRY_DELAYS_MS = [1000, 2000, 4000];
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   token: Cookies.get('token') || null,
@@ -37,8 +38,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: false,
 
   setToken: (token: string, refresh?: string) => {
-    Cookies.set('token', token, { expires: 7 });
-    if (refresh) Cookies.set('refresh_token', refresh, { expires: 30 });
+    saveSession(token, refresh);
     set({ token, refreshToken: refresh || get().refreshToken });
   },
 
@@ -47,45 +47,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
-    Cookies.remove('token');
-    Cookies.remove('refresh_token');
+    clearSession();
     set({ token: null, refreshToken: null, user: null });
   },
 
-  refreshAccessToken: async (): Promise<boolean> => {
-    const refresh = get().refreshToken;
-    if (!refresh) return false;
-    try {
-      const { data } = await api.post('/api/v1/auth/refresh', { refresh_token: refresh });
-      if (data.access_token) {
-        get().setToken(data.access_token, data.refresh_token || refresh);
-        return true;
-      }
-      return false;
-    } catch {
-      get().logout();
-      return false;
-    }
-  },
-
   fetchProfile: async () => {
+    if (!Cookies.get('token')) {
+      get().logout();
+      return;
+    }
+    set({ isLoading: true });
     try {
-      set({ isLoading: true });
-      const token = get().token || Cookies.get('token');
-      if (!token) { get().logout(); return; }
-      const { data } = await api.get('/api/v1/users/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      set({ user: data });
-    } catch (error: any) {
-      if (error.response?.status === 401) {
-        const refreshed = await get().refreshAccessToken();
-        if (refreshed) {
-          await get().fetchProfile();
+      // Token ve 401'de yenileme api.ts interceptor'ında. Oturum gerçekten geçersizse
+      // interceptor çerezleri temizler ve store'u sıfırlar (setSessionExpiredHandler).
+      // Ağ hatası / 5xx (sunucu yeniden başlıyor, bağlantı koptu) oturumu KAPATMAZ:
+      // birkaç kez kısa aralıklarla yeniden denenir.
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const { data } = await api.get('/api/v1/users/me');
+          set({ user: data });
           return;
+        } catch {
+          if (!Cookies.get('token') || attempt >= PROFILE_RETRY_DELAYS_MS.length) return;
+          await new Promise((resolve) => setTimeout(resolve, PROFILE_RETRY_DELAYS_MS[attempt]));
         }
       }
-      get().logout();
     } finally {
       set({ isLoading: false });
     }
@@ -100,3 +86,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   }
 }));
+
+// Yenileme reddedilince (refresh token geçersiz) store da temizlenir; middleware sonraki
+// gezinmede girişe yönlendirir.
+setSessionExpiredHandler(() => useAuthStore.setState({ token: null, refreshToken: null, user: null }));

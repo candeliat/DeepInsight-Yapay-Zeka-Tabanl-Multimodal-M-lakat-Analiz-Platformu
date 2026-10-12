@@ -1,5 +1,5 @@
 """
-Soru bankası (RAG) hibrit akışının `/start`, `/chat` ve `/chat/stream`
+Soru bankası (RAG) hibrit akışının `/start` ve `/chat/stream`
 uç noktalarına doğru bağlandığını doğrulayan entegrasyon testleri.
 
 Gerçek Supabase/embedding/LLM çağrısı YAPILMAZ — `question_bank_service`,
@@ -23,8 +23,7 @@ from unittest.mock import AsyncMock
 from app.services.llm_service import llm_service
 import app.api.routes.interview as interview_route
 
-from test_interview_chat_flow import client, _mock_interview_service, _history_with_n_questions_asked  # noqa: F401
-from test_interview_chat_stream import _parse_sse_events  # noqa: F401
+from test_interview_chat_flow import client, _mock_interview_service, _history_with_n_questions_asked, _parse_sse_events, _stream_events  # noqa: F401
 
 
 # --- /start ---
@@ -119,12 +118,10 @@ def test_start_falls_back_to_generation_when_bank_delivery_raises(client, monkey
 
 # --- /chat ---
 
-def test_chat_uses_bank_delivery_for_matching_pool_index(client, monkeypatch):
+def test_stream_uses_pool_entry_matching_question_index(client, monkeypatch):
     monkeypatch.setattr(interview_route.settings, "MAX_INTERVIEW_QUESTIONS", 3)
     # 1 soru soruldu -> questions_asked=1 -> pool[1] kullanılmalı (2. soru).
-    history = _history_with_n_questions_asked(1)
-    _mock_interview_service(monkeypatch, history)
-
+    _mock_interview_service(monkeypatch, _history_with_n_questions_asked(1))
     pool = [
         {"id": "q1", "question_text": "Birinci havuz sorusu.", "similarity": 0.8},
         {"id": "q2", "question_text": "İkinci havuz sorusu.", "similarity": 0.75},
@@ -133,52 +130,43 @@ def test_chat_uses_bank_delivery_for_matching_pool_index(client, monkeypatch):
         interview_route, "get_interview",
         AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
     )
+    seen = {}
 
-    deliver_mock = AsyncMock(return_value="Güzel cevap! İkinci havuz sorusu.")
-    monkeypatch.setattr(llm_service, "deliver_bank_question", deliver_mock)
-    get_next_question_mock = AsyncMock(return_value="ASLA ÇAĞRILMAMALI")
-    monkeypatch.setattr(llm_service, "get_next_question", get_next_question_mock)
+    async def _fake_bank_stream(*args, **kwargs):
+        seen.update(kwargs)
+        yield "Güzel cevap! İkinci havuz sorusu."
+    monkeypatch.setattr(llm_service, "stream_deliver_bank_question", _fake_bank_stream)
 
-    resp = client.post(
-        "/api/v1/interview/chat",
-        json={"interview_id": "interview-1", "message": "cevabım"},
-    )
+    events = _stream_events(client, "cevabım")
 
-    assert resp.status_code == 200
-    assert resp.json()["response"] == "Güzel cevap! İkinci havuz sorusu."
-    get_next_question_mock.assert_not_awaited()
-    deliver_mock.assert_awaited_once()
-    assert deliver_mock.await_args.kwargs["bank_question_text"] == "İkinci havuz sorusu."
-    assert deliver_mock.await_args.kwargs["question_number"] == 2
+    assert [e[1] for e in events if e[0] == "chunk"] == ["Güzel cevap! İkinci havuz sorusu."]
+    assert seen["bank_question_text"] == "İkinci havuz sorusu."
+    assert seen["question_number"] == 2
 
 
-def test_chat_falls_back_to_generation_when_pool_exhausted(client, monkeypatch):
+def test_stream_falls_back_to_generation_when_pool_exhausted(client, monkeypatch):
     """Havuz 1 soru içeriyor ama zaten 1 soru soruldu (index 1 için karşılık
     yok) -> tam-üretim akışına düşülmeli, mülakat kesintiye uğramamalı."""
     monkeypatch.setattr(interview_route.settings, "MAX_INTERVIEW_QUESTIONS", 3)
-    history = _history_with_n_questions_asked(1)
-    _mock_interview_service(monkeypatch, history)
-
+    _mock_interview_service(monkeypatch, _history_with_n_questions_asked(1))
     pool = [{"id": "q1", "question_text": "Sadece bir soru.", "similarity": 0.8}]
     monkeypatch.setattr(
         interview_route, "get_interview",
         AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "ongoing", "question_pool": pool}),
     )
 
-    deliver_mock = AsyncMock(return_value="ASLA ÇAĞRILMAMALI")
-    monkeypatch.setattr(llm_service, "deliver_bank_question", deliver_mock)
-    get_next_question_mock = AsyncMock(return_value="Sıfırdan üretilen ikinci soru.")
-    monkeypatch.setattr(llm_service, "get_next_question", get_next_question_mock)
+    async def _must_not_be_called(*args, **kwargs):
+        raise AssertionError("Havuz bitmişken banka teslimi çağrılmamalı")
+        yield  # pragma: no cover
+    monkeypatch.setattr(llm_service, "stream_deliver_bank_question", _must_not_be_called)
 
-    resp = client.post(
-        "/api/v1/interview/chat",
-        json={"interview_id": "interview-1", "message": "cevabım"},
-    )
+    async def _fake_generation_stream(*args, **kwargs):
+        yield "Sıfırdan üretilen ikinci soru."
+    monkeypatch.setattr(llm_service, "stream_next_question", _fake_generation_stream)
 
-    assert resp.status_code == 200
-    assert resp.json()["response"] == "Sıfırdan üretilen ikinci soru."
-    deliver_mock.assert_not_awaited()
-    get_next_question_mock.assert_awaited_once()
+    events = _stream_events(client, "cevabım")
+
+    assert [e[1] for e in events if e[0] == "chunk"] == ["Sıfırdan üretilen ikinci soru."]
 
 
 # --- /chat/stream ---

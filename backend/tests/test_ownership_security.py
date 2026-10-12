@@ -42,9 +42,8 @@ def foreign_interview(monkeypatch):
     return save
 
 
-@pytest.mark.parametrize("path", ["/api/v1/interview/chat", "/api/v1/interview/chat/stream"])
-def test_cannot_chat_in_someone_elses_interview(client, foreign_interview, path):
-    resp = client.post(path, json={"interview_id": "inv-x", "message": "merhaba"})
+def test_cannot_chat_in_someone_elses_interview(client, foreign_interview):
+    resp = client.post("/api/v1/interview/chat/stream", json={"interview_id": "inv-x", "message": "merhaba"})
     assert resp.status_code == 404
     foreign_interview.assert_not_awaited()  # başkasının mülakatına mesaj yazılmadı
 

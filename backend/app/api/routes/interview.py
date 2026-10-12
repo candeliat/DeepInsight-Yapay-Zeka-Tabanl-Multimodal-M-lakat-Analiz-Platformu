@@ -343,129 +343,6 @@ async def start_interview(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/chat", response_model=ChatResponse)
-async def chat_with_ai(
-    request: ChatRequest,
-    token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user)
-):
-    """
-    Kullanıcının son mesajını alıp anında DB'ye kaydeder, geçmişi DB'den okur
-    ve LLM servisinden bir cevap döndürür. Eğer mülakat bittiyse değerlendirmeyi kaydeder.
-
-    Not: Mesajın boş/whitespace-only olmadığı zaten `ChatRequest` şeması
-    (Field min_length=1 + sanitize eden field_validator) tarafından istek
-    ayrıştırılırken garanti edilir — bu fonksiyon çalıştığında `request.message`
-    her zaman dolu ve temizlenmiştir.
-    """
-    try:
-        # Mülakat bilgilerini al (role, topic) — yalnızca kendi mülakatı
-        interview = await _owned_interview(request.interview_id, current_user.id)
-
-        role = interview.get("role", "Yazılım Mühendisi")
-        topic = interview.get("topic", "Genel")
-        
-        # Eğer mülakat zaten tamamlanmışsa hata dön
-        if interview.get("status") == "completed":
-            raise HTTPException(status_code=400, detail="Bu mülakat zaten tamamlanmış.")
-
-        # Kullanıcı mesajını anlık kaydet
-        await save_message(request.interview_id, role="user", content=request.message, token=token)
-
-        # Geçmişi veritabanından çek (en son eklediğimiz kullanıcı mesajı dahil olmak üzere)
-        history_records = await get_interview_history(request.interview_id, token=token)
-
-        # Mülakatın bitip bitmediğine modelin kendi kararına GÜVENMİYORUZ — kaç soru
-        # sorulduğunu (kaç 'model' mesajı kaydedildiğini) sunucu tarafında sayıyoruz.
-        max_questions = settings.MAX_INTERVIEW_QUESTIONS
-        questions_asked = sum(1 for m in history_records if m.get("role") == "model")
-
-        interview_complete = False
-        evaluation_data = None
-
-        if questions_asked >= max_questions:
-            # Son soru da cevaplandı — modele yeni bir soru sordurmak yerine
-            # doğrudan nihai değerlendirmeyi zorluyoruz.
-            #
-            # Pahalı LLM değerlendirme çağrısına girmeden ÖNCE, bu isteğin
-            # mülakatı atomik olarak "claim" edip etmediğini kontrol ediyoruz —
-            # aksi halde aynı anda gelen iki final istek (çift tıklama, ağ
-            # retry'ı) iki kez LLM'e sorup iki kez model mesajı kaydedebilirdi.
-            claimed = await try_claim_interview_finalization(request.interview_id, token=token)
-            if not claimed:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Bu mülakat şu anda başka bir istek tarafından sonlandırılıyor. Lütfen bekleyin.",
-                )
-
-            try:
-                evaluation_data = await llm_service.get_final_evaluation(
-                    history=[{"role": m["role"], "content": m["content"]} for m in history_records],
-                    role=role,
-                    topic=topic,
-                )
-            except Exception:
-                # Claim alındı ama değerlendirme başarısız oldu — mülakatı
-                # 'ongoing'e geri al ki kullanıcı tekrar deneyebilsin.
-                await release_interview_finalization_claim(request.interview_id, token=token)
-                raise
-
-            interview_complete = True
-
-            feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
-            tech_score = evaluation_data.get("technical_score", 0)
-            conf_score = evaluation_data.get("confidence_score", 0)
-            vocab_score = evaluation_data.get("vocabulary_score", 0)
-
-            ai_response_text = (
-                f"Mülakat tamamlandı.\nDeğerlendirme Raporunuz:\n"
-                f"- Teknik Bilgi: {tech_score}/100\n- Özgüven: {conf_score}/100\n"
-                f"- Kelime Kullanımı: {vocab_score}/100\n\nGeri Bildirim: {feedback}"
-            )
-        else:
-            # Son mesaj hariç öncekileri geçmiş olarak ayarla, son mesajı ayrı parametre olarak geç
-            history_dicts = [{"role": item["role"], "content": item["content"]} for item in history_records[:-1]]
-            last_message = history_records[-1]["content"] if history_records else request.message
-
-            ai_response_text = await _ask_question(
-                role=role,
-                topic=topic,
-                question_number=questions_asked + 1,
-                max_questions=max_questions,
-                message=last_message,
-                history_dicts=history_dicts,
-                question_pool=interview.get("question_pool") or [],
-                candidate_context=await _candidate_context_for(interview, current_user.id),
-            )
-
-        # AI cevabını anlık kaydet
-        try:
-            await save_message(request.interview_id, role="model", content=ai_response_text, token=token)
-
-            # Mülakat tamamlandıysa durumu güncelle ve puanları kaydet
-            if interview_complete and evaluation_data:
-                await finish_interview_and_evaluate(request.interview_id, evaluation_data, token=token)
-        except Exception:
-            if interview_complete:
-                # Claim alınmıştı ama mesaj/skor kaydı başarısız oldu —
-                # 'completed' durumunda skorsuz takılı kalmasın diye geri al.
-                await release_interview_finalization_claim(request.interview_id, token=token)
-            raise
-
-        return ChatResponse(
-            response=ai_response_text,
-            interview_complete=interview_complete,
-            evaluation=evaluation_data
-        )
-
-    except HTTPException:
-        raise
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Bir hata oluştu: {str(e)}")
-
-
 def _sse(event: str, data: Any) -> str:
     """Bir SSE (Server-Sent Events) event'ini formatlar. `data`, JSON'a
     çevrilir — böylece içindeki yeni satır/özel karakterler SSE'nin tek
@@ -480,8 +357,8 @@ async def chat_with_ai_stream(
     current_user: UserProfile = Depends(get_current_user)
 ):
     """
-    `/chat` ile aynı iş mantığı (sunucu taraflı soru sayacı dahil), ama
-    LLM'in soru metnini token-token SSE (`text/event-stream`) olarak akıtır.
+    Adayın cevabını kaydeder ve sıradaki soruyu (sunucu taraflı soru sayacıyla)
+    token-token SSE (`text/event-stream`) olarak akıtır; son soru cevaplanınca değerlendirir.
 
     Event'ler:
       - `chunk`: üretilen metin parçası (JSON string)
@@ -639,7 +516,7 @@ async def finish_interview_early(
     istediği durumlar için. Soru sayacına bakmaksızın o ana kadarki
     geçmişle doğrudan nihai değerlendirmeyi zorlar.
 
-    Not: `/chat` ve `/chat/stream`'de mülakatın bitişi artık kesinlikle
+    Not: `/chat/stream`'de mülakatın bitişi kesinlikle
     sunucu taraflı soru sayacına bağlı (LLM'e "bitir" mesajı göndermek
     işe yaramaz) — erken sonlandırma için bu ayrı uç nokta gerekir.
     """
@@ -648,9 +525,9 @@ async def finish_interview_early(
     if interview.get("status") == "completed":
         raise HTTPException(status_code=400, detail="Bu mülakat zaten tamamlanmış.")
 
-    # /chat veya /chat/stream aynı mülakatı tam bu sırada zaten sonlandırıyor
+    # /chat/stream aynı mülakatı tam bu sırada zaten sonlandırıyor
     # olabilir (soru sayacı tam bu anda max'a ulaşmış olabilir) — atomik claim
-    # ile bu yarış durumunu da /chat ile aynı şekilde kapatıyoruz.
+    # ile bu yarış durumunu da /chat/stream ile aynı şekilde kapatıyoruz.
     claimed = await try_claim_interview_finalization(interview_id, token=token)
     if not claimed:
         raise HTTPException(
@@ -718,27 +595,6 @@ async def abandon_interview(
     await delete_ongoing_interview(interview_id)
     return {"status": "deleted"}
 
-
-@router.get("/history/{user_id}", response_model=List[Dict[str, Any]])
-async def get_history(
-    user_id: str,
-    token: str = Depends(oauth2_scheme),
-    current_user: UserProfile = Depends(get_current_user)
-):
-    """
-    Belirli bir kullanıcının tüm mülakat geçmişini döndürür.
-    """
-    try:
-        # Prevent users from accessing other users' history
-        if current_user.id != user_id:
-            raise HTTPException(status_code=403, detail="Not authorized to access this history")
-            
-        interviews = await get_user_interviews(user_id, token=token)
-        return interviews
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Bir hata oluştu: {str(e)}")
 
 @router.post("/transcribe")
 async def transcribe_audio_endpoint(

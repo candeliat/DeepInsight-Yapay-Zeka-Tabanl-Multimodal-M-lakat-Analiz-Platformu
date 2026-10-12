@@ -54,7 +54,7 @@ jobs:
             requirements.txt > "$RUNNER_TEMP/requirements-ci.txt"
           cat "$RUNNER_TEMP/requirements-ci.txt"
           python -m pip install --upgrade pip
-          pip install -r "$RUNNER_TEMP/requirements-ci.txt" pytest
+          pip install -r "$RUNNER_TEMP/requirements-ci.txt" $(grep -E "^pytest" requirements-dev.txt)
 
       - name: pytest
         run: python -m pytest tests -q -p no:cacheprovider

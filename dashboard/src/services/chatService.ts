@@ -75,21 +75,6 @@ export const chatService = {
   },
 
   /**
-   * Kullanıcının cevabını backend'e gönderir ve AI'ın yeni sorusunu alır.
-   */
-  async sendMessage(interview_id: string, message: string): Promise<ChatResponse> {
-    try {
-      const response = await api.post("/api/v1/interview/chat", { interview_id, message } satisfies ChatRequest);
-      return response.data;
-    } catch (error: unknown) {
-      const e = error as { response?: { data?: { detail?: string } }, message?: string };
-      throw new Error(
-        e.response?.data?.detail ?? `API hatası: ${e.message}`
-      );
-    }
-  },
-
-  /**
    * Aday, MAX_INTERVIEW_QUESTIONS'a ulaşılmadan mülakatı erken bitirmek
    * istediğinde çağrılır. Mülakatın bitişi backend'de sunucu taraflı soru
    * sayacına bağlı olduğundan (bkz. /chat), LLM'e "bitir" mesajı göndermek

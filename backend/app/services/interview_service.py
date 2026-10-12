@@ -105,7 +105,7 @@ async def try_claim_interview_finalization(interview_id: str, token: str = None)
     UPDATE ... WHERE status='ongoing' şeklindeki koşullu güncellemesi).
 
     Bu, aynı interview_id için eş zamanlı gelen iki "final" istek (örn. çift
-    tıklama, ağ retry'ı, veya /chat ile /finish'in aynı anda tetiklenmesi)
+    tıklama, ağ retry'ı, veya /chat/stream ile /finish'in aynı anda tetiklenmesi)
     arasındaki yarış durumunu engeller: kaybeden istek burada hemen False alır
     ve pahalı LLM değerlendirme çağrısına hiç girmeden HTTPException döner.
     Kazanan istek, gerçek puanları `finish_interview_and_evaluate` ile ayrıca

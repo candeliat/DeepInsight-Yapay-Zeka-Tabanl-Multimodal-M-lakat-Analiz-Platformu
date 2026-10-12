@@ -161,7 +161,7 @@ function StackedBarChart({ data }: { data: { name: string, value: number }[] }) 
 
 export default function InterviewResultScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id, analysis } = useLocalSearchParams<{ id: string; analysis?: string }>();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [analyticsData, setAnalyticsData] = useState<any>(null);
@@ -338,6 +338,14 @@ export default function InterviewResultScreen() {
           </View>
 
           <Text style={styles.resultsTitle}>{isCompleted ? 'Mülakat tamamlandı' : 'Yarıda kaldı'}</Text>
+          {analysis === 'failed' && (
+            <View style={styles.analysisNotice} accessibilityRole="alert">
+              <Ionicons name="information-circle-outline" size={18} color={Colors.onSurfaceVariant} />
+              <Text style={styles.analysisNoticeText}>
+                Video analizi tamamlanamadı; sonuçlar yalnızca cevaplarınıza göre hesaplandı.
+              </Text>
+            </View>
+          )}
           <Text style={styles.resultsDesc}>
             {isCompleted
               ? 'Aşağıda performansınızın yapay zeka değerlendirmesini görebilirsiniz.'
@@ -498,6 +506,8 @@ export default function InterviewResultScreen() {
 }
 
 const styles = StyleSheet.create({
+  analysisNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: 12, marginBottom: 4, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, backgroundColor: Colors.surfaceContainerLow, maxWidth: 420 },
+  analysisNoticeText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant },
   safeArea: { flex: 1, backgroundColor: Colors.background },
   resultsScroll: {
     flexGrow: 1,

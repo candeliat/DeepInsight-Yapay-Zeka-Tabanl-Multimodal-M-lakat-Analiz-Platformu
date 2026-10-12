@@ -1,4 +1,5 @@
 import { api } from "../lib/api";
+import { extractErrorMessage, call } from "../lib/apiError";
 
 export interface JobRequirements {
   title: string | null;
@@ -63,22 +64,6 @@ export interface JobMatch {
   summary: string | null;
   llm_error: string | null;
   created_at: string | null;
-}
-
-function extractErrorMessage(error: unknown): string {
-  const e = error as { response?: { data?: { detail?: unknown } }; message?: string };
-  const detail = e.response?.data?.detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
-  return e.message ?? "Bilinmeyen bir hata oluştu.";
-}
-
-async function call<T>(request: Promise<{ data: T }>): Promise<T> {
-  try {
-    return (await request).data;
-  } catch (error: unknown) {
-    throw new Error(extractErrorMessage(error));
-  }
 }
 
 export const jobService = {

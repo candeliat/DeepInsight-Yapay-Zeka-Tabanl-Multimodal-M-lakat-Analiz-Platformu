@@ -1,4 +1,5 @@
 import { api } from "../lib/api";
+import { extractErrorMessage } from "../lib/apiError";
 
 export type MetricKey = "technical" | "confidence" | "vocabulary";
 
@@ -57,12 +58,6 @@ export interface Progress {
     pause_count: number | null;
   } | null;
   recommendations: Recommendation[];
-}
-
-function extractErrorMessage(error: unknown): string {
-  const e = error as { response?: { data?: { detail?: unknown } }; message?: string };
-  const detail = e.response?.data?.detail;
-  return typeof detail === "string" ? detail : e.message ?? "Bilinmeyen bir hata oluştu.";
 }
 
 export const progressService = {

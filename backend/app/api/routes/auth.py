@@ -3,7 +3,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
-from app.api.dependencies.auth import get_current_user
+from app.api.dependencies.auth import _TRANSIENT, get_current_user
 from datetime import datetime, timezone
 
 from app.api.schemas.user import PRIVACY_NOTICE_VERSION, UserCreate, UserLogin, TokenResponse, UserProfile
@@ -43,10 +43,17 @@ def refresh_token(body: RefreshTokenRequest):
         )
     except HTTPException:
         raise
-    except Exception as e:
+    except _TRANSIENT:
+        # Kimlik servisine ulaşılamadı: refresh token geçersiz DEĞİL. 401 dönülürse istemci
+        # oturumu kapatır; geçici bir ağ sorunu kullanıcıyı sistemden atmamalı.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Kimlik doğrulama servisine şu an ulaşılamıyor, lütfen tekrar deneyin.",
+        )
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Token yenilenemedi: {str(e)}"
+            detail="Refresh token geçersiz veya süresi dolmuş.",
         )
 
 

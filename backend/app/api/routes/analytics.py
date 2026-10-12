@@ -21,7 +21,7 @@ from app.api.schemas.analytics import (
 from app.services.analytics import run_full_analysis
 from app.services import account_service
 from app.core.config import settings
-from app.core.database import supabase
+from app.core.database import run, aw, supabase
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ async def _require_own_interview(interview_id: str, user_id: str) -> str:
         raise HTTPException(status_code=404, detail="Mülakat bulunamadı.")
     if not supabase:
         raise HTTPException(status_code=503, detail="Veritabanı bağlantısı yok.")
-    owner = supabase.table("interviews").select("user_id").eq("id", interview_id).execute().data
+    owner = (await run(supabase.table("interviews").select("user_id").eq("id", interview_id))).data
     if not owner or str(owner[0].get("user_id")) != str(user_id):
         raise HTTPException(status_code=404, detail="Mülakat bulunamadı.")
     return interview_id
@@ -74,7 +74,7 @@ async def start_analysis(
     # --- Validasyonlar ---
     interview_id = await _require_own_interview(interview_id, current_user.id)
     # Video/ses kaydı ve yüz-ifadesi analizi açık onam gerektirir (bkz. account_service).
-    if not account_service.has_video_consent(current_user.id):
+    if not (await aw(account_service.has_video_consent(current_user.id))):
         raise HTTPException(
             status_code=403,
             detail="Video analizi için onam vermediniz. Görüntülü mülakatın kurulum ekranından onam verebilirsiniz.",
@@ -166,10 +166,9 @@ async def get_analysis_status(
 
     try:
         result = (
-            supabase.table("interview_analytics")
+            (await run(supabase.table("interview_analytics")
             .select("interview_id, analysis_status, error_message")
-            .eq("interview_id", interview_id)
-            .execute()
+            .eq("interview_id", interview_id)))
         )
 
         if not result.data:
@@ -214,10 +213,9 @@ async def get_analysis_results(
 
     try:
         result = (
-            supabase.table("interview_analytics")
+            (await run(supabase.table("interview_analytics")
             .select("*")
-            .eq("interview_id", interview_id)
-            .execute()
+            .eq("interview_id", interview_id)))
         )
 
         if not result.data:

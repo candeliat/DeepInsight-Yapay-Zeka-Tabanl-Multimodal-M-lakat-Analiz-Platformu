@@ -16,7 +16,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from app.core.database import supabase
+from app.core.database import aw, supabase
 from app.services import progress_service
 
 MIN_COHORT = 3
@@ -36,7 +36,7 @@ _IDENTITY_TTL = timedelta(minutes=5)
 _identity_cache: Dict[str, Any] = {}
 
 
-def get_identity(user_id: str) -> Dict[str, Optional[str]]:
+async def get_identity(user_id: str) -> Dict[str, Optional[str]]:
     """
     Üyenin e-posta ve adını Supabase Auth'tan okur (yalnızca kurum yöneticisi/eğitmen görür).
     Üye başına ayrı bir Auth isteği gerektiği için 5 dakika süreç içinde önbelleğe alınır.
@@ -46,7 +46,7 @@ def get_identity(user_id: str) -> Dict[str, Optional[str]]:
     if cached and cached[0] > now:
         return cached[1]
     try:
-        user = supabase.auth.admin.get_user_by_id(user_id).user
+        user = (await aw(supabase.auth.admin.get_user_by_id(user_id))).user
     except Exception:
         return {"email": None, "name": None}  # hata önbelleğe alınmaz
     meta = user.user_metadata or {}
@@ -54,6 +54,20 @@ def get_identity(user_id: str) -> Dict[str, Optional[str]]:
     identity = {"email": user.email, "name": name}
     _identity_cache[user_id] = (now + _IDENTITY_TTL, identity)
     return identity
+
+
+async def get_identities(user_ids: List[str], concurrency: int = 10) -> Dict[str, Dict[str, Optional[str]]]:
+    """Birden çok üyenin kimliğini PARALEL okur (en fazla `concurrency` eşzamanlı Auth isteği).
+    Önceden üye başına sıralı ve senkron istek yapılıyordu (500 üyede 500 ardışık istek)."""
+    import asyncio
+
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def _one(uid: str):
+        async with semaphore:
+            return uid, await aw(get_identity(uid))
+
+    return dict(await asyncio.gather(*(_one(u) for u in dict.fromkeys(user_ids))))
 
 
 def scope_to_group(memberships: List[Dict[str, Any]], data: Dict[str, Any],

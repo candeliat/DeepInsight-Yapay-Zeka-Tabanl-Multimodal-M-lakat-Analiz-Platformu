@@ -13,7 +13,7 @@ aynı olmak zorundadır.
 import re
 from typing import Any, Dict, Iterable, List, Optional
 
-from app.core.database import supabase
+from app.core.database import run, supabase
 from app.services import organization_service
 
 MAX_INVITES = 500
@@ -34,7 +34,7 @@ def normalize_email(value: Optional[str]) -> Optional[str]:
 # --- gruplar ---
 
 async def list_groups(org_id: str, memberships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    groups = _db().table("org_groups").select("id, name, created_at").eq("org_id", org_id).order("name").execute().data or []
+    groups = (await run(_db().table("org_groups").select("id, name, created_at").eq("org_id", org_id).order("name"))).data or []
     counts: Dict[str, int] = {}
     for m in memberships:
         if m.get("group_id"):
@@ -43,16 +43,16 @@ async def list_groups(org_id: str, memberships: List[Dict[str, Any]]) -> List[Di
 
 
 async def get_group(org_id: str, group_id: str) -> Optional[Dict[str, Any]]:
-    result = _db().table("org_groups").select("*").eq("id", group_id).eq("org_id", org_id).execute()
+    result = (await run(_db().table("org_groups").select("*").eq("id", group_id).eq("org_id", org_id)))
     return result.data[0] if result.data else None
 
 
 async def create_group(actor_id: str, org_id: str, name: str) -> Dict[str, Any]:
     name = name.strip()
-    existing = _db().table("org_groups").select("id").eq("org_id", org_id).eq("name", name).execute().data
+    existing = (await run(_db().table("org_groups").select("id").eq("org_id", org_id).eq("name", name))).data
     if existing:
         raise ValueError(f"'{name}' adlı bir grup zaten var")
-    result = _db().table("org_groups").insert({"org_id": org_id, "name": name}).execute()
+    result = (await run(_db().table("org_groups").insert({"org_id": org_id, "name": name})))
     if not result.data:
         raise RuntimeError("Grup oluşturulamadı")
     group = result.data[0]
@@ -64,7 +64,7 @@ async def delete_group(actor_id: str, org_id: str, group_id: str) -> bool:
     """Grubu siler; üyeler kurumda kalır, yalnızca grupsuz olur (FK on delete set null)."""
     if not await get_group(org_id, group_id):
         return False
-    _db().table("org_groups").delete().eq("id", group_id).eq("org_id", org_id).execute()
+    (await run(_db().table("org_groups").delete().eq("id", group_id).eq("org_id", org_id)))
     await organization_service.log_audit(actor_id, org_id, "group.delete", "group", group_id)
     return True
 
@@ -74,7 +74,7 @@ async def set_member_group(actor_id: str, org_id: str, user_id: str, group_id: O
         raise ValueError("Üye bulunamadı")
     if group_id and not await get_group(org_id, group_id):
         raise ValueError("Grup bulunamadı")
-    _db().table("memberships").update({"group_id": group_id}).eq("org_id", org_id).eq("user_id", user_id).execute()
+    (await run(_db().table("memberships").update({"group_id": group_id}).eq("org_id", org_id).eq("user_id", user_id)))
     await organization_service.log_audit(actor_id, org_id, "member.group_change", "user", user_id, {"group_id": group_id})
 
 
@@ -82,7 +82,7 @@ async def _group_ids_by_name(actor_id: str, org_id: str, names: Iterable[str]) -
     wanted = {n.strip() for n in names if n and n.strip()}
     if not wanted:
         return {}
-    rows = _db().table("org_groups").select("id, name").eq("org_id", org_id).execute().data or []
+    rows = (await run(_db().table("org_groups").select("id, name").eq("org_id", org_id))).data or []
     by_name = {r["name"].casefold(): r["id"] for r in rows}
     for name in sorted(wanted):
         if name.casefold() not in by_name:
@@ -128,7 +128,7 @@ async def create_invites(actor_id: str, org_id: str, rows: List[Dict[str, Option
     ]
     if records:
         # Aynı e-postaya tekrar davet: rol/grup güncellenir, yeni satır açılmaz.
-        _db().table("org_invites").upsert(records, on_conflict="org_id,email").execute()
+        (await run(_db().table("org_invites").upsert(records, on_conflict="org_id,email")))
         await organization_service.log_audit(actor_id, org_id, "invite.bulk_create", "organization", org_id,
                                              {"count": len(records)})
     return {
@@ -141,16 +141,16 @@ async def create_invites(actor_id: str, org_id: str, rows: List[Dict[str, Option
 
 async def list_org_invites(org_id: str) -> List[Dict[str, Any]]:
     return (
-        _db().table("org_invites").select("id, email, role, group_id, created_at")
-        .eq("org_id", org_id).order("created_at", desc=True).execute().data or []
+        (await run(_db().table("org_invites").select("id, email, role, group_id, created_at")
+        .eq("org_id", org_id).order("created_at", desc=True))).data or []
     )
 
 
 async def delete_invite(actor_id: str, org_id: str, invite_id: str) -> bool:
-    found = _db().table("org_invites").select("id").eq("id", invite_id).eq("org_id", org_id).execute().data
+    found = (await run(_db().table("org_invites").select("id").eq("id", invite_id).eq("org_id", org_id))).data
     if not found:
         return False
-    _db().table("org_invites").delete().eq("id", invite_id).eq("org_id", org_id).execute()
+    (await run(_db().table("org_invites").delete().eq("id", invite_id).eq("org_id", org_id)))
     await organization_service.log_audit(actor_id, org_id, "invite.delete", "invite", invite_id)
     return True
 
@@ -159,26 +159,26 @@ async def my_invites(email: Optional[str]) -> List[Dict[str, Any]]:
     email = normalize_email(email)
     if not email:
         return []
-    invites = _db().table("org_invites").select("id, org_id, role, created_at").eq("email", email).execute().data or []
+    invites = (await run(_db().table("org_invites").select("id, org_id, role, created_at").eq("email", email))).data or []
     if not invites:
         return []
-    orgs = _db().table("organizations").select("id, name").in_("id", [i["org_id"] for i in invites]).execute().data or []
+    orgs = (await run(_db().table("organizations").select("id, name").in_("id", [i["org_id"] for i in invites]))).data or []
     names = {o["id"]: o["name"] for o in orgs}
     return [{**i, "org_name": names.get(i["org_id"])} for i in invites]
 
 
 async def respond_to_invite(user_id: str, email: Optional[str], invite_id: str, accept: bool) -> Dict[str, Any]:
-    result = _db().table("org_invites").select("*").eq("id", invite_id).execute()
+    result = (await run(_db().table("org_invites").select("*").eq("id", invite_id)))
     invite = result.data[0] if result.data else None
     # Başkasına ait davet "yok" gibi davranır (varlığı sızdırılmaz).
     if not invite or invite["email"] != normalize_email(email):
         raise ValueError("Davet bulunamadı")
 
     if accept and not await organization_service.get_membership(invite["org_id"], user_id):
-        _db().table("memberships").insert({
+        (await run(_db().table("memberships").insert({
             "org_id": invite["org_id"], "user_id": user_id, "role": invite["role"], "group_id": invite.get("group_id"),
-        }).execute()
-    _db().table("org_invites").delete().eq("id", invite_id).execute()
+        })))
+    (await run(_db().table("org_invites").delete().eq("id", invite_id)))
     await organization_service.log_audit(user_id, invite["org_id"], "invite.accept" if accept else "invite.decline",
                                          "user", user_id)
     return {"org_id": invite["org_id"], "accepted": accept}

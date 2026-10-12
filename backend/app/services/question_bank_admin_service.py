@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from app.core.database import supabase
+from app.core.database import run, aw, supabase
 from app.services.llm_service import llm_service
 from app.services.local_embedding_service import embed_text_local
 
@@ -33,12 +33,12 @@ def _scope(query, org_id: Optional[str]):
     return query.eq("org_id", org_id) if org_id else query.is_("org_id", "null")
 
 
-def _assert_family_in_scope(family_id: Optional[str], org_id: Optional[str]) -> None:
+async def _assert_family_in_scope(family_id: Optional[str], org_id: Optional[str]) -> None:
     """Başka bir kapsamdaki (kurum/global) bir aileye soru eklenmesini engeller —
     aksi halde aile zinciri üzerinden kapsamlar arası sızıntı olurdu."""
     if not family_id:
         return
-    members = supabase.table("question_bank").select("org_id").eq("family_id", family_id).execute().data or []
+    members = (await run(supabase.table("question_bank").select("org_id").eq("family_id", family_id))).data or []
     if any((m.get("org_id") or None) != (org_id or None) for m in members):
         raise ValueError("Bu aile bu kapsamda bulunamadı")
 
@@ -72,9 +72,8 @@ async def list_questions(org_id: Optional[str] = None) -> List[Dict[str, Any]]:
     if not supabase:
         return []
     result = (
-        _scope(supabase.table("question_bank").select(_SELECT_COLUMNS), org_id)
-        .order("created_at", desc=True)
-        .execute()
+        (await run(_scope(supabase.table("question_bank").select(_SELECT_COLUMNS), org_id)
+        .order("created_at", desc=True)))
     )
     return result.data or []
 
@@ -93,7 +92,7 @@ async def create_question(
         raise RuntimeError("Supabase client is not initialized")
 
     if not new_family:
-        _assert_family_in_scope(family_id, org_id)
+        (await aw(_assert_family_in_scope(family_id, org_id)))
     resolved_family_id = str(uuid.uuid4()) if new_family else family_id
 
     # "passage" — bankaya kaydedilen soru metni olarak encode edilir (arama
@@ -116,12 +115,12 @@ async def create_question(
     }
     if org_id:
         record["org_id"] = org_id
-    result = supabase.table("question_bank").insert(record).execute()
+    result = (await run(supabase.table("question_bank").insert(record)))
     if not result.data:
         raise RuntimeError("Soru eklenemedi")
 
     inserted_id = result.data[0]["id"]
-    full_row = supabase.table("question_bank").select(_SELECT_COLUMNS).eq("id", inserted_id).execute()
+    full_row = (await run(supabase.table("question_bank").select(_SELECT_COLUMNS).eq("id", inserted_id)))
     return full_row.data[0] if full_row.data else _strip_embedding(result.data[0])
 
 
@@ -141,28 +140,27 @@ async def update_question(question_id: str, updates: Dict[str, Any], org_id: Opt
         if embedding_local is not None:
             record["embedding_local"] = embedding_local
 
-    result = _scope(supabase.table("question_bank").update(record).eq("id", question_id), org_id).execute()
+    result = (await run(_scope(supabase.table("question_bank").update(record).eq("id", question_id), org_id)))
     if not result.data:
         raise ValueError("Soru bulunamadı")
 
-    full_row = supabase.table("question_bank").select(_SELECT_COLUMNS).eq("id", question_id).execute()
+    full_row = (await run(supabase.table("question_bank").select(_SELECT_COLUMNS).eq("id", question_id)))
     return full_row.data[0] if full_row.data else _strip_embedding(result.data[0])
 
 
 async def delete_question(question_id: str, org_id: Optional[str] = None) -> None:
     if not supabase:
         raise RuntimeError("Supabase client is not initialized")
-    _scope(supabase.table("question_bank").delete().eq("id", question_id), org_id).execute()
+    (await run(_scope(supabase.table("question_bank").delete().eq("id", question_id), org_id)))
 
 
 async def list_gaps() -> List[Dict[str, Any]]:
     if not supabase:
         return []
     result = (
-        supabase.table("question_bank_gaps")
+        (await run(supabase.table("question_bank_gaps")
         .select("*")
-        .order("miss_count", desc=True)
-        .execute()
+        .order("miss_count", desc=True)))
     )
     return result.data or []
 
@@ -186,7 +184,7 @@ async def generate_candidates_for_gaps(limit: int = 5) -> List[Dict[str, Any]]:
         return []
 
     gaps_result = (
-        supabase.table("question_bank_gaps").select("*").order("miss_count", desc=True).limit(limit).execute()
+        (await run(supabase.table("question_bank_gaps").select("*").order("miss_count", desc=True).limit(limit)))
     )
     gaps = gaps_result.data or []
 
@@ -204,7 +202,7 @@ async def generate_candidates_for_gaps(limit: int = 5) -> List[Dict[str, Any]]:
                 "source_gap_id": gap["id"],
                 "status": "pending",
             }
-            result = supabase.table("question_bank_candidates").insert(record).execute()
+            result = (await run(supabase.table("question_bank_candidates").insert(record)))
             if result.data:
                 created.append(result.data[0])
         except Exception:
@@ -221,11 +219,10 @@ async def list_candidates(status: str = "pending") -> List[Dict[str, Any]]:
     if not supabase:
         return []
     result = (
-        supabase.table("question_bank_candidates")
+        (await run(supabase.table("question_bank_candidates")
         .select("*")
         .eq("status", status)
-        .order("created_at", desc=True)
-        .execute()
+        .order("created_at", desc=True)))
     )
     return result.data or []
 
@@ -236,7 +233,7 @@ async def approve_candidate(candidate_id: str) -> Dict[str, Any]:
     if not supabase:
         raise RuntimeError("Supabase client is not initialized")
 
-    cand_result = supabase.table("question_bank_candidates").select("*").eq("id", candidate_id).execute()
+    cand_result = (await run(supabase.table("question_bank_candidates").select("*").eq("id", candidate_id)))
     if not cand_result.data:
         raise ValueError("Öneri bulunamadı")
     candidate = cand_result.data[0]
@@ -251,10 +248,10 @@ async def approve_candidate(candidate_id: str) -> Dict[str, Any]:
         new_family=False,
     )
 
-    supabase.table("question_bank_candidates").update({
+    (await run(supabase.table("question_bank_candidates").update({
         "status": "approved",
         "reviewed_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("id", candidate_id).execute()
+    }).eq("id", candidate_id)))
 
     return created
 
@@ -262,7 +259,7 @@ async def approve_candidate(candidate_id: str) -> Dict[str, Any]:
 async def reject_candidate(candidate_id: str) -> None:
     if not supabase:
         raise RuntimeError("Supabase client is not initialized")
-    supabase.table("question_bank_candidates").update({
+    (await run(supabase.table("question_bank_candidates").update({
         "status": "rejected",
         "reviewed_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("id", candidate_id).execute()
+    }).eq("id", candidate_id)))

@@ -21,7 +21,9 @@ import math
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from app.core.database import supabase
+# Bu modül senkron yazılmıştır: iş parçacığına özel senkron istemciyi kullanır ve asenkron
+# koddan asyncio.to_thread ile çağrılır (bkz. app/core/database.py).
+from app.core.database import sync_supabase as supabase
 from app.services import progress_service
 
 CONSENT_TYPE = "research_pilot"

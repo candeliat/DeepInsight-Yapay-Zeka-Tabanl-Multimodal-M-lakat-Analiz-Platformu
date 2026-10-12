@@ -5,6 +5,7 @@ video analizi onamı, yarıda kalan mülakatı silme, kayıtta aydınlatma onay�
 """
 from unittest.mock import AsyncMock, MagicMock
 
+import asyncio
 import pytest
 from fastapi.testclient import TestClient
 
@@ -49,7 +50,7 @@ def test_revoking_video_consent_deletes_analytics(monkeypatch):
     fake = MagicMock()
     fake.table.return_value.select.return_value.eq.return_value.execute.return_value = MagicMock(data=[{"id": "i1"}])
     monkeypatch.setattr(account_service, "supabase", fake)
-    account_service.set_consent("user-1", account_service.VIDEO_CONSENT_TYPE, False)
+    asyncio.run(account_service.set_consent("user-1", account_service.VIDEO_CONSENT_TYPE, False))
     tables = [c.args[0] for c in fake.table.call_args_list]
     assert "interview_analytics" in tables
     fake.table.return_value.delete.return_value.in_.assert_called_with("interview_id", ["i1"])
@@ -134,6 +135,8 @@ def test_change_password_checks_current_password(client, monkeypatch):
 def test_update_profile_merges_metadata(client, monkeypatch):
     fake = MagicMock()
     monkeypatch.setattr(users_route, "supabase", fake)
+    # Birleştirme token'daki değil, Supabase'den okunan GÜNCEL metadata üzerinden yapılır.
+    monkeypatch.setattr(users_route, "fetch_user_profile", AsyncMock(return_value=ME))
     resp = client.patch("/api/v1/users/me", json={"target": "  Backend <Developer> "})
     assert resp.status_code == 200
     meta = resp.json()["user_metadata"]

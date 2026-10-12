@@ -1,3 +1,4 @@
+import asyncio
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -48,7 +49,7 @@ async def my_pilot_status(
     token: str = Depends(oauth2_scheme),
     current_user: UserProfile = Depends(get_current_user),
 ):
-    return pilot.my_status(current_user.id)
+    return await asyncio.to_thread(pilot.my_status, current_user.id)
 
 
 @router.put("/me/consent")
@@ -58,7 +59,7 @@ async def set_pilot_consent(
     current_user: UserProfile = Depends(get_current_user),
 ):
     """Araştırma onamı verir ya da geri çeker (geri çekilirse anket yanıtları silinir)."""
-    granted = pilot.set_consent(current_user.id, payload.granted)
+    granted = await asyncio.to_thread(pilot.set_consent, current_user.id, payload.granted)
     await organization_service.log_audit(current_user.id, None, "pilot.consent", "user", current_user.id, {"granted": granted})
     return {"consent": granted}
 
@@ -70,7 +71,7 @@ async def submit_post_interview_survey(
     current_user: UserProfile = Depends(get_current_user),
 ):
     try:
-        pilot.submit_post_interview(current_user.id, payload.interview_id, payload.answers, payload.comment)
+        await asyncio.to_thread(pilot.submit_post_interview, current_user.id, payload.interview_id, payload.answers, payload.comment)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
@@ -85,7 +86,7 @@ async def submit_sus_survey(
     current_user: UserProfile = Depends(get_current_user),
 ):
     try:
-        score = pilot.submit_sus(current_user.id, payload.answers)
+        score = await asyncio.to_thread(pilot.submit_sus, current_user.id, payload.answers)
     except PermissionError as e:
         raise HTTPException(status_code=403, detail=str(e))
     except ValueError as e:
@@ -99,7 +100,7 @@ async def pilot_report(
     current_user: UserProfile = Depends(require_admin),
 ):
     """Kimliksiz pilot raporu (yalnızca platform yöneticisi)."""
-    report = pilot.fetch_report()
+    report = await asyncio.to_thread(pilot.fetch_report)
     await organization_service.log_audit(current_user.id, None, "pilot.report_view", "report", "pilot")
     return report
 
@@ -109,7 +110,7 @@ async def pilot_report_csv(
     token: str = Depends(oauth2_scheme),
     current_user: UserProfile = Depends(require_admin),
 ):
-    report = pilot.fetch_report()
+    report = await asyncio.to_thread(pilot.fetch_report)
     await organization_service.log_audit(current_user.id, None, "pilot.report_export", "report", "pilot")
     return Response(
         content=pilot.report_csv(report).encode("utf-8"),

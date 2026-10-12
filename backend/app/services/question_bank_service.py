@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.core.config import settings
-from app.core.database import supabase
+from app.core.database import run, supabase
 from app.services.llm_service import llm_service
 from app.services.local_embedding_service import embed_text_local
 from app.services.question_tags import interview_tags, related_tags
@@ -117,7 +117,7 @@ async def _fetch_tagged_rows(tags: set, org_id: Optional[str]) -> List[Dict[str,
             .eq("is_active", True).overlaps("tags", sorted(tags))
         )
         query = query.or_(f"org_id.is.null,org_id.eq.{org_id}") if org_id else query.is_("org_id", "null")
-        data = query.execute().data
+        data = (await run(query)).data
     except Exception:
         logger.warning("[question_bank_service] Etiket sorgusu başarısız (tags=%s).", sorted(tags), exc_info=True)
         return []
@@ -199,7 +199,7 @@ async def _semantic_candidates(
         rpc_params["filter_org_id"] = org_id
 
     try:
-        result = supabase.rpc(rpc_name, rpc_params).execute()
+        result = (await run(supabase.rpc(rpc_name, rpc_params)))
     except Exception:
         logger.warning(
             "[question_bank_service] %s RPC başarısız (role=%s, topic=%s) — semantik arama atlanıyor.",
@@ -277,11 +277,10 @@ async def _fetch_family_chain(
         return []
     try:
         result = (
-            supabase.table("question_bank")
+            (await run(supabase.table("question_bank")
             .select("id, question_text, difficulty, org_id, answer_points")
             .eq("family_id", family_id)
-            .eq("is_active", True)
-            .execute()
+            .eq("is_active", True)))
         )
     except Exception:
         logger.warning("[question_bank_service] Aile zinciri çekilemedi (family_id=%s).", family_id, exc_info=True)
@@ -320,7 +319,7 @@ async def _increment_times_served(question_ids: List[str]) -> None:
     if not supabase or not question_ids:
         return
     try:
-        supabase.rpc("increment_times_served", {"question_ids": question_ids}).execute()
+        (await run(supabase.rpc("increment_times_served", {"question_ids": question_ids})))
     except Exception:
         logger.warning(
             "[question_bank_service] times_served güncellenemedi (ids=%s).", question_ids, exc_info=True,
@@ -339,23 +338,23 @@ async def _log_question_bank_gap(role: str, topic: str, difficulty: Optional[str
     try:
         query = supabase.table("question_bank_gaps").select("id, miss_count").eq("role", role).eq("topic", topic)
         query = query.is_("difficulty", "null") if difficulty is None else query.eq("difficulty", difficulty)
-        existing = query.execute()
+        existing = (await run(query))
 
         if existing.data:
             row = existing.data[0]
-            supabase.table("question_bank_gaps").update({
+            (await run(supabase.table("question_bank_gaps").update({
                 "miss_count": (row.get("miss_count") or 0) + 1,
                 "last_missing_count": missing_count,
                 "last_seen_at": datetime.now(timezone.utc).isoformat(),
-            }).eq("id", row["id"]).execute()
+            }).eq("id", row["id"])))
         else:
-            supabase.table("question_bank_gaps").insert({
+            (await run(supabase.table("question_bank_gaps").insert({
                 "role": role,
                 "topic": topic,
                 "difficulty": difficulty,
                 "miss_count": 1,
                 "last_missing_count": missing_count,
-            }).execute()
+            })))
     except Exception:
         logger.warning(
             "[question_bank_service] Boşluk kaydedilemedi (role=%s, topic=%s, difficulty=%s).",

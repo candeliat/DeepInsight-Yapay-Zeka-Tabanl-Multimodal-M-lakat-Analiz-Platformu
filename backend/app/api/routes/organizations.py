@@ -1,9 +1,11 @@
+import asyncio
 import logging
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
+from app.core.database import aw
 from app.api.dependencies.auth import get_current_user, oauth2_scheme, require_admin, require_org_role
 from app.api.schemas.organization import (
     BulkInviteRequest,
@@ -144,10 +146,10 @@ async def list_members(
 
 async def _member_rows(org_id: str, group_id: Optional[str]):
     memberships = await org_service.list_members(org_id)
-    # Supabase istemcisi (paylaşılan HTTP/2 bağlantısı) iş parçacıkları arasında eşzamanlı
-    # kullanılınca bağlantı kopuyor (RemoteProtocolError) — çağrılar to_thread'siz yapılır.
-    memberships, data = insights.scope_to_group(memberships, progress_service.fetch_org_data(org_id), group_id)
-    identities = {str(m["user_id"]): insights.get_identity(str(m["user_id"])) for m in memberships}
+    # progress_service senkron; iş parçacığına özel istemciyle iş parçacığında çalışır.
+    org_data = await asyncio.to_thread(progress_service.fetch_org_data, org_id)
+    memberships, data = insights.scope_to_group(memberships, org_data, group_id)
+    identities = await insights.get_identities([str(m["user_id"]) for m in memberships])
     return insights.build_member_rows(memberships, data, identities, await _rubric(org_id))
 
 
@@ -164,7 +166,7 @@ async def org_overview(
         raise HTTPException(status_code=404, detail="Kurum bulunamadı")
     await _check_group(org_id, group_id)
     memberships, data = insights.scope_to_group(
-        await org_service.list_members(org_id), progress_service.fetch_org_data(org_id), group_id,
+        await org_service.list_members(org_id), await asyncio.to_thread(progress_service.fetch_org_data, org_id), group_id,
     )
     return insights.build_overview(org, memberships, data)
 
@@ -178,7 +180,7 @@ async def member_progress(
 ):
     """Bir öğrencinin kurum içindeki ilerlemesi — yalnızca öğrenci paylaşım rızası verdiyse."""
     memberships = await org_service.list_members(org_id)
-    data = progress_service.fetch_org_data(org_id)
+    data = await asyncio.to_thread(progress_service.fetch_org_data, org_id)
     try:
         progress = insights.member_progress(memberships, user_id, data, await _rubric(org_id))
     except ValueError as e:
@@ -380,8 +382,8 @@ async def _assignment_rows(org_id: str, assignment_id: str):
     if not assignment:
         raise HTTPException(status_code=404, detail="Ödev bulunamadı")
     members = await org_service.list_members(org_id)
-    interviews = assignment_service.assignment_interviews([assignment_id])
-    identities = {str(m["user_id"]): insights.get_identity(str(m["user_id"])) for m in members if m["role"] == "candidate"}
+    interviews = (await aw(assignment_service.assignment_interviews([assignment_id])))
+    identities = await insights.get_identities([str(m["user_id"]) for m in members if m["role"] == "candidate"])
     return assignment_service.build_assignment_rows(members, interviews, identities, assignment, await _rubric(org_id))
 
 
@@ -489,7 +491,7 @@ async def bulk_invite(
             raise HTTPException(status_code=403, detail="Eğitmen daveti yalnızca kurum yöneticisi gönderebilir")
     await _check_group(org_id, payload.group_id)
     members = await org_service.list_members(org_id)
-    member_emails = [insights.get_identity(str(m["user_id"])).get("email") for m in members]
+    member_emails = [i.get("email") for i in (await insights.get_identities([str(m["user_id"]) for m in members])).values()]
     try:
         return await groups.create_invites(
             current_user.id, org_id, [r.model_dump() for r in payload.rows], payload.role, payload.group_id,

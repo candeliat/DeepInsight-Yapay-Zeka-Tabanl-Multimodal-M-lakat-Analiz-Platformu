@@ -82,3 +82,17 @@ test('sonuç ekranından yarıda kalan mülakat silinir', async ({ authedPage: p
   await expect(page).toHaveURL(/\/reports/);
   expect(api.callsTo('DELETE', `/api/v1/interview/${ONGOING_ID}`)).toHaveLength(1);
 });
+
+test('video analizi tamamlanamazsa sonuç ekranı bunu bant olarak bildirir', async ({ authedPage: page, api }) => {
+  const done = { ...api.state.interviews.find((i) => i.id === 'int-strong')!, feedback: 'İyi iş.', messages: [] };
+  api.on('GET', '/api/v1/interview/int-strong', { json: done });
+  const notice = page.getByText('Video analizi tamamlanamadı; sonuçlar yalnızca cevaplarınıza göre hesaplandı.');
+
+  await page.goto('/interview-result?id=int-strong&analysis=failed');
+  await expect(page.getByText('Mülakat tamamlandı')).toBeVisible();
+  await expect(notice).toBeVisible();
+
+  await page.goto('/interview-result?id=int-strong');
+  await expect(page.getByText('Mülakat tamamlandı')).toBeVisible();
+  await expect(notice).toHaveCount(0);
+});

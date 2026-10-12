@@ -1,4 +1,5 @@
 import { api } from "../lib/api";
+import { extractErrorMessage } from "../lib/apiError";
 
 export interface QuestionBankItem {
   id: string;
@@ -52,14 +53,6 @@ export interface UpdateQuestionPayload {
   question_text?: string;
   tags?: string[];
   is_active?: boolean;
-}
-
-function extractErrorMessage(error: unknown): string {
-  const e = error as { response?: { data?: { detail?: unknown } }; message?: string };
-  const detail = e.response?.data?.detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
-  return e.message ?? "Bilinmeyen bir hata oluştu.";
 }
 
 export const questionBankService = {

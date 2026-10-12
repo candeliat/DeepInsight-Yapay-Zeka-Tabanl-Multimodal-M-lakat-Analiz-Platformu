@@ -1,12 +1,5 @@
 import { api } from "../lib/api";
-
-function extractErrorMessage(error: unknown): string {
-  const e = error as { response?: { data?: { detail?: unknown } }; message?: string };
-  const detail = e.response?.data?.detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
-  return e.message ?? "Bilinmeyen bir hata oluştu.";
-}
+import { extractErrorMessage } from "../lib/apiError";
 
 export interface ConsentStatus {
   consent_type: string;

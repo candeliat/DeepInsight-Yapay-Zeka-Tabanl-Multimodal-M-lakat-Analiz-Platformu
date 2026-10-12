@@ -1,4 +1,5 @@
 import { api } from "../lib/api";
+import { call } from "../lib/apiError";
 import { Progress, TopicStat } from "./progressService";
 
 export type OrgRole = "org_admin" | "instructor" | "candidate";
@@ -90,22 +91,6 @@ export interface OrgOverview {
   metric_means: Partial<Record<"technical" | "confidence" | "vocabulary" | "average", number | null>>;
   weekly: { week: string; count: number; average: number | null }[];
   topics: TopicStat[];
-}
-
-function extractErrorMessage(error: unknown): string {
-  const e = error as { response?: { data?: { detail?: unknown } }; message?: string };
-  const detail = e.response?.data?.detail;
-  if (typeof detail === "string") return detail;
-  if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
-  return e.message ?? "Bilinmeyen bir hata oluştu.";
-}
-
-async function call<T>(request: Promise<{ data: T }>): Promise<T> {
-  try {
-    return (await request).data;
-  } catch (error: unknown) {
-    throw new Error(extractErrorMessage(error));
-  }
 }
 
 export const orgService = {

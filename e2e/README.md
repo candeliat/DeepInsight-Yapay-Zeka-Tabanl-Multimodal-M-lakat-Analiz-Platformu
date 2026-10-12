@@ -32,9 +32,10 @@ CI: `.github/workflows/e2e.yml` her PR'da ve `main`'e her gönderimde tür denet
 | `web/cv.spec.ts` | CV rızası, yükleme + otomatik analiz (skor, kontroller, profil), tür/boyut doğrulaması, sınır mesajı, silme ve rızayı geri çekme |
 | `web/jobs.spec.ts` | ilan ekleme doğrulaması, CV ile eşleştirme (skor, beceri durumları, yol haritası), kayıtlı eşleştirme, hata, silme |
 | `web/organizations.spec.ts` | davet kabul/ret, davet koduyla katılma, paylaşım izni, Ödevlerim, ödevden mülakat, kurum paneli (≥3 öğrenci kuralı, kod yenileme, ödev atama, toplu davet), yetkisiz erişim |
+| `web/question-bank.spec.ts` | soru bankası: tarayıcı penceresi yerine satır içi silme onayı, hata bandı, 422 dizi ve bağlantı hatasının Türkçe mesajı |
 | `mobile/account.spec.ts` | giriş + şifremi unuttum, şifre mesajları, onam geri çekme onayı, çıkış onayı |
 | `mobile/career.spec.ts` | CV yükleme (dosya seçici) ve analiz, CV silme/rıza, ilan ekleme, eşleştirme ve yol haritası, kurum daveti/kodu/paylaşım, ödevler |
-| `mobile/interview.spec.ts` | hazırlan (hedef rol, onam uyarısı, yazılı başlatma), devam et → mülakat odası, gönderim hatası, "şimdilik çık", silme |
+| `mobile/interview.spec.ts` | hazırlan (hedef rol, onam uyarısı, yazılı başlatma), devam et → mülakat odası, gönderim hatası, "şimdilik çık", silme, video analizi hatası bandı |
 
 ## Yeni test yazarken
 

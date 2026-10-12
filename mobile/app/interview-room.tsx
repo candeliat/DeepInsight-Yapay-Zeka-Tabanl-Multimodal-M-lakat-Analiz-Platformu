@@ -12,7 +12,6 @@ import {
   Platform,
   ScrollView,
   Animated,
-  Alert,
   AppState,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -185,16 +184,13 @@ export default function InterviewRoomScreen() {
     return () => sub.remove();
   }, [recording]);
 
-  // İzin kontrolü — eksik izin varsa uyar
+  // Görüntülü modda kamera izni kalıcı olarak reddedildiyse mülakat analizsiz sürer; satır içinde bildirilir
+  // (Alert.alert web'de görünmez). Yazılı modda kamera kullanılmadığı için uyarı gösterilmez.
   useEffect(() => {
-    if (cameraPermission && !cameraPermission.granted && !cameraPermission.canAskAgain) {
-      Alert.alert(
-        'Kamera İzni Gerekli',
-        'Mülakat için kamera erişimine ihtiyaç duyulur. Lütfen ayarlardan izin verin.',
-        [{ text: 'Tamam' }]
-      );
+    if (!textMode && cameraPermission && !cameraPermission.granted && !cameraPermission.canAskAgain) {
+      setSendError('Kamera izni verilmedi: mülakat video analizi olmadan sürüyor. İzni cihaz ayarlarından açabilirsiniz.');
     }
-  }, [cameraPermission]);
+  }, [cameraPermission, textMode]);
 
   // Sayaç (useMemo ile formatTime optimize edildi)
   useEffect(() => {
@@ -320,9 +316,9 @@ export default function InterviewRoomScreen() {
       router.replace({ pathname: '/interview-result', params: { id: interviewId } });
     } catch (error: any) {
       setUploading(false);
-      Alert.alert('Bilgi', 'Analiz aşamasında bir sorun oluştu veya yükleme tamamlanamadı. Sonuçlara geçiliyor.', [{ text: 'Tamam' }]);
       try { await FileSystem.deleteAsync(uri, { idempotent: true }); } catch (e) {}
-      router.replace({ pathname: '/interview-result', params: { id: interviewId } });
+      // Bilgi sonuç ekranında bant olarak gösterilir (Alert web'de görünmez, ekran da hemen değişiyor).
+      router.replace({ pathname: '/interview-result', params: { id: interviewId, analysis: 'failed' } });
     }
   };
 
@@ -341,13 +337,14 @@ export default function InterviewRoomScreen() {
 
   // Ses kaydı başlat
   const startRecording = useCallback(async () => {
+    setSendError(null);
     try {
       let perm = micPermission;
       if (!perm?.granted) {
         perm = await requestMicPermission();
       }
       if (!perm?.granted) {
-        Alert.alert('Mikrofon İzni Yok', 'Sesli yanıt verebilmek için mikrofon erişimi gereklidir.', [{ text: 'Tamam' }]);
+        setSendError('Sesli yanıt için mikrofon izni gerekli. İzin vermek istemiyorsanız cevabınızı yazabilirsiniz.');
         return;
       }
 
@@ -357,7 +354,7 @@ export default function InterviewRoomScreen() {
       setIsRecording(true);
       Speech.stop();
     } catch (err) {
-      Alert.alert('Kayıt Başlatılamadı', 'Ses kaydı başlatılırken hata oluştu. Lütfen tekrar deneyin.', [{ text: 'Tamam' }]);
+      setSendError('Ses kaydı başlatılamadı. Tekrar deneyin ya da cevabınızı yazın.');
     }
   }, [micPermission, requestMicPermission]);
 
@@ -373,13 +370,13 @@ export default function InterviewRoomScreen() {
       if (uri) {
         const text = await transcribeAudio(uri);
         if (!text || text.trim().length === 0) {
-          Alert.alert('Ses Anlaşılamadı', 'Ses kaydı metne dönüştürülemedi. Lütfen daha net konuşun veya yazarak yanıt verin.', [{ text: 'Tamam' }]);
+          setSendError('Ses anlaşılamadı. Daha net konuşarak tekrar deneyin ya da cevabınızı yazın.');
           return;
         }
         setUserAnswer((prev) => (prev ? prev + ' ' + text : text));
       }
     } catch (err) {
-      Alert.alert('Kayıt Hatası', 'Ses kaydı işlenirken bir hata oluştu. Lütfen tekrar deneyin.', [{ text: 'Tamam' }]);
+      setSendError('Ses kaydı işlenemedi. Tekrar deneyin ya da cevabınızı yazın.');
     } finally {
       setIsTranscribing(false);
     }

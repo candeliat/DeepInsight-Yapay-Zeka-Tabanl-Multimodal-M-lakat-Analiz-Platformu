@@ -610,6 +610,7 @@ function TextInterviewContent() {
             <button
               onClick={handleSendAnswer}
               disabled={!userAnswer.trim() || isThinking}
+              aria-label="Cevabı gönder"
               className="w-14 h-[56px] rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-md"
             >
               {isThinking ? (

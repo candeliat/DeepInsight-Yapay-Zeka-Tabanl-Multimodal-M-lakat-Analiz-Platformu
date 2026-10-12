@@ -704,6 +704,7 @@ export default function InterviewRoomPage() {
                   : "bg-background hover:bg-muted border-border text-foreground"
               }`}
               title="Sesle Yanıtla"
+              aria-pressed={isListening}
             >
               {isListening ? <Mic className="w-6 h-6" /> : <MicOff className="w-5 h-5 opacity-70" />}
             </button>
@@ -730,6 +731,7 @@ export default function InterviewRoomPage() {
             <button
               onClick={handleSendAnswer}
               disabled={!userAnswer.trim() || isThinking}
+              aria-label="Cevabı gönder"
               className="w-14 h-[56px] rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-md"
             >
               {isThinking ? (

@@ -111,6 +111,7 @@ function VideoConsentRow() {
   const [consent, setConsent] = useState<ConsentStatus | null>(null);
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     accountService.getConsent("video_analysis").then(setConsent).catch(() => setConsent(null));
@@ -119,9 +120,12 @@ function VideoConsentRow() {
   if (!consent) return null;
   const revoke = async () => {
     setBusy(true);
+    setError(null);
     try {
       setConsent(await accountService.setConsent("video_analysis", false));
       setConfirm(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Onam geri çekilemedi.");
     } finally {
       setBusy(false);
     }
@@ -136,11 +140,12 @@ function VideoConsentRow() {
             ? "Görüntülü mülakat kayıtlarınızın analiz edilmesine onam verdiniz. Geri çekerseniz video analizi sonuçlarınız silinir."
             : "Onam vermediniz; görüntülü mülakat başlatırken onam istenir."}
         </p>
+        {error && <p role="alert" className="mt-2 text-sm font-semibold text-destructive">{error}</p>}
       </div>
       {consent.granted &&
         (confirm ? (
           <span className="text-sm">
-            <button onClick={revoke} disabled={busy} className="font-bold text-destructive hover:underline">Geri çek ve sil</button>
+            <button onClick={revoke} disabled={busy} className="font-bold text-destructive hover:underline">{busy ? "Geri çekiliyor…" : "Geri çek ve sil"}</button>
             <button onClick={() => setConfirm(false)} className="ml-3 text-muted-foreground hover:underline">Vazgeç</button>
           </span>
         ) : (

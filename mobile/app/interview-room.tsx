@@ -498,6 +498,8 @@ export default function InterviewRoomScreen() {
               ]}
               onPress={toggleRecording}
               disabled={isTranscribing || isThinking}
+              accessibilityRole="button"
+              accessibilityLabel="Sesle yanıtla"
             >
               {isTranscribing ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -512,6 +514,8 @@ export default function InterviewRoomScreen() {
                 { backgroundColor: Colors.error }
               ]}
               onPress={toggleRecording}
+              accessibilityRole="button"
+              accessibilityLabel="Kaydı durdur"
             >
               <Ionicons name="stop" size={20} color="#fff" />
             </TouchableOpacity>
@@ -520,6 +524,8 @@ export default function InterviewRoomScreen() {
               style={[styles.sendBtn, isThinking && styles.sendBtnDisabled]}
               onPress={handleSendAnswer}
               disabled={isThinking}
+              accessibilityRole="button"
+              accessibilityLabel="Cevabı gönder"
             >
               <Ionicons name="send" size={18} color="#fff" />
             </TouchableOpacity>

@@ -28,6 +28,7 @@ export default function RegisterScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorText, setErrorText] = useState('');
   const [successText, setSuccessText] = useState('');
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const handleRegister = async () => {
     setErrorText('');
@@ -41,8 +42,12 @@ export default function RegisterScreen() {
       setErrorText('Şifreler eşleşmiyor!');
       return;
     }
-    if (password.length < 6) {
-      setErrorText('Şifre en az 6 karakter olmalıdır.');
+    if (password.length < 8) {
+      setErrorText('Şifre en az 8 karakter olmalıdır.');
+      return;
+    }
+    if (!privacyAccepted) {
+      setErrorText('Devam etmek için aydınlatma metnini okuduğunuzu onaylayın.');
       return;
     }
 
@@ -58,10 +63,10 @@ export default function RegisterScreen() {
         first_name,
         last_name,
         target,
+        privacy_accepted: true,
       });
 
-      setSuccessText('Hesabınız oluşturuldu! Lütfen giriş yapın.');
-      setTimeout(() => router.replace('/(auth)/login'), 1500);
+      router.replace({ pathname: '/(auth)/login', params: { registered: '1' } });
     } catch (error: any) {
       setErrorText(
         error.response?.data?.detail || 'Kayıt sırasında bir hata oluştu.'
@@ -119,7 +124,7 @@ export default function RegisterScreen() {
           <View style={styles.form}>
             <CustomInput
               label="AD SOYAD"
-              placeholder="Ali Veli"
+              placeholder="Ayşe Yılmaz"
               iconName="person-outline"
               autoCapitalize="words"
               value={name}
@@ -147,7 +152,7 @@ export default function RegisterScreen() {
 
             <CustomInput
               label="ŞİFRE"
-              placeholder="Min. 6 karakter"
+              placeholder="En az 8 karakter"
               iconName="lock-closed-outline"
               isPassword
               value={password}
@@ -162,6 +167,28 @@ export default function RegisterScreen() {
               value={confirmPassword}
               onChangeText={setConfirmPassword}
             />
+
+            <View style={styles.privacyRow}>
+              <TouchableOpacity
+                onPress={() => setPrivacyAccepted((v) => !v)}
+                accessibilityRole="checkbox"
+                aria-checked={privacyAccepted}
+                accessibilityLabel="Aydınlatma metnini okudum"
+                hitSlop={8}
+              >
+                <Ionicons
+                  name={privacyAccepted ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={privacyAccepted ? Colors.secondary : Colors.outline}
+                />
+              </TouchableOpacity>
+              <Text style={styles.privacyText}>
+                <Text style={styles.linkTextSmall} onPress={() => router.push('/privacy')}>
+                  KVKK Aydınlatma Metni
+                </Text>
+                {"'ni okudum; kişisel verilerimin bu metinde açıklandığı şekilde işleneceğini biliyorum."}
+              </Text>
+            </View>
 
             {/* Kayıt Butonu */}
             <TouchableOpacity
@@ -253,6 +280,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: FontFamilies.sansMedium,
   },
+  privacyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4, marginBottom: 20 },
+  privacyText: { flex: 1, fontSize: 13, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, lineHeight: 19 },
+  linkTextSmall: { color: Colors.secondary, fontFamily: FontFamilies.sansBold, textDecorationLine: 'underline' },
   successBox: {
     flexDirection: 'row',
     alignItems: 'center',

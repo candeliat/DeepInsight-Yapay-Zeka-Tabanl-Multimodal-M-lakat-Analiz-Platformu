@@ -25,6 +25,9 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import Link from "next/link";
+import { accountService, ConsentStatus } from "@/services/accountService";
+import { useAuthStore } from "@/store/useAuthStore";
 
 // Tarayıcı uyumluluğu için SpeechRecognition türleri
 declare global {
@@ -46,6 +49,26 @@ export default function InterviewRoomPage() {
   const [role, setRole] = useState("Yazılım Mühendisi");
   const [topic, setTopic] = useState("React ve Modern Web Geliştirme");
   const [difficulty, setDifficulty] = useState("ORTA");
+  // Video analizi onamı: kayıt sunucuya yüklenir ve yüz ifadesi analiz edilir — açık onam şart.
+  const [videoConsent, setVideoConsent] = useState<ConsentStatus | null>(null);
+  const [consentChecked, setConsentChecked] = useState(false);
+  const [showConsentText, setShowConsentText] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  // Kamera izni penceresi beklenirken düğmede ayrı mesaj (önceden yalnızca "Hazırlanıyor...").
+  const [waitingCamera, setWaitingCamera] = useState(false);
+  // Mülakat sırasındaki hatalar alert() yerine satır içinde gösterilir.
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const { user } = useAuthStore();
+  const target = user?.user_metadata?.target as string | undefined;
+
+  useEffect(() => {
+    accountService.getConsent("video_analysis").then(setVideoConsent).catch(() => setVideoConsent(null));
+  }, []);
+
+  useEffect(() => {
+    if (target) setRole(target.slice(0, 80));
+  }, [target]);
   
   // Mülakat State
   const [interviewId, setInterviewId] = useState("");
@@ -253,16 +276,27 @@ export default function InterviewRoomPage() {
   // ----------------------------------------------------------------------
   const handleStartInterview = async (e: React.FormEvent) => {
     e.preventDefault();
+    setStartError(null);
+    if (!videoConsent?.granted && !consentChecked) {
+      setStartError("Görüntülü mülakat için video analizine onam vermeniz gerekir. Kamerasız devam etmek için Yazılı Mülakat'ı kullanabilirsiniz.");
+      return;
+    }
     setIsThinking(true);
     
     try {
-      // 1. Backend'e başlatma isteği
+      if (!videoConsent?.granted) {
+        setVideoConsent(await accountService.setConsent("video_analysis", true));
+      }
+      // 1. Önce kamera izni: izin penceresi açıkken sunucuda boş bir "yarıda kalan"
+      // mülakat oluşmasın. İzin verilmezse mülakat analizsiz devam eder (mediaError bandı).
+      setWaitingCamera(true);
+      await setupCamera();
+      setWaitingCamera(false);
+
+      // 2. Backend'e başlatma isteği
       const data = await chatService.startInterview(role, topic, difficulty);
       setInterviewId(data.interview_id);
       setCurrentQuestion(data.first_message);
-      
-      // 2. Kamera aç
-      await setupCamera();
       
       // 3. Arka plan video/ses kaydını başlat
       startRecording();
@@ -273,8 +307,10 @@ export default function InterviewRoomPage() {
       
     } catch (error) {
       console.error("Mülakat başlatılamadı:", error);
-      alert("Mülakat başlatılırken bir hata oluştu.");
+      setStartError(error instanceof Error ? error.message : "Mülakat başlatılırken bir hata oluştu.");
+      stopCamera();
     } finally {
+      setWaitingCamera(false);
       setIsThinking(false);
     }
   };
@@ -328,7 +364,9 @@ export default function InterviewRoomPage() {
     }
 
     const currentAnswer = userAnswer;
+    const previousQuestion = currentQuestion;
     setUserAnswer("");
+    setChatError(null);
     setIsThinking(true);
     // Yeni cevap gönderilirken ekranı temizle — chunk'lar geldikçe burası
     // token-token dolacak (typewriter efekti).
@@ -351,16 +389,23 @@ export default function InterviewRoomPage() {
         },
         onError: (detail, partialSaved) => {
           console.error("Stream hatası:", detail, "kısmi metin kaydedildi mi:", partialSaved);
-          alert(
+          if (!partialSaved) {
+            // Cevap kaybolmasın: kutuya geri konur, soru da eski haline döner.
+            setUserAnswer(currentAnswer);
+            if (!streamedText) setCurrentQuestion(previousQuestion);
+          }
+          setChatError(
             partialSaved
               ? "Yanıt üretimi yarıda kesildi, ama o ana kadarki kısım kaydedildi. Lütfen tekrar deneyin."
-              : "Bağlantı hatası oluştu. Lütfen tekrar deneyin."
+              : "Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz."
           );
         },
       });
     } catch (error) {
       console.error("Cevap gönderilemedi:", error);
-      alert("Bağlantı hatası oluştu.");
+      setUserAnswer(currentAnswer);
+      if (!streamedText) setCurrentQuestion(previousQuestion);
+      setChatError("Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz.");
     } finally {
       setIsThinking(false);
     }
@@ -376,6 +421,8 @@ export default function InterviewRoomPage() {
       setIsListening(false);
     }
 
+    setConfirmEnd(false);
+    setChatError(null);
     setIsThinking(true);
     try {
       // Soru sayısına bakmaksızın o ana kadarki cevaplarla nihai
@@ -384,7 +431,7 @@ export default function InterviewRoomPage() {
       finalizeInterview(response.evaluation ?? null);
     } catch (e) {
       console.error("Mülakatı bitirme hatası:", e);
-      alert("Mülakat sonlandırılamadı.");
+      setChatError("Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.");
     } finally {
       setIsThinking(false);
     }
@@ -505,14 +552,42 @@ export default function InterviewRoomPage() {
 
             <div className="flex items-center gap-2 bg-muted border border-border p-4 rounded-xl text-xs text-muted-foreground font-semibold mb-2">
               <ShieldCheck className="w-5 h-5 text-success shrink-0" />
-              <span>Görüntü ve ses analizi tamamen cihazınız üzerinden güvenli şekilde yürütülecektir.</span>
+              <span>
+                Kaydınız mülakattan sonra analiz için sunucumuza yüklenir; göz teması, yüz ifadesi (duygu/stres tahmini) ve
+                konuşma ölçümleri çıkarılır, video dosyası analizden sonra silinir.
+              </span>
             </div>
 
-            <Button type="submit" size="lg" disabled={isThinking} className="w-full">
-              {isThinking ? (
+            <div className="bg-card border border-border p-4 rounded-xl text-xs text-muted-foreground space-y-2">
+              {showConsentText && videoConsent && <p className="leading-relaxed">{videoConsent.text}</p>}
+              <button type="button" onClick={() => setShowConsentText((v) => !v)} className="font-semibold text-primary hover:underline">
+                {showConsentText ? "Onam metnini gizle" : "Onam metnini oku"}
+              </button>
+              {videoConsent?.granted ? (
+                <p className="text-success font-semibold">Video analizine onam verdiniz. Profil → Verilerim&apos;den geri çekebilirsiniz.</p>
+              ) : (
+                <label className="flex items-start gap-2 cursor-pointer text-foreground">
+                  <input type="checkbox" checked={consentChecked} onChange={(e) => setConsentChecked(e.target.checked)} className="mt-0.5 w-4 h-4" />
+                  <span>Video ve ses kaydımın bu amaçla işlenmesine açık rıza veriyorum.</span>
+                </label>
+              )}
+              <p>
+                Kamerasız ya da CV/ilana göre kişiselleştirilmiş mülakat için{" "}
+                <Link href="/chat/text" className="font-semibold text-primary hover:underline">Yazılı Mülakat</Link>.
+              </p>
+            </div>
+
+            {startError && (
+              <p role="alert" className="text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-3">{startError}</p>
+            )}
+
+            <Button type="submit" size="lg" disabled={isThinking || (!videoConsent?.granted && !consentChecked)} className="w-full">
+              {waitingCamera ? (
+                <><Loader2 className="w-5 h-5 animate-spin" /> Tarayıcının kamera/mikrofon izin penceresini onaylayın...</>
+              ) : isThinking ? (
                 <><Loader2 className="w-5 h-5 animate-spin" /> Hazırlanıyor...</>
               ) : (
-                <><Play className="w-5 h-5 fill-current" /> Mülakata Başla</>
+                <><Play className="w-5 h-5 fill-current" /> Görüntülü mülakata başla</>
               )}
             </Button>
           </form>
@@ -552,17 +627,36 @@ export default function InterviewRoomPage() {
               className="w-full h-full object-cover transform -scale-x-100 flex-1"
             />
             <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md text-[10px] text-white font-bold">
-              <UserCameraIcon /> Kaydediliyor
+              <UserCameraIcon /> {mediaError ? "Kayıt yok" : "Kaydediliyor"}
             </div>
           </div>
           
-          <button
-            onClick={handleEndInterviewManual}
-            disabled={isThinking}
-            className="ml-4 px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50"
-          >
-            Mülakatı Bitir
-          </button>
+          {confirmEnd ? (
+            <div className="ml-4 flex items-center gap-2" role="group" aria-label="Mülakatı bitirme onayı">
+              <span className="text-xs text-muted-foreground max-w-[12rem]">Şimdiye kadarki cevaplarla değerlendirilsin mi?</span>
+              <button
+                onClick={handleEndInterviewManual}
+                disabled={isThinking}
+                className="px-3 py-2 bg-destructive text-white rounded-xl font-semibold text-xs disabled:opacity-50"
+              >
+                Bitir
+              </button>
+              <button
+                onClick={() => setConfirmEnd(false)}
+                className="px-3 py-2 bg-background border border-border rounded-xl font-semibold text-xs"
+              >
+                Vazgeç
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmEnd(true)}
+              disabled={isThinking}
+              className="ml-4 px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50"
+            >
+              Mülakatı Bitir
+            </button>
+          )}
         </div>
 
         {/* Orta Kısım: Soru ve AI Durumu */}
@@ -592,6 +686,11 @@ export default function InterviewRoomPage() {
 
         {/* Alt Kısım: Cevap Girişi */}
         <div className="p-6 bg-background/50 backdrop-blur-xl border-t border-border mt-auto relative z-20">
+          {chatError && (
+            <p role="alert" className="max-w-4xl mx-auto mb-3 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-2.5">
+              {chatError}
+            </p>
+          )}
           <div className="max-w-4xl mx-auto flex items-end gap-3">
             
             {/* Sesle Cevap Butonu */}
@@ -605,6 +704,7 @@ export default function InterviewRoomPage() {
                   : "bg-background hover:bg-muted border-border text-foreground"
               }`}
               title="Sesle Yanıtla"
+              aria-pressed={isListening}
             >
               {isListening ? <Mic className="w-6 h-6" /> : <MicOff className="w-5 h-5 opacity-70" />}
             </button>
@@ -631,6 +731,7 @@ export default function InterviewRoomPage() {
             <button
               onClick={handleSendAnswer}
               disabled={!userAnswer.trim() || isThinking}
+              aria-label="Cevabı gönder"
               className="w-14 h-[56px] rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-md"
             >
               {isThinking ? (

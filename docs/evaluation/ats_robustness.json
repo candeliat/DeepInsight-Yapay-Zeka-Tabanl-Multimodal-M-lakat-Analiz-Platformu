@@ -1,0 +1,72 @@
+[
+  {
+    "profile": "CV1",
+    "base_score": 85,
+    "base_method": "pdf_text",
+    "deterministic": true,
+    "variants": {
+      "taranmis": {
+        "score": 71,
+        "delta": -14,
+        "method": "ocr",
+        "changed_checks": {
+          "text_layer": -14
+        },
+        "text_similarity": 0.872,
+        "content_checks_preserved": 1.0
+      },
+      "standart_disi_baslik": {
+        "score": 72,
+        "delta": -13,
+        "method": "pdf_text",
+        "changed_checks": {
+          "sections": -13
+        }
+      },
+      "sayisiz_tarihsiz": {
+        "score": 70,
+        "delta": -15,
+        "method": "pdf_text",
+        "changed_checks": {
+          "dates": -10,
+          "quantified": -5
+        }
+      }
+    }
+  },
+  {
+    "profile": "CV2",
+    "base_score": 85,
+    "base_method": "pdf_text",
+    "deterministic": true,
+    "variants": {
+      "taranmis": {
+        "score": 71,
+        "delta": -14,
+        "method": "ocr",
+        "changed_checks": {
+          "text_layer": -14
+        },
+        "text_similarity": 0.636,
+        "content_checks_preserved": 1.0
+      },
+      "standart_disi_baslik": {
+        "score": 72,
+        "delta": -13,
+        "method": "pdf_text",
+        "changed_checks": {
+          "sections": -13
+        }
+      },
+      "sayisiz_tarihsiz": {
+        "score": 70,
+        "delta": -15,
+        "method": "pdf_text",
+        "changed_checks": {
+          "dates": -10,
+          "quantified": -5
+        }
+      }
+    }
+  }
+]

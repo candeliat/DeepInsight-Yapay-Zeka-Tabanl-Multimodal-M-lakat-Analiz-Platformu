@@ -8,6 +8,7 @@ import { Calendar, ChevronRight, Video, Briefcase, BarChart, Loader2 } from "luc
 import { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { chatService } from "@/services/chatService";
+import { BAND_BADGE, scoreBand } from "@/lib/scoreBand";
 
 export default function InterviewsPage() {
   const { user } = useAuthStore();
@@ -28,13 +29,10 @@ export default function InterviewsPage() {
     loadInterviews();
   }, []);
 
+  // Tek skor ölçeği (lib/scoreBand.ts) — diğer ekranlarla aynı eşik ve kelimeler.
   const getStatusInfo = (status: string, score: number) => {
-    if (status === "completed") {
-      if (score >= 80) return { variant: "success" as const, label: "Başarılı" };
-      if (score >= 60) return { variant: "warning" as const, label: "Geliştirilmeli" };
-      return { variant: "destructive" as const, label: "Zayıf" };
-    }
-    return { variant: "default" as const, label: "Devam Ediyor" };
+    const band = status === "completed" ? scoreBand(score) : null;
+    return band ? { variant: BAND_BADGE[band.tone], label: band.label } : { variant: "default" as const, label: "Yarıda kaldı" };
   };
 
   return (
@@ -45,13 +43,13 @@ export default function InterviewsPage() {
             Mülakat geçmişiniz
           </h1>
           <p className="text-muted-foreground mt-1">
-            Daha önce girdiğin tüm AI destekli mülakatların detaylı sonuçları.
+            Tamamladığın mülakatların sonuçları; yarıda kalanlara kaldığın yerden devam edebilirsin.
           </p>
         </div>
-        <Button variant="outline" className="gap-2 hidden sm:flex" asChild>
-          <Link href="/chat">
+        <Button className="gap-2 hidden sm:flex" asChild>
+          <Link href="/chat/text">
             <Video className="w-4 h-4" />
-            Mülakat Simülasyonu
+            Yeni mülakat
           </Link>
         </Button>
       </div>
@@ -66,7 +64,7 @@ export default function InterviewsPage() {
             <Video className="w-12 h-12 text-muted-foreground mb-4" />
             <p className="text-lg font-medium">Henüz bir mülakat yapmadınız.</p>
             <Button className="mt-4" asChild>
-              <Link href="/chat">Hemen Başla</Link>
+              <Link href="/chat/text">İlk mülakatını başlat</Link>
             </Button>
           </CardContent>
         </Card>
@@ -78,7 +76,11 @@ export default function InterviewsPage() {
             const formattedDate = new Date(interview.created_at).toLocaleDateString("tr-TR", { day: 'numeric', month: 'short', year: 'numeric' });
 
             return (
-              <Link key={interview.id} href={`/interviews/${interview.id}`} className="group block h-full">
+              <Link
+                key={interview.id}
+                href={interview.status === "completed" ? `/interviews/${interview.id}` : `/chat/text?resume=${interview.id}`}
+                className="group block h-full"
+              >
                 <Card className="h-full flex flex-col">
                   <CardHeader className="pb-3 border-b border-border/50">
                     <div className="flex items-start justify-between">
@@ -88,7 +90,7 @@ export default function InterviewsPage() {
                       {interview.status === "completed" && (
                         <div className="flex items-center gap-1 text-primary font-bold bg-primary/10 px-2 py-1 rounded-md text-sm">
                           <BarChart className="w-4 h-4" />
-                          %{avgScore}
+                          {avgScore}
                         </div>
                       )}
                     </div>
@@ -110,10 +112,10 @@ export default function InterviewsPage() {
                     </div>
 
                     <div className="mt-auto">
-                      <Button variant="secondary" className="w-full justify-between group-hover:bg-primary group-hover:text-primary-foreground transition-all">
-                        {interview.status === "completed" ? "Detaylı Analizi Gör" : "Devam Et"}
+                      <span className="flex w-full items-center justify-between rounded-xl bg-muted px-4 py-2.5 text-sm font-semibold text-foreground group-hover:bg-primary group-hover:text-primary-foreground transition-all">
+                        {interview.status === "completed" ? "Sonuçları gör" : "Kaldığın yerden devam et"}
                         <ChevronRight className="w-4 h-4" />
-                      </Button>
+                      </span>
                     </div>
                   </CardContent>
                 </Card>

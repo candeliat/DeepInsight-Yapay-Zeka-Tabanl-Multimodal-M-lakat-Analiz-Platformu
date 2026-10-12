@@ -49,6 +49,14 @@ def test_my_interviews_uses_objective_confidence_when_analysis_completed(client,
     assert body["average_score"] == 80.0
 
 
+def test_ongoing_interview_has_no_average(client, monkeypatch):
+    # Devam eden mülakatın skor kolonları 0 olsa da ortalaması "0/100" olarak dönmemeli.
+    ongoing = _interview(status="ongoing", technical_score=0, confidence_score=0, vocabulary_score=0)
+    monkeypatch.setattr(interview_route, "get_user_interviews", AsyncMock(return_value=[ongoing]))
+    monkeypatch.setattr(interview_route, "get_completed_confidence_map", AsyncMock(return_value={}))
+    assert client.get("/api/v1/interview/me").json()[0]["average_score"] is None
+
+
 def test_my_interviews_falls_back_to_llm_confidence_when_analysis_missing(client, monkeypatch):
     monkeypatch.setattr(interview_route, "get_user_interviews", AsyncMock(return_value=[_interview()]))
     monkeypatch.setattr(interview_route, "get_completed_confidence_map", AsyncMock(return_value={}))

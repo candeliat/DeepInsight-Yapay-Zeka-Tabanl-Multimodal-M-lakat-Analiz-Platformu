@@ -1,0 +1,74 @@
+# Web (Next.js) ve mobil (Expo web) uçtan uca testleri + tür denetimi.
+# Backend testlerde taklit edildiği için (e2e/fixtures) gizli anahtar, veritabanı ya da LLM gerekmez.
+name: E2E testleri
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: "true"
+      # e2e/.npmrc yerel makinede önbelleği D:'ye yönlendirir; CI'da ortam değişkeni onu ezer.
+      npm_config_cache: /home/runner/.npm
+      # Ön yüzler taklit backend'in dinlendiği adrese (:8123) istek atar.
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:8123
+      EXPO_PUBLIC_API_URL: http://localhost:8123
+      NEXT_TELEMETRY_DISABLED: "1"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            dashboard/package-lock.json
+            mobile/package-lock.json
+            e2e/package-lock.json
+
+      - name: Bağımlılıklar
+        run: |
+          npm ci --prefix dashboard
+          npm ci --prefix mobile
+          npm ci --prefix e2e
+
+      - name: Tür denetimi
+        run: |
+          (cd dashboard && npx tsc --noEmit)
+          (cd mobile && npx tsc --noEmit)
+          (cd e2e && npx tsc --noEmit)
+
+      # Kurulu Google Chrome kullanılır (playwright.config.ts: channel 'chrome'); runner'da yoksa kurulur.
+      - name: Chrome
+        working-directory: e2e
+        run: command -v google-chrome || npx playwright install --with-deps chrome
+
+      # Geliştirme sunucularını Playwright başlatır (webServer); ilk derleme yavaş olduğu için CI'da 1 tekrar var.
+      - name: E2E testleri
+        working-directory: e2e
+        run: npx playwright test
+
+      - name: Test raporu
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/.out/report
+            e2e/.out/results
+          retention-days: 7
+          if-no-files-found: ignore

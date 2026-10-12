@@ -16,7 +16,14 @@ logger = logging.getLogger(__name__)
 _DIFFICULTY_RANK = {"JUNIOR": 0, "ORTA": 1, "UZMAN": 2}
 
 
-async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], size: int) -> List[Dict[str, Any]]:
+async def fetch_question_pool(
+    role: str,
+    topic: str,
+    difficulty: Optional[str],
+    size: int,
+    org_id: Optional[str] = None,
+    skills_hint: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
     """
     Mülakat başında (yalnızca `/start`'ta) BİR KEZ çağrılır: role+topic
     (+ difficulty) için soru bankasından en iyi `size` adet eşleşen soruyu
@@ -47,6 +54,9 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
     # serbest metin olduğu için SQL tarafında tam eşleşme değil, semantik
     # benzerlik aranır (bkz. sql/001_question_bank.sql'deki match_questions).
     query_text = f"{role} pozisyonu için {topic} konusunda teknik mülakat sorusu"
+    if skills_hint:
+        # Adayın CV'sindeki öne çıkan beceriler aramayı o yöne çeker.
+        query_text += f". Adayın becerileri: {', '.join(skills_hint[:8])}"
 
     rpc_name = "match_questions"
     try:
@@ -71,15 +81,18 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
     # en iyi" bir aday havuzu olmaz.
     candidate_count = min(size * settings.QUESTION_BANK_CANDIDATE_POOL_MULTIPLIER, 30)
 
+    rpc_params: Dict[str, Any] = {
+        "query_embedding": query_embedding,
+        "filter_difficulty": difficulty,
+        "match_count": candidate_count,
+    }
+    if org_id:
+        # Yalnızca kurum bağlamında gönderilir: verilmezse yalnızca global
+        # sorular aranır (SQL tarafında filter_org_id default null).
+        rpc_params["filter_org_id"] = org_id
+
     try:
-        result = supabase.rpc(
-            rpc_name,
-            {
-                "query_embedding": query_embedding,
-                "filter_difficulty": difficulty,
-                "match_count": candidate_count,
-            },
-        ).execute()
+        result = supabase.rpc(rpc_name, rpc_params).execute()
     except Exception:
         logger.warning(
             "[question_bank_service] %s RPC başarısız (role=%s, topic=%s) — banka bu mülakat için atlanıyor.",
@@ -93,7 +106,7 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
         if row.get("similarity") is not None and row["similarity"] >= settings.QUESTION_BANK_MIN_SIMILARITY
     ]
     ranked_rows = _rank_with_exposure_penalty(relevant_rows)
-    selected_rows = await _pack_pool_with_family_chains(ranked_rows, size)
+    selected_rows = await _pack_pool_with_family_chains(ranked_rows, size, org_id)
 
     pool = [
         {"id": row["id"], "question_text": row["question_text"], "similarity": row.get("similarity")}
@@ -114,7 +127,9 @@ async def fetch_question_pool(role: str, topic: str, difficulty: Optional[str], 
     return pool
 
 
-async def _pack_pool_with_family_chains(ranked_rows: List[Dict[str, Any]], size: int) -> List[Dict[str, Any]]:
+async def _pack_pool_with_family_chains(
+    ranked_rows: List[Dict[str, Any]], size: int, org_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """
     Sıralanmış adaylardan `size` uzunluğunda nihai havuzu oluşturur. Bir aday
     bir aileye (`family_id`) aitse ve o aile bu havuzda daha önce hiç
@@ -142,7 +157,7 @@ async def _pack_pool_with_family_chains(ranked_rows: List[Dict[str, Any]], size:
         family_id = row.get("family_id")
         if family_id and family_id not in used_family_ids:
             used_family_ids.add(family_id)
-            chain = await _fetch_family_chain(family_id, start_difficulty=row.get("difficulty"))
+            chain = await _fetch_family_chain(family_id, start_difficulty=row.get("difficulty"), org_id=org_id)
             if not chain:
                 # Zincir çekilemedi/boş döndü — en azından eşleşen tek soruyu kullan.
                 chain = [row]
@@ -158,7 +173,9 @@ async def _pack_pool_with_family_chains(ranked_rows: List[Dict[str, Any]], size:
     return selected
 
 
-async def _fetch_family_chain(family_id: str, start_difficulty: Optional[str]) -> List[Dict[str, Any]]:
+async def _fetch_family_chain(
+    family_id: str, start_difficulty: Optional[str], org_id: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """
     Bir ailenin, verilen başlangıç zorluğundan (dahil) daha zor ya da eşit
     olan varyantlarını zorluk ARTAN sırada döner. Embedding sıralamasından
@@ -173,7 +190,7 @@ async def _fetch_family_chain(family_id: str, start_difficulty: Optional[str]) -
     try:
         result = (
             supabase.table("question_bank")
-            .select("id, question_text, difficulty")
+            .select("id, question_text, difficulty, org_id")
             .eq("family_id", family_id)
             .eq("is_active", True)
             .execute()
@@ -182,7 +199,8 @@ async def _fetch_family_chain(family_id: str, start_difficulty: Optional[str]) -
         logger.warning("[question_bank_service] Aile zinciri çekilemedi (family_id=%s).", family_id, exc_info=True)
         return []
 
-    rows = result.data or []
+    # Kapsam sızıntısını önlemek için: yalnızca global ya da isteyen kurumun soruları.
+    rows = [r for r in (result.data or []) if r.get("org_id") in (None, org_id)]
     start_rank = _DIFFICULTY_RANK.get(start_difficulty, 0)
     chain = [row for row in rows if _DIFFICULTY_RANK.get(row.get("difficulty"), 0) >= start_rank]
     chain.sort(key=lambda row: _DIFFICULTY_RANK.get(row.get("difficulty"), 0))

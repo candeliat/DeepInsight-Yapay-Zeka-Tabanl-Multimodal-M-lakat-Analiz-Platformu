@@ -3,26 +3,26 @@
 import React, { useEffect, useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { chatService } from "@/services/chatService";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import {
-  User,
   Mail,
   Briefcase,
   Calendar,
   Trophy,
   ClipboardList,
   LogOut,
-  Shield,
   Loader2
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { DataRightsCard } from "@/components/profile/DataRightsCard";
+import { PasswordCard, ProfileEditCard } from "@/components/profile/ProfileEditCard";
 
 export default function ProfilePage() {
   const { user, logout } = useAuthStore();
   const router = useRouter();
-  const [interviews, setInterviews] = useState<any[]>([]);
+  const [interviews, setInterviews] = useState<{ status: string; average_score?: number | null; created_at: string }[]>([]);
   const [loadingStats, setLoadingStats] = useState(true);
 
   useEffect(() => {
@@ -86,7 +86,6 @@ export default function ProfilePage() {
   const lastName = user?.user_metadata?.last_name || "";
   const targetPosition = user?.user_metadata?.target || "Belirtilmemiş";
 
-  const fieldClass = "mt-1.5 text-base font-semibold text-foreground border border-border bg-muted rounded-xl px-3 py-2";
   const labelClass = "text-xs font-semibold text-muted-foreground uppercase tracking-wider";
 
   return (
@@ -116,10 +115,11 @@ export default function ProfilePage() {
                 <Mail className="w-4 h-4" />
                 {user.email}
               </p>
+              <p className="text-xs text-muted-foreground mt-1">Üyelik: {formatDate(user.created_at)}</p>
 
               <div className="mt-4 flex flex-col gap-2 w-full justify-center items-center">
                 <Badge variant="default" className="w-fit">
-                  {user.user_metadata.role === 'admin' ? 'Yönetici' : 'Aday'}
+                  {user.app_metadata?.role === 'admin' ? 'Platform yöneticisi' : 'Aday'}
                 </Badge>
                 {user.user_metadata.target && (
                   <Badge variant="outline" className="w-fit flex items-center gap-1">
@@ -173,7 +173,7 @@ export default function ProfilePage() {
                       Ort. Başarı Puanı
                     </p>
                     <p className="font-serif text-2xl text-foreground">
-                      {loadingStats ? "-" : `%${avgScore}`}
+                      {loadingStats ? "-" : completedInterviews.length ? avgScore : "–"}
                     </p>
                   </div>
                   <div className="p-2 bg-success/10 rounded-xl text-success">
@@ -202,59 +202,11 @@ export default function ProfilePage() {
             </Card>
           </div>
 
-          {/* Kişisel Bilgiler Detay */}
-          <Card>
-            <CardHeader className="border-b border-border pb-4">
-              <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-                <User className="w-5 h-5 text-primary" />
-                Kişisel Bilgiler
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className={labelClass}>Ad</label>
-                  <p className={fieldClass}>{firstName || "-"}</p>
-                </div>
-                <div>
-                  <label className={labelClass}>Soyad</label>
-                  <p className={fieldClass}>{lastName || "-"}</p>
-                </div>
-                <div>
-                  <label className={labelClass}>Hedef Pozisyon</label>
-                  <p className={fieldClass}>{targetPosition}</p>
-                </div>
-                <div>
-                  <label className={labelClass}>E-posta Adresi</label>
-                  <p className={fieldClass}>{user.email || "-"}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ProfileEditCard />
 
-          {/* Hesap Bilgileri Detay */}
-          <Card>
-            <CardHeader className="border-b border-border pb-4">
-              <CardTitle className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Shield className="w-5 h-5 text-primary" />
-                Hesap Bilgileri
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className={labelClass}>Kayıt Tarihi</label>
-                  <p className={fieldClass}>{formatDate(user.created_at)}</p>
-                </div>
-                <div>
-                  <label className={labelClass}>Hesap Kimliği (UUID)</label>
-                  <p className={`${fieldClass} text-sm font-mono truncate`} title={user.id}>
-                    {user.id}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <PasswordCard />
+
+          <DataRightsCard email={user.email} />
         </div>
       </div>
     </div>

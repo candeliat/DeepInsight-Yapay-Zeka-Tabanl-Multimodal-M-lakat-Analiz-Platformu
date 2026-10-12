@@ -1,0 +1,418 @@
+{
+  "corpus_size": 27,
+  "query_count": 20,
+  "models": {
+    "api": {
+      "name": "nvidia/nemotron-3-embed-1b (API)",
+      "failures": 0,
+      "mean_latency_s": 0.22,
+      "median_latency_s": 0.156,
+      "overall": {
+        "top1": 1.0,
+        "p_at_5": 0.77,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.914
+      },
+      "by_style": {
+        "beceri": {
+          "top1": 1.0,
+          "p_at_5": 0.75,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.863
+        },
+        "ingilizce": {
+          "top1": 1.0,
+          "p_at_5": 0.8,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.925
+        },
+        "kisa": {
+          "top1": 1.0,
+          "p_at_5": 0.75,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.925
+        },
+        "uretim_sablonu": {
+          "top1": 1.0,
+          "p_at_5": 0.8,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.934
+        },
+        "yeniden_ifade": {
+          "top1": 1.0,
+          "p_at_5": 0.75,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.923
+        }
+      },
+      "queries": [
+        {
+          "topic": "Python",
+          "style": "uretim_sablonu",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9363792118010481
+        },
+        {
+          "topic": "Python",
+          "style": "kisa",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.933745776545611
+        },
+        {
+          "topic": "Python",
+          "style": "yeniden_ifade",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9363792118010481
+        },
+        {
+          "topic": "Python",
+          "style": "ingilizce",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8701249883466592
+        },
+        {
+          "topic": "Python",
+          "style": "beceri",
+          "top1": 1.0,
+          "p_at_5": 0.8,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.6470538417566039
+        },
+        {
+          "topic": "JavaScript",
+          "style": "uretim_sablonu",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8318724637288826
+        },
+        {
+          "topic": "JavaScript",
+          "style": "kisa",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8318724637288826
+        },
+        {
+          "topic": "JavaScript",
+          "style": "yeniden_ifade",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8318724637288826
+        },
+        {
+          "topic": "JavaScript",
+          "style": "ingilizce",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8318724637288826
+        },
+        {
+          "topic": "JavaScript",
+          "style": "beceri",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8048099750039491
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "uretim_sablonu",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9674679834891693
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "kisa",
+          "top1": 1.0,
+          "p_at_5": 0.4,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9325210919548239
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "yeniden_ifade",
+          "top1": 1.0,
+          "p_at_5": 0.4,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9217868789962071
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "ingilizce",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "beceri",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "uretim_sablonu",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "kisa",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "yeniden_ifade",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "ingilizce",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "beceri",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        }
+      ]
+    },
+    "local": {
+      "name": "intfloat/multilingual-e5-base (yerel)",
+      "failures": 0,
+      "mean_latency_s": 4.502,
+      "median_latency_s": 0.045,
+      "overall": {
+        "top1": 1.0,
+        "p_at_5": 0.7,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.877
+      },
+      "by_style": {
+        "beceri": {
+          "top1": 1.0,
+          "p_at_5": 0.5,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.747
+        },
+        "ingilizce": {
+          "top1": 1.0,
+          "p_at_5": 0.65,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.865
+        },
+        "kisa": {
+          "top1": 1.0,
+          "p_at_5": 0.8,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.955
+        },
+        "uretim_sablonu": {
+          "top1": 1.0,
+          "p_at_5": 0.75,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.887
+        },
+        "yeniden_ifade": {
+          "top1": 1.0,
+          "p_at_5": 0.8,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.931
+        }
+      },
+      "queries": [
+        {
+          "topic": "Python",
+          "style": "uretim_sablonu",
+          "top1": 1.0,
+          "p_at_5": 0.8,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.7849818707050382
+        },
+        {
+          "topic": "Python",
+          "style": "kisa",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8669479898642709
+        },
+        {
+          "topic": "Python",
+          "style": "yeniden_ifade",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8669479898642709
+        },
+        {
+          "topic": "Python",
+          "style": "ingilizce",
+          "top1": 1.0,
+          "p_at_5": 0.4,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.5868720866710773
+        },
+        {
+          "topic": "Python",
+          "style": "beceri",
+          "top1": 1.0,
+          "p_at_5": 0.2,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.4412851793128928
+        },
+        {
+          "topic": "JavaScript",
+          "style": "uretim_sablonu",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8318724637288826
+        },
+        {
+          "topic": "JavaScript",
+          "style": "kisa",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9550236580992475
+        },
+        {
+          "topic": "JavaScript",
+          "style": "yeniden_ifade",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.961999147059583
+        },
+        {
+          "topic": "JavaScript",
+          "style": "ingilizce",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9279611693743142
+        },
+        {
+          "topic": "JavaScript",
+          "style": "beceri",
+          "top1": 1.0,
+          "p_at_5": 0.4,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.8262373741149447
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "uretim_sablonu",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "kisa",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "yeniden_ifade",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9674679834891693
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "ingilizce",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9469024295259745
+        },
+        {
+          "topic": "Makine Öğrenmesi",
+          "style": "beceri",
+          "top1": 1.0,
+          "p_at_5": 0.6,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "uretim_sablonu",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9292442392789195
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "kisa",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9971876401972103
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "yeniden_ifade",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.9292442392789195
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "ingilizce",
+          "top1": 1.0,
+          "p_at_5": 1.0,
+          "mrr": 1.0,
+          "ndcg_at_10": 1.0
+        },
+        {
+          "topic": "React ve Modern Web Geliştirme",
+          "style": "beceri",
+          "top1": 1.0,
+          "p_at_5": 0.8,
+          "mrr": 1.0,
+          "ndcg_at_10": 0.7217913362056995
+        }
+      ]
+    }
+  }
+}

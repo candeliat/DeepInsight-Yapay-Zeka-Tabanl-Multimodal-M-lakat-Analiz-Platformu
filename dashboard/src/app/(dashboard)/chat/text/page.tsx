@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { Suspense, useState, useRef, useEffect } from "react";
 import {
   Send,
   Loader2,
@@ -11,9 +11,20 @@ import {
   MessageSquare,
   ArrowRight,
   KeyRound,
+  FileText,
+  Briefcase,
+  ClipboardList,
 } from "lucide-react";
+import { assignmentService, MyAssignment } from "@/services/assignmentService";
+import { pilotService, PilotStatus } from "@/services/pilotService";
+import { PostInterviewSurvey } from "@/components/pilot/PostInterviewSurvey";
 import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { cvService, CVDetail, CVItem } from "@/services/cvService";
+import { jobService, JobDetail, JobItem } from "@/services/jobService";
+import { useAuthStore } from "@/store/useAuthStore";
+import { orgService, MyOrganization } from "@/services/orgService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -26,7 +37,27 @@ type TranscriptMessage = {
 };
 
 export default function TextInterviewPage() {
+  // useSearchParams bir Suspense sınırı gerektirir.
+  return (
+    <Suspense fallback={null}>
+      <TextInterviewContent />
+    </Suspense>
+  );
+}
+
+function TextInterviewContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const cvId = searchParams.get("cv");
+  const jobId = searchParams.get("job");
+  // "Pratik yap" (Gelişimim sayfası) gibi bağlantılardan gelen hazır ayarlar.
+  const roleParam = searchParams.get("role");
+  const topicParam = searchParams.get("topic");
+  const difficultyParam = searchParams.get("difficulty");
+  const assignmentParam = searchParams.get("assignment");
+  // Yarıda kalmış bir mülakata kaldığı yerden devam (?resume=<id>).
+  const resumeParam = searchParams.get("resume");
+  const { user } = useAuthStore();
 
   const [currentState, setCurrentState] = useState<InterviewState>("SETUP");
 
@@ -35,12 +66,32 @@ export default function TextInterviewPage() {
   const [topic, setTopic] = useState("React ve Modern Web Geliştirme");
   const [difficulty, setDifficulty] = useState("ORTA");
 
+  // CV'ye özel mülakat (opsiyonel, ?cv=<id>)
+  const [cv, setCv] = useState<CVDetail | null>(null);
+  // İlana göre mülakat (opsiyonel, ?job=<id>)
+  const [job, setJob] = useState<JobDetail | null>(null);
+  // Kurum bağlamı (opsiyonel): varsayılan bireysel — mülakatın kuruma görünmesi bilinçli bir seçim olmalı.
+  const [orgs, setOrgs] = useState<MyOrganization[]>([]);
+  const [orgId, setOrgId] = useState("");
+  // Kurum ödevi (opsiyonel, ?assignment=<id>): rol/konu/zorluk ve kurum ödevden gelir, değiştirilemez.
+  const [assignment, setAssignment] = useState<MyAssignment | null>(null);
+  const [startError, setStartError] = useState<string | null>(null);
+  // Kurulumdaki CV / ilan seçicileri için listeler (seçim URL parametresine yazılır).
+  const [myCvs, setMyCvs] = useState<CVItem[]>([]);
+  const [myJobs, setMyJobs] = useState<JobItem[]>([]);
+  const [resuming, setResuming] = useState(!!resumeParam);
+  // Mülakat sırasındaki hatalar alert() yerine satır içinde; bitirme onayı da satır içinde.
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [confirmEnd, setConfirmEnd] = useState(false);
+
   // Mülakat State
   const [interviewId, setInterviewId] = useState("");
   const [messages, setMessages] = useState<TranscriptMessage[]>([]);
   const [userAnswer, setUserAnswer] = useState("");
   const [isThinking, setIsThinking] = useState(false);
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
+  // Pilot katılımcısıysa sonuç ekranında kısa mülakat anketi gösterilir.
+  const [pilot, setPilot] = useState<PilotStatus | null>(null);
 
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -49,6 +100,123 @@ export default function TextInterviewPage() {
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
+
+  useEffect(() => {
+    orgService.myOrganizations().then(setOrgs).catch(() => setOrgs([]));
+    cvService.listCvs().then(setMyCvs).catch(() => setMyCvs([]));
+    jobService.listJobs().then(setMyJobs).catch(() => setMyJobs([]));
+  }, []);
+
+  // Profildeki hedef pozisyon, başka bir öneri yoksa rolü önceden doldurur.
+  const target = user?.user_metadata?.target as string | undefined;
+  useEffect(() => {
+    if (target && !roleParam && !cvId && !jobId && !assignmentParam && !resumeParam) setRole(target.slice(0, 80));
+  }, [target, roleParam, cvId, jobId, assignmentParam, resumeParam]);
+
+  // Kaldığı yerden devam: geçmişi yükle ve doğrudan sohbet ekranına geç.
+  useEffect(() => {
+    if (!resumeParam) return;
+    let cancelled = false;
+    chatService
+      .getInterviewDetail(resumeParam)
+      .then((detail) => {
+        if (cancelled) return;
+        if (detail.status === "completed") {
+          router.replace(`/interviews/${resumeParam}`);
+          return;
+        }
+        type Msg = { role: string; content: string };
+        const history = ((detail.messages ?? []) as Msg[]).filter(
+          (m, i) => !(i === 0 && m.role === "user" && m.content === "Mülakatı başlat."),
+        );
+        setRole(detail.role);
+        setTopic(detail.topic);
+        if (detail.difficulty) setDifficulty(detail.difficulty);
+        setInterviewId(resumeParam);
+        setMessages(history.map((m) => ({ role: m.role === "model" ? "ai" : "user", content: m.content })));
+        setCurrentState("INTERVIEWING");
+      })
+      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "Mülakat yüklenemedi."))
+      .finally(() => !cancelled && setResuming(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeParam, router]);
+
+  // CV / ilan seçimi URL'ye yazılır; mevcut yükleme mantığı (öneriler, bağlam bandı) aynen çalışır.
+  const setContextParam = (key: "cv" | "job", value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    router.replace(`/chat/text${params.toString() ? `?${params}` : ""}`);
+  };
+
+  useEffect(() => {
+    if (roleParam) setRole(roleParam.slice(0, 80));
+    if (topicParam) setTopic(topicParam.slice(0, 120));
+    if (difficultyParam && ["JUNIOR", "ORTA", "UZMAN"].includes(difficultyParam)) setDifficulty(difficultyParam);
+  }, [roleParam, topicParam, difficultyParam]);
+
+  useEffect(() => {
+    if (!assignmentParam) {
+      setAssignment(null);
+      return;
+    }
+    let cancelled = false;
+    assignmentService
+      .mine()
+      .then((items) => {
+        if (cancelled) return;
+        const found = items.find((a) => a.id === assignmentParam);
+        if (!found) {
+          setStartError("Ödev bulunamadı ya da artık bu kurumun öğrencisi değilsiniz.");
+          return;
+        }
+        setAssignment(found);
+        setRole(found.role);
+        setTopic(found.topic);
+        if (found.difficulty) setDifficulty(found.difficulty);
+        setOrgId(found.org_id);
+      })
+      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "Ödev yüklenemedi."));
+    return () => {
+      cancelled = true;
+    };
+  }, [assignmentParam]);
+
+  // CV ve/veya ilan seçilmişse yükle; rol/konu/zorluğu öner (kullanıcı değiştirebilir).
+  // İlan varsa öneriler ilandan, yoksa CV profilinden gelir.
+  useEffect(() => {
+    if (!cvId && !jobId) {
+      setCv(null);
+      setJob(null);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([cvId ? cvService.getCv(cvId) : null, jobId ? jobService.getJob(jobId) : null])
+      .then(([cvDetail, jobDetail]) => {
+        if (cancelled) return;
+        setCv(cvDetail);
+        setJob(jobDetail);
+        const profile = cvDetail?.profile;
+        const reqs = jobDetail?.requirements;
+        const suggestedRole = jobDetail?.title || profile?.target_roles[0];
+        const skills = reqs?.required_skills.length ? reqs.required_skills : profile?.skills ?? [];
+        const suggestedLevel = reqs?.seniority || profile?.seniority;
+        if (suggestedRole) setRole(suggestedRole);
+        if (skills.length > 0) setTopic(skills.slice(0, 2).join(" ve "));
+        if (suggestedLevel) setDifficulty(suggestedLevel);
+      })
+      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "CV veya ilan yüklenemedi."));
+    return () => {
+      cancelled = true;
+    };
+  }, [cvId, jobId]);
+
+  useEffect(() => {
+    if (currentState !== "RESULTS") return;
+    pilotService.status().then(setPilot).catch(() => setPilot(null));
+  }, [currentState]);
 
   useEffect(() => {
     if (currentState === "INTERVIEWING" && !isThinking) {
@@ -62,15 +230,16 @@ export default function TextInterviewPage() {
   const handleStartInterview = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsThinking(true);
+    setStartError(null);
 
     try {
-      const data = await chatService.startInterview(role, topic, difficulty);
+      const data = await chatService.startInterview(role, topic, difficulty, { cvId: cv?.id, jobId: job?.id, orgId: orgId || undefined, assignmentId: assignment?.id });
       setInterviewId(data.interview_id);
       setMessages([{ role: "ai", content: data.first_message }]);
       setCurrentState("INTERVIEWING");
     } catch (error) {
       console.error("Mülakat başlatılamadı:", error);
-      alert("Mülakat başlatılırken bir hata oluştu.");
+      setStartError(error instanceof Error ? error.message : "Mülakat başlatılırken bir hata oluştu.");
     } finally {
       setIsThinking(false);
     }
@@ -81,6 +250,7 @@ export default function TextInterviewPage() {
 
     const currentAnswer = userAnswer.trim();
     setUserAnswer("");
+    setChatError(null);
     setIsThinking(true);
     setMessages((prev) => [...prev, { role: "user", content: currentAnswer }, { role: "ai", content: "" }]);
 
@@ -104,22 +274,33 @@ export default function TextInterviewPage() {
         },
         onError: (detail, partialSaved) => {
           console.error("Stream hatası:", detail, "kısmi metin kaydedildi mi:", partialSaved);
-          alert(
+          if (!partialSaved) restoreAnswer(currentAnswer, streamedText);
+          setChatError(
             partialSaved
               ? "Yanıt üretimi yarıda kesildi, ama o ana kadarki kısım kaydedildi. Lütfen tekrar deneyin."
-              : "Bağlantı hatası oluştu. Lütfen tekrar deneyin."
+              : "Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz."
           );
         },
       });
     } catch (error) {
       console.error("Cevap gönderilemedi:", error);
-      alert("Bağlantı hatası oluştu.");
+      restoreAnswer(currentAnswer, streamedText);
+      setChatError("Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz.");
     } finally {
       setIsThinking(false);
     }
   };
 
+  // Gönderim başarısızsa cevap kaybolmasın: eklenen iki baloncuk geri alınır, metin kutuya döner.
+  const restoreAnswer = (answer: string, streamed: string) => {
+    if (streamed) return;
+    setMessages((prev) => prev.slice(0, -2));
+    setUserAnswer(answer);
+  };
+
   const handleEndInterviewManual = async () => {
+    setConfirmEnd(false);
+    setChatError(null);
     setIsThinking(true);
     try {
       const response = await chatService.finishInterviewEarly(interviewId);
@@ -127,7 +308,7 @@ export default function TextInterviewPage() {
       setCurrentState("RESULTS");
     } catch (e) {
       console.error("Mülakatı bitirme hatası:", e);
-      alert("Mülakat sonlandırılamadı.");
+      setChatError("Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.");
     } finally {
       setIsThinking(false);
     }
@@ -137,9 +318,17 @@ export default function TextInterviewPage() {
   // EKRANLAR (RENDER)
   // ----------------------------------------------------------------------
 
+  if (currentState === "SETUP" && resuming) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center text-muted-foreground">
+        <Loader2 className="w-6 h-6 animate-spin" />
+      </div>
+    );
+  }
+
   if (currentState === "SETUP") {
     return (
-      <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex flex-col min-h-[calc(100vh-8rem)] items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
         <div className="max-w-md w-full bg-card border border-border rounded-3xl shadow-lg p-8 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-black via-[#00687a] to-[#57dffe]"></div>
 
@@ -153,6 +342,45 @@ export default function TextInterviewPage() {
             </p>
           </div>
 
+          {assignment && (
+            <div className="mb-6 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+              <ClipboardList className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="text-xs flex-1 min-w-0">
+                <p className="font-bold text-foreground">Ödev: {assignment.title}</p>
+                <p className="text-muted-foreground">
+                  {assignment.org_name ?? "Kurum"} · rol, konu ve zorluk eğitmen tarafından belirlendi
+                </p>
+                {assignment.instructions && <p className="text-foreground mt-1.5 whitespace-pre-wrap">{assignment.instructions}</p>}
+              </div>
+            </div>
+          )}
+
+          {job && (
+            <div className="mb-3 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+              <Briefcase className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="text-xs flex-1 min-w-0">
+                <p className="font-bold text-foreground">Bu ilana göre mülakat</p>
+                <p className="text-muted-foreground truncate">{[job.title, job.company].filter(Boolean).join(" · ")}</p>
+              </div>
+            </div>
+          )}
+
+          {cv && (
+            <div className="mb-6 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+              <FileText className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="text-xs flex-1 min-w-0">
+                <p className="font-bold text-foreground">CV&apos;nize göre kişiselleştirilecek</p>
+                <p className="text-muted-foreground truncate">{cv.original_filename}</p>
+                {!cv.profile && (
+                  <p className="text-warning mt-1">
+                    Bu CV henüz analiz edilmemiş. <Link href="/cv" className="underline font-semibold">CV sayfasında analiz edin.</Link>
+                  </p>
+                )}
+              </div>
+              <Link href="/chat/text" className="text-[11px] text-muted-foreground underline shrink-0">CV&apos;siz devam et</Link>
+            </div>
+          )}
+
           <form onSubmit={handleStartInterview} className="space-y-6">
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
@@ -161,6 +389,7 @@ export default function TextInterviewPage() {
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
                 placeholder="Örn: Yazılım Mühendisi"
+                readOnly={!!assignment}
                 required
               />
             </div>
@@ -172,6 +401,7 @@ export default function TextInterviewPage() {
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
                 placeholder="Örn: React ve Modern Web"
+                readOnly={!!assignment}
                 required
               />
             </div>
@@ -184,7 +414,8 @@ export default function TextInterviewPage() {
                     key={level}
                     type="button"
                     onClick={() => setDifficulty(level)}
-                    className={`flex-1 py-3 rounded-xl border-2 font-bold text-xs tracking-wider transition-all cursor-pointer ${
+                    disabled={!!assignment && difficulty !== level}
+                    className={`flex-1 py-3 rounded-xl border-2 font-bold text-xs tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                       difficulty === level
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-border hover:bg-muted text-muted-foreground"
@@ -196,10 +427,74 @@ export default function TextInterviewPage() {
               </div>
             </div>
 
+            {!assignment && (myCvs.length > 0 || myJobs.length > 0) && (
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Kişiselleştir (opsiyonel)</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {myCvs.length > 0 && (
+                    <select
+                      aria-label="CV'ye göre kişiselleştir"
+                      value={cvId ?? ""}
+                      onChange={(e) => setContextParam("cv", e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                    >
+                      <option value="">CV kullanma</option>
+                      {myCvs.map((c) => (
+                        <option key={c.id} value={c.id}>CV: {c.original_filename}</option>
+                      ))}
+                    </select>
+                  )}
+                  {myJobs.length > 0 && (
+                    <select
+                      aria-label="İlana göre mülakat"
+                      value={jobId ?? ""}
+                      onChange={(e) => setContextParam("job", e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                    >
+                      <option value="">İlan seçme</option>
+                      {myJobs.map((j) => (
+                        <option key={j.id} value={j.id}>İlan: {[j.title, j.company].filter(Boolean).join(" · ") || "Başlıksız"}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground ml-1">Seçerseniz sorular CV&apos;nize ve/veya ilanın gereksinimlerine göre uyarlanır.</p>
+              </div>
+            )}
+
+            {orgs.length > 0 && !assignment && (
+              <div className="space-y-2">
+                <label htmlFor="org-select" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Mülakat bağlamı</label>
+                <select
+                  id="org-select"
+                  value={orgId}
+                  onChange={(e) => setOrgId(e.target.value)}
+                  className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                >
+                  <option value="">Bireysel (kuruma görünmez)</option>
+                  {orgs.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+                {orgId && (
+                  <p className="text-[11px] text-muted-foreground ml-1">
+                    Bu mülakat kurumun kotasından düşer ve kurumun soru bankası kullanılır. Eğitmenler katılımınızı görür;
+                    skorlarınızı yalnızca &quot;Kurumlarım&quot; sayfasından paylaşım izni verdiyseniz görür.
+                  </p>
+                )}
+              </div>
+            )}
+
             <div className="flex items-center gap-2 bg-muted border border-border p-4 rounded-xl text-xs text-muted-foreground font-semibold mb-2">
               <KeyRound className="w-5 h-5 text-primary shrink-0" />
               <span>Kamera ve mikrofon gerekmez — mülakat tamamen yazışarak ilerler.</span>
             </div>
+
+            {startError && (
+              <p role="alert" className="text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-3">
+                {startError}
+              </p>
+            )}
 
             <Button type="submit" size="lg" disabled={isThinking} className="w-full">
               {isThinking ? (
@@ -228,13 +523,29 @@ export default function TextInterviewPage() {
             </span>
           </div>
 
-          <button
-            onClick={handleEndInterviewManual}
-            disabled={isThinking}
-            className="px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50 shrink-0"
-          >
-            Mülakatı Bitir
-          </button>
+          {confirmEnd ? (
+            <div className="flex items-center gap-2 shrink-0" role="group" aria-label="Mülakatı bitirme onayı">
+              <span className="hidden sm:inline text-xs text-muted-foreground">Şimdiye kadarki cevaplarla değerlendirilsin mi?</span>
+              <button
+                onClick={handleEndInterviewManual}
+                disabled={isThinking}
+                className="px-3 py-2 bg-destructive text-white rounded-xl font-semibold text-xs disabled:opacity-50"
+              >
+                Bitir
+              </button>
+              <button onClick={() => setConfirmEnd(false)} className="px-3 py-2 bg-background border border-border rounded-xl font-semibold text-xs">
+                Vazgeç
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmEnd(true)}
+              disabled={isThinking}
+              className="px-4 py-2 bg-destructive/10 text-destructive hover:bg-destructive/15 rounded-xl font-semibold text-xs border border-destructive/20 transition-colors shadow-sm disabled:opacity-50 shrink-0"
+            >
+              Mülakatı Bitir
+            </button>
+          )}
         </div>
 
         {/* Orta Kısım: Transkript */}
@@ -272,6 +583,11 @@ export default function TextInterviewPage() {
 
         {/* Alt Kısım: Cevap Girişi */}
         <div className="p-6 bg-background/50 border-t border-border">
+          {chatError && (
+            <p role="alert" className="max-w-2xl mx-auto mb-3 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-2.5">
+              {chatError}
+            </p>
+          )}
           <div className="max-w-2xl mx-auto flex items-end gap-3">
             <div className="relative flex-1">
               <Textarea
@@ -294,6 +610,7 @@ export default function TextInterviewPage() {
             <button
               onClick={handleSendAnswer}
               disabled={!userAnswer.trim() || isThinking}
+              aria-label="Cevabı gönder"
               className="w-14 h-[56px] rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 shadow-md"
             >
               {isThinking ? (
@@ -339,6 +656,12 @@ export default function TextInterviewPage() {
               {evaluation.feedback}
             </p>
           </div>
+
+          {pilot?.consent && (
+            <div className="mt-6">
+              <PostInterviewSurvey interviewId={interviewId} items={pilot.post_items} />
+            </div>
+          )}
 
           <div className="mt-8 flex flex-col sm:flex-row justify-center items-center gap-4">
             <Button variant="outline" onClick={() => { setCurrentState("SETUP"); setMessages([]); setEvaluation(null); }} className="w-full sm:w-auto">

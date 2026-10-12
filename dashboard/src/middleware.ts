@@ -12,7 +12,11 @@ export function middleware(request: NextRequest) {
   // Public paths or Static assets that shouldn't be blocked
   const isPublicAsset = pathname.startsWith('/_next') || pathname.startsWith('/favicon.ico') || pathname.startsWith('/api');
 
-  if (isPublicAsset) {
+  // Oturum olsa da olmasa da açılabilen sayfalar: aydınlatma metni ve şifre sıfırlama
+  // (sıfırlama bağlantısı e-postadan açılır; kullanıcı başka bir oturumdayken de çalışmalı).
+  const isOpenPage = ['/gizlilik', '/forgot-password', '/reset-password'].some((p) => pathname.startsWith(p));
+
+  if (isPublicAsset || isOpenPage) {
     return NextResponse.next();
   }
 

@@ -31,9 +31,9 @@ Backend sunucusunu yerel ortamda çalıştırmak için aşağıdaki adımları u
    ```env
    SUPABASE_URL=https://your-supabase-project.supabase.co
    # ÖNEMLİ: Bu MUTLAKA service_role (secret) key olmalı, anon/publishable key DEĞİL.
-   # interview_service.py mesaj kayıtlarında RLS'i bilinçli olarak bypass eder
-   # (bkz. save_message/get_interview_history) — anon key ile "row violates
-   # row-level security policy for table interview_messages" hatası alırsınız.
+   # Tüm tablolarda RLS açık ve politika yok (bkz. sql/014): veritabanına yalnızca
+   # backend erişir, yetki kontrolü route katmanındadır (docs/SECURITY_AND_KVKK.md).
+   # Bu anahtar istemcilere (dashboard/mobil) asla verilmemelidir.
    # Supabase panelinde: Project Settings → API → "service_role" (secret).
    SUPABASE_KEY=your-supabase-service-role-key
 
@@ -71,11 +71,14 @@ Backend sunucusunu yerel ortamda çalıştırmak için aşağıdaki adımları u
 ## 📂 Klasör Yapısı
 
 *   `app/main.py`: FastAPI uygulamasının başlatıldığı, CORS ayarlarının yapıldığı ve yönlendiricilerin (routers) dahil edildiği giriş dosyası.
-*   `app/api/routes`: API uç noktalarının (endpoints) tanımlandığı yönlendiriciler:
-    *   `auth.py`: Kullanıcı kimlik doğrulama işlemleri.
-    *   `users.py`: Kullanıcı profil işlemleri.
-    *   `interview.py`: Mülakat oluşturma, başlatma, sohbet (`/chat` ve token-token akan `/chat/stream` — SSE), ses transkripsiyonu işlemleri.
-    *   `analytics.py`: Analiz durumunu ve sonuçlarını getiren uç noktalar.
+*   `app/api/routes`: API uç noktalarının (endpoints) tanımlandığı yönlendiriciler (tam liste: [`docs/API.md`](../docs/API.md)):
+    *   `auth.py`, `users.py`: kimlik doğrulama, token yenileme, profil.
+    *   `interview.py`: mülakat başlatma (CV/ilan/kurum/ödev bağlamıyla), sohbet (`/chat` ve SSE `/chat/stream`), erken bitirme, transkripsiyon.
+    *   `analytics.py`: video/ses analizi başlatma, durum ve sonuçlar.
+    *   `cv.py`, `jobs.py`, `progress.py`: CV/ATS, ilan eşleştirme, gelişim ve PDF rapor.
+    *   `organizations.py`, `assignments.py`: kurumlar, üyeler, gruplar, davetler, kurum soru bankası, ödevler, CSV dışa aktarma.
+    *   `pilot.py`, `account.py`: pilot çalışma (onam, anketler, rapor) ve KVKK veri hakları.
+    *   `question_bank_admin.py`: global soru bankası yönetimi (platform admini).
 *   `app/api/schemas`: API istek ve yanıtlarında veri doğrulama için kullanılan Pydantic şemaları.
 *   `app/core`: Veritabanı (Supabase) ve genel yapılandırma ayarları (`config.py`, `database.py`).
 *   `app/services`: Ana iş mantığını ve AI entegrasyonlarını barındıran servisler:
@@ -94,6 +97,7 @@ Backend sunucusunu yerel ortamda çalıştırmak için aşağıdaki adımları u
     pip install -r requirements-dev.txt
     pytest tests/ -v
     ```
+*   **Akademik ölçüm betikleri** (`scripts/eval/`): embedding karşılaştırması, LLM değerlendirici tutarlılığı, ATS dayanıklılığı — bkz. [`docs/evaluation`](../docs/evaluation/README.md).
 *   **Manuel canlı doğrulama script'leri** (gerçek `.env` + gerçek API çağrısı gerektirir, kota/kredi harcar, pytest'e dahil değildir):
     *   `python check_llm_live.py` — `llm_service`'i gerçek LLM sağlayıcısına karşı çalıştırıp soru üretme + JSON değerlendirme akışını doğrular (Supabase gerekmez).
     *   `python check_interview_e2e.py` — çalışan bir sunucuya (`uvicorn app.main:app --port 8123`) karşı kayıt→giriş→5 soruluk mülakat→değerlendirme→kalıcılık akışının tamamını gerçek HTTP istekleriyle test eder.

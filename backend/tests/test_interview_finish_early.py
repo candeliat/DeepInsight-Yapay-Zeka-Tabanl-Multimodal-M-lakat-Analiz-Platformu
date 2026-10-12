@@ -106,7 +106,7 @@ def test_finish_early_returns_403_for_other_users_interview(client, monkeypatch)
         AsyncMock(return_value={"user_id": "someone-else", "role": "Backend Developer", "topic": "Python", "status": "ongoing"}),
     )
     resp = client.post("/api/v1/interview/interview-1/finish")
-    assert resp.status_code == 403
+    assert resp.status_code == 404  # başkasının mülakatı: varlığı sızdırılmaz
 
 
 def test_finish_early_returns_400_when_already_completed(client, monkeypatch):

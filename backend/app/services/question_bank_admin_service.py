@@ -20,7 +20,27 @@ from app.services.local_embedding_service import embed_text_local
 
 logger = logging.getLogger(__name__)
 
-_SELECT_COLUMNS = "id, role, topic, difficulty, question_text, tags, family_id, times_served, is_active, created_at"
+_SELECT_COLUMNS = "id, role, topic, difficulty, question_text, tags, family_id, times_served, is_active, created_at, org_id"
+
+
+def _scope(query, org_id: Optional[str]):
+    """
+    Her sorgu tek bir kapsama sabitlenir: org_id verilirse yalnızca o kurumun
+    soruları, verilmezse yalnızca GLOBAL (org_id null) sorular. Böylece bir
+    kurum başka bir kurumun (ya da global) sorusunu id tahmin ederek bile
+    okuyamaz, değiştiremez, silemez.
+    """
+    return query.eq("org_id", org_id) if org_id else query.is_("org_id", "null")
+
+
+def _assert_family_in_scope(family_id: Optional[str], org_id: Optional[str]) -> None:
+    """Başka bir kapsamdaki (kurum/global) bir aileye soru eklenmesini engeller —
+    aksi halde aile zinciri üzerinden kapsamlar arası sızıntı olurdu."""
+    if not family_id:
+        return
+    members = supabase.table("question_bank").select("org_id").eq("family_id", family_id).execute().data or []
+    if any((m.get("org_id") or None) != (org_id or None) for m in members):
+        raise ValueError("Bu aile bu kapsamda bulunamadı")
 
 
 def _strip_embedding(row: Dict[str, Any]) -> Dict[str, Any]:
@@ -48,12 +68,11 @@ async def _embed_local_best_effort(question_text: str) -> Optional[List[float]]:
         return None
 
 
-async def list_questions() -> List[Dict[str, Any]]:
+async def list_questions(org_id: Optional[str] = None) -> List[Dict[str, Any]]:
     if not supabase:
         return []
     result = (
-        supabase.table("question_bank")
-        .select(_SELECT_COLUMNS)
+        _scope(supabase.table("question_bank").select(_SELECT_COLUMNS), org_id)
         .order("created_at", desc=True)
         .execute()
     )
@@ -68,10 +87,13 @@ async def create_question(
     tags: List[str],
     family_id: Optional[str],
     new_family: bool,
+    org_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     if not supabase:
         raise RuntimeError("Supabase client is not initialized")
 
+    if not new_family:
+        _assert_family_in_scope(family_id, org_id)
     resolved_family_id = str(uuid.uuid4()) if new_family else family_id
 
     # "passage" — bankaya kaydedilen soru metni olarak encode edilir (arama
@@ -92,6 +114,8 @@ async def create_question(
         "embedding": embedding,
         "embedding_local": embedding_local,
     }
+    if org_id:
+        record["org_id"] = org_id
     result = supabase.table("question_bank").insert(record).execute()
     if not result.data:
         raise RuntimeError("Soru eklenemedi")
@@ -101,7 +125,7 @@ async def create_question(
     return full_row.data[0] if full_row.data else _strip_embedding(result.data[0])
 
 
-async def update_question(question_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
+async def update_question(question_id: str, updates: Dict[str, Any], org_id: Optional[str] = None) -> Dict[str, Any]:
     if not supabase:
         raise RuntimeError("Supabase client is not initialized")
 
@@ -117,7 +141,7 @@ async def update_question(question_id: str, updates: Dict[str, Any]) -> Dict[str
         if embedding_local is not None:
             record["embedding_local"] = embedding_local
 
-    result = supabase.table("question_bank").update(record).eq("id", question_id).execute()
+    result = _scope(supabase.table("question_bank").update(record).eq("id", question_id), org_id).execute()
     if not result.data:
         raise ValueError("Soru bulunamadı")
 
@@ -125,10 +149,10 @@ async def update_question(question_id: str, updates: Dict[str, Any]) -> Dict[str
     return full_row.data[0] if full_row.data else _strip_embedding(result.data[0])
 
 
-async def delete_question(question_id: str) -> None:
+async def delete_question(question_id: str, org_id: Optional[str] = None) -> None:
     if not supabase:
         raise RuntimeError("Supabase client is not initialized")
-    supabase.table("question_bank").delete().eq("id", question_id).execute()
+    _scope(supabase.table("question_bank").delete().eq("id", question_id), org_id).execute()
 
 
 async def list_gaps() -> List[Dict[str, Any]]:

@@ -23,7 +23,7 @@ PASSWORD = "TestSifre!2026"
 client = httpx.Client(timeout=90)
 
 print(f"=== 1) Kayıt: {EMAIL} ===")
-r = client.post(f"{BASE}/auth/register", json={"email": EMAIL, "password": PASSWORD, "first_name": "Test", "last_name": "User"})
+r = client.post(f"{BASE}/auth/register", json={"email": EMAIL, "password": PASSWORD, "first_name": "Test", "last_name": "User", "privacy_accepted": True})
 print(r.status_code, r.text[:300])
 
 print("\n=== 2) Giriş ===")

@@ -14,8 +14,10 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
+import { scoreBand } from '../../src/utils/scoreBand';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
+import { ProgressSection } from '../../src/components/ProgressSection';
 
 interface Interview {
   id: string;
@@ -26,15 +28,16 @@ interface Interview {
   technical_score?: number;
   confidence_score?: number;
   vocabulary_score?: number;
+  average_score?: number | null;
   feedback?: string;
 }
 
 function CircularScore({ value }: { value: number }) {
-  const color = value >= 75 ? Colors.secondary : value >= 50 ? '#d97706' : Colors.error;
+  const color = scoreBand(value)?.color ?? Colors.outline;
   return (
     <View style={circleStyles.container}>
       <View style={[circleStyles.ring, { borderColor: color }]}>
-        <Text style={[circleStyles.value, { color }]}>{value}%</Text>
+        <Text style={[circleStyles.value, { color }]}>{value}</Text>
         <Text style={circleStyles.label}>GENEL</Text>
       </View>
     </View>
@@ -61,7 +64,7 @@ function ScoreBar({ label, value, color = Colors.secondary }: { label: string; v
     <View style={{ marginBottom: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
         <Text style={{ fontSize: 12, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface, letterSpacing: 0.3 }}>{label}</Text>
-        <Text style={{ fontSize: 12, fontFamily: FontFamilies.sansBold, color }}>{value}%</Text>
+        <Text style={{ fontSize: 12, fontFamily: FontFamilies.sansBold, color }}>{value}</Text>
       </View>
       <View style={{ height: 8, backgroundColor: Colors.surfaceContainerHigh, borderRadius: 4, overflow: 'hidden' }}>
         <View style={{ height: 8, width: `${value}%`, backgroundColor: color, borderRadius: 4 }} />
@@ -87,7 +90,10 @@ export default function ReportsScreen() {
       const res = await api.get(`/api/v1/interview/me`);
       const data: Interview[] = res.data || [];
       setInterviews(data);
-      if (data.length > 0) setSelected(data[0]);
+      // "Son Mülakat" kartı puanlanmış son mülakatı gösterir; devam eden mülakatın
+      // skorları henüz 0'dır ve "0% Geliştirmeli" gibi yanıltıcı görünür.
+      const lastCompleted = data.find((iv) => iv.status === 'completed');
+      setSelected(lastCompleted ?? null);
     } catch (e) {
       // sessizce geç
     } finally {
@@ -101,12 +107,15 @@ export default function ReportsScreen() {
     fetchHistory();
   };
 
+  // Sunucunun ortalaması (kurum rubriği ağırlıklarını içerir) esas alınır; web ile aynı sayı.
   const avg = (iv: Interview) =>
-    iv.technical_score !== undefined
-      ? Math.round(
-          ((iv.technical_score || 0) + (iv.confidence_score || 0) + (iv.vocabulary_score || 0)) / 3
-        )
-      : null;
+    iv.status !== 'completed'
+      ? null
+      : iv.average_score != null
+        ? Math.round(iv.average_score)
+        : iv.technical_score !== undefined
+          ? Math.round(((iv.technical_score || 0) + (iv.confidence_score || 0) + (iv.vocabulary_score || 0)) / 3)
+          : null;
 
   const formatDate = (str: string) => {
     try {
@@ -177,21 +186,29 @@ export default function ReportsScreen() {
           </View>
         ) : (
           <>
+            <ProgressSection />
+
+            <Text style={styles.sectionTitle}>Son Mülakat</Text>
             {/* Seçili Mülakat - Detay Görünümü */}
+            {!selected && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Henüz puanlanmış bir mülakatınız yok. Başladığınız mülakatı tamamladığınızda sonuç burada görünür.</Text>
+              </View>
+            )}
             {selected && (
               <>
                 {/* Skor + Başarı Durumu Kartı */}
                 <View style={styles.mainScoreCard}>
                   <View style={styles.aiInsightBadge}>
                     <Ionicons name="sparkles" size={12} color={Colors.secondary} />
-                    <Text style={styles.aiInsightText}>YZ ÖNGÖRÜSÜ</Text>
+                    <Text style={styles.aiInsightText}>SON MÜLAKAT</Text>
                   </View>
 
                   <View style={styles.mainScoreContent}>
                     <CircularScore value={avg(selected) || 0} />
                     <View style={styles.mainScoreInfo}>
                       <Text style={styles.mainScoreTitle}>
-                        {(avg(selected) || 0) >= 75 ? 'Güçlü Aday' : (avg(selected) || 0) >= 50 ? 'Gelişiyor' : 'Geliştirmeli'}
+                        {scoreBand(avg(selected) || 0)?.label}
                       </Text>
                       <Text style={styles.mainScoreRole} numberOfLines={2}>
                         {selected.role}
@@ -242,7 +259,7 @@ export default function ReportsScreen() {
                   </View>
                   <TouchableOpacity
                     style={styles.ctaBtn}
-                    onPress={() => router.push('/(tabs)/prepare')}
+                    onPress={() => router.push({ pathname: '/(tabs)/prepare', params: { role: selected.role ?? undefined, topic: selected.topic ?? undefined } })}
                     activeOpacity={0.85}
                   >
                     <Ionicons name="arrow-forward" size={18} color="#fff" />
@@ -316,13 +333,13 @@ export default function ReportsScreen() {
                                 <Text
                                   style={[
                                     styles.historyScore,
-                                    { color: score >= 75 ? Colors.secondary : '#d97706' },
+                                    { color: scoreBand(score)?.color ?? Colors.outline },
                                   ]}
                                 >
-                                  {score}%
+                                  {score}
                                 </Text>
                               ) : (
-                                <Text style={styles.historyPending}>—</Text>
+                                <Text style={styles.historyPending}>{iv.status === 'completed' ? '—' : 'Yarıda kaldı'}</Text>
                               )}
                             </View>
                             <Ionicons

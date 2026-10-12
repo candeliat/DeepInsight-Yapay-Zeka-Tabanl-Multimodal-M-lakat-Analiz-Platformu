@@ -2,66 +2,96 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Video, User, MessageSquare, MessageCircle, Database } from "lucide-react";
+import {
+  LayoutDashboard, Video, User, MessageCircle, Database, FileText, Briefcase, TrendingUp, Building2, ClipboardList,
+  FlaskConical, History, LucideIcon,
+} from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 
-const candidateLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/interviews", label: "Mülakatlarım", icon: Video },
-  { href: "/chat", label: "AI Danışman", icon: MessageSquare },
-  { href: "/chat/text", label: "Yazılı Mülakat", icon: MessageCircle },
-  { href: "/profile", label: "Profil", icon: User },
+type NavLink = { href: string; label: string; icon: LucideIcon };
+
+// Gruplu menü: 11 maddelik düz liste yerine "ne yapmak istiyorum?" sorusuna göre.
+// "AI Danışman" adı bir sohbet asistanı izlenimi veriyordu; sayfa aslında kameralı/sesli mülakat.
+const GROUPS: { title: string; links: NavLink[] }[] = [
+  {
+    title: "Mülakat",
+    links: [
+      { href: "/chat/text", label: "Yazılı Mülakat", icon: MessageCircle },
+      { href: "/chat", label: "Görüntülü Mülakat", icon: Video },
+      { href: "/interviews", label: "Mülakatlarım", icon: History },
+      { href: "/progress", label: "Gelişimim", icon: TrendingUp },
+    ],
+  },
+  {
+    title: "Kariyer",
+    links: [
+      { href: "/cv", label: "CV Analizi", icon: FileText },
+      { href: "/jobs", label: "İlan Eşleştirme", icon: Briefcase },
+    ],
+  },
+  {
+    title: "Kurum",
+    links: [
+      { href: "/assignments", label: "Ödevlerim", icon: ClipboardList },
+      { href: "/organizations", label: "Kurumlarım", icon: Building2 },
+    ],
+  },
+  {
+    title: "Hesap",
+    links: [
+      { href: "/pilot", label: "Pilot Çalışma", icon: FlaskConical },
+      { href: "/profile", label: "Profil", icon: User },
+    ],
+  },
 ];
 
-const adminLinks = [
-  { href: "/question-bank", label: "Soru Bankası", icon: Database },
-];
+const ADMIN_GROUP = { title: "Yönetim", links: [{ href: "/question-bank", label: "Soru Bankası", icon: Database }] };
 
 export default function Sidebar() {
   const { user } = useAuthStore();
   const pathname = usePathname();
-  const displayName = user?.user_metadata?.first_name || "Aday";
   const isAdmin = user?.app_metadata?.role === "admin";
-  const links = isAdmin ? [...candidateLinks, ...adminLinks] : candidateLinks;
+  const groups = isAdmin ? [...GROUPS, ADMIN_GROUP] : GROUPS;
+
+  const linkClass = (active: boolean) =>
+    `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+      active ? "bg-primary/10 text-primary" : "text-foreground hover:bg-muted"
+    }`;
 
   return (
     <aside className="w-64 bg-card border-r border-border h-screen flex flex-col">
       <div className="p-6">
-        <h1 className="font-serif italic text-2xl text-primary flex items-center gap-2">
+        <Link href="/dashboard" className="font-serif italic text-2xl text-primary flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-sans not-italic text-sm font-bold">
             DI
           </div>
           DeepInsight
-        </h1>
+        </Link>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-6">
-        <div>
-          <p className="px-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            {displayName} Paneli
-          </p>
-          <div className="space-y-1">
-            {links.map((link) => {
-              const Icon = link.icon;
-              const isActive = pathname === link.href;
-              return (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-                    isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-foreground hover:bg-muted"
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
-                  {link.label}
-                </Link>
-              );
-            })}
+      <nav className="flex-1 overflow-y-auto px-4 pb-6 space-y-5" aria-label="Ana menü">
+        <Link href="/dashboard" className={linkClass(pathname === "/dashboard")} aria-current={pathname === "/dashboard" ? "page" : undefined}>
+          <LayoutDashboard className={`w-5 h-5 ${pathname === "/dashboard" ? "text-primary" : "text-muted-foreground"}`} />
+          Ana Sayfa
+        </Link>
+        {groups.map((group) => (
+          <div key={group.title}>
+            <p className="px-3 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">{group.title}</p>
+            <div className="space-y-0.5">
+              {group.links.map((link) => {
+                const Icon = link.icon;
+                const isActive = pathname === link.href || (link.href !== "/chat" && pathname.startsWith(`${link.href}/`));
+                return (
+                  <Link key={link.href} href={link.href} className={linkClass(isActive)} aria-current={isActive ? "page" : undefined}>
+                    <Icon className={`w-5 h-5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
+                    {link.label}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      </div>
+        ))}
+      </nav>
     </aside>
   );
 }

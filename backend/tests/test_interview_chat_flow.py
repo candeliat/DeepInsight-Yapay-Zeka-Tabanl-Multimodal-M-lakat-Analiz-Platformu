@@ -49,7 +49,7 @@ def _mock_interview_service(monkeypatch, history):
     monkeypatch.setattr(
         interview_route,
         "get_interview",
-        AsyncMock(return_value={"role": "Backend Developer", "topic": "Python", "status": "ongoing"}),
+        AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "ongoing"}),
     )
     monkeypatch.setattr(interview_route, "save_message", AsyncMock(return_value={}))
     monkeypatch.setattr(interview_route, "get_interview_history", AsyncMock(return_value=history))
@@ -192,7 +192,7 @@ def test_chat_returns_400_when_interview_already_completed(client, monkeypatch):
     monkeypatch.setattr(
         interview_route,
         "get_interview",
-        AsyncMock(return_value={"role": "Backend Developer", "topic": "Python", "status": "completed"}),
+        AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "completed"}),
     )
     monkeypatch.setattr(interview_route, "save_message", AsyncMock(return_value={}))
     monkeypatch.setattr(interview_route, "get_interview_history", AsyncMock(return_value=[]))

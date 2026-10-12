@@ -240,6 +240,7 @@ class LLMService:
         topic: str,
         question_number: int,
         max_questions: int | None = None,
+        candidate_context: str | None = None,
     ) -> str:
         """
         `get_next_question`'ın HAFİF sürümü: soruyu sıfırdan üretmek yerine,
@@ -254,7 +255,9 @@ class LLMService:
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
 
-        system_prompt = build_question_delivery_prompt(role, topic, question_number, max_questions, bank_question_text)
+        system_prompt = build_question_delivery_prompt(
+            role, topic, question_number, max_questions, bank_question_text, candidate_context,
+        )
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
         if message:
@@ -402,6 +405,7 @@ class LLMService:
         topic: str,
         question_number: int,
         max_questions: int | None = None,
+        candidate_context: str | None = None,
     ) -> str:
         """
         Sohbetin bir sonraki mülakat sorusunu (düz metin) üretir.
@@ -410,7 +414,7 @@ class LLMService:
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
 
-        system_prompt = build_question_prompt(role, topic, question_number, max_questions)
+        system_prompt = build_question_prompt(role, topic, question_number, max_questions, candidate_context)
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
         if message:
@@ -489,6 +493,7 @@ class LLMService:
         topic: str,
         question_number: int,
         max_questions: int | None = None,
+        candidate_context: str | None = None,
     ):
         """
         `get_next_question` ile aynı işi yapar ama metni token-token (async
@@ -499,7 +504,7 @@ class LLMService:
             str: Model tarafından üretilen art arda metin parçaları.
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
-        system_prompt = build_question_prompt(role, topic, question_number, max_questions)
+        system_prompt = build_question_prompt(role, topic, question_number, max_questions, candidate_context)
         async for delta in self._stream_chat(system_prompt, history, message, max_tokens=1024, purpose="question_stream"):
             yield delta
 
@@ -512,6 +517,7 @@ class LLMService:
         topic: str,
         question_number: int,
         max_questions: int | None = None,
+        candidate_context: str | None = None,
     ):
         """
         `deliver_bank_question`'ın token-token akan sürümü — bkz. `_stream_chat`
@@ -521,7 +527,9 @@ class LLMService:
             str: Model tarafından üretilen art arda metin parçaları.
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
-        system_prompt = build_question_delivery_prompt(role, topic, question_number, max_questions, bank_question_text)
+        system_prompt = build_question_delivery_prompt(
+            role, topic, question_number, max_questions, bank_question_text, candidate_context,
+        )
         async for delta in self._stream_chat(system_prompt, history, message, max_tokens=256, purpose="question_from_bank_stream"):
             yield delta
 
@@ -730,6 +738,57 @@ class LLMService:
             last_error, exc_info=True,
         )
         return InterviewEvaluation().model_dump()
+
+    async def generate_json(
+        self,
+        system_prompt: str,
+        user_content: str,
+        purpose: str,
+        max_tokens: int = 3000,
+        temperature: float = 0.2,
+    ) -> dict:
+        """
+        Genel amaçlı yapılandırılmış çıktı: aynı model zinciri / zaman aşımı /
+        geri çekilme mantığıyla bir JSON nesnesi döner (bkz. get_final_evaluation).
+        `get_final_evaluation`'ın aksine güvenli bir varsayılan UYDURMAZ: tüm
+        modeller başarısız olursa RuntimeError fırlatır, çağıran taraf karar verir.
+        """
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_content},
+        ]
+        last_error: Exception | None = None
+        for i, model_name in enumerate(self._fallback_models()):
+            self._record_attempt(model_name)
+            try:
+                response = await asyncio.wait_for(
+                    self.client.chat.completions.create(
+                        model=model_name,
+                        messages=messages,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                        response_format={"type": "json_object"},
+                    ),
+                    timeout=settings.LLM_ATTEMPT_MAX_DURATION,
+                )
+                content = response.choices[0].message.content
+                parsed = _extract_json_object(content or "")
+                if parsed is None:
+                    finish_reason = getattr(response.choices[0], "finish_reason", None)
+                    raise ValueError(f"Model geçerli bir JSON döndürmedi (finish_reason={finish_reason}).")
+                self._record_success(model_name, getattr(response, "usage", None), purpose=purpose)
+                return parsed
+            except (asyncio.TimeoutError, RateLimitError, APIStatusError) as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] (%s) '%s' başarısız: %s. Sıradaki deneniyor...", purpose, model_name, type(e).__name__)
+                await self._sleep_backoff(i)
+            except Exception as e:
+                last_error = e
+                self._record_failure(model_name)
+                logger.warning("[LLMService] (%s) '%s' beklenmeyen hata: %s. Sıradaki deneniyor...", purpose, model_name, str(e)[:120])
+
+        raise RuntimeError(f"AI servisi ile iletişim kurulamadı. Son hata: {last_error}")
 
     async def transcribe_audio(self, audio_bytes: bytes, mime_type: str = "audio/m4a") -> str:
         """

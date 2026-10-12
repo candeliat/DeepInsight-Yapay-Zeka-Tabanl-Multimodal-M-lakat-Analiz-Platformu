@@ -1,8 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { chatService } from "@/services/chatService";
+import { BAND_BADGE, scoreBand } from "@/lib/scoreBand";
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import {
   Loader2,
@@ -16,6 +19,8 @@ import {
   UserCheck,
   TrendingUp,
   MessageSquare,
+  Play,
+  Trash2,
 } from "lucide-react";
 import {
   Radar,
@@ -36,7 +41,10 @@ import {
 
 export default function InterviewDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params?.id as string;
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [interview, setInterview] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -168,6 +176,23 @@ export default function InterviewDetailPage() {
   };
 
   const avgScore = Math.round(interview.average_score || 0);
+  const isCompleted = interview.status === "completed";
+  const band = isCompleted ? scoreBand(interview.average_score) : null;
+  // "Mülakatı başlat." sunucunun ilk soruyu tetiklemek için kaydettiği iç komuttur; adayın cevabı değildir.
+  const messages = (interview.messages || []).filter(
+    (m: { role: string; content: string }, i: number) => !(i === 0 && m.role === "user" && m.content === "Mülakatı başlat."),
+  );
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await chatService.deleteInterview(id);
+      router.push("/interviews");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Mülakat silinemedi.");
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-16">
@@ -175,9 +200,11 @@ export default function InterviewDetailPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-card border border-border rounded-3xl p-6 shadow-sm">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">
-              Mülakat Tamamlandı
-            </span>
+            {isCompleted ? (
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary">Mülakat tamamlandı</span>
+            ) : (
+              <span className="px-3 py-1 rounded-full text-xs font-semibold bg-warning/15 text-warning">Yarıda kaldı</span>
+            )}
             {analytics && (
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-primary/10 text-primary flex items-center gap-1">
                 <Sparkles className="w-3 h-3 animate-pulse" /> AI Analiz Raporu Aktif
@@ -185,25 +212,50 @@ export default function InterviewDetailPage() {
             )}
           </div>
           <h1 className="font-serif italic text-3xl text-foreground mt-2">
-            Mülakat sonuç raporu
+            {isCompleted ? "Mülakat sonuç raporu" : "Yarıda kalan mülakat"}
           </h1>
           <p className="text-muted-foreground text-sm font-medium">
             {interview.role} Pozisyonu • {formatDate(interview.created_at)}
           </p>
         </div>
 
-        <div className="flex items-center gap-4 bg-muted border border-border px-6 py-4 rounded-2xl">
-          <div className="text-right">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">GENEL SKOR</p>
-            <div className="font-serif text-3xl text-foreground">
-              %{avgScore}
+        {isCompleted ? (
+          <div className="flex items-center gap-4 bg-muted border border-border px-6 py-4 rounded-2xl">
+            <div className="text-right">
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Genel skor</p>
+              <div className="font-serif text-3xl text-foreground">%{avgScore}</div>
             </div>
+            {band && <Badge variant={BAND_BADGE[band.tone]}>{band.label}</Badge>}
           </div>
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center text-white font-serif text-xl shadow-md">
-            A
+        ) : (
+          <div className="flex flex-col items-stretch gap-2">
+            <Button asChild>
+              <Link href={`/chat/text?resume=${id}`}>
+                <Play className="w-4 h-4" /> Kaldığın yerden devam et
+              </Link>
+            </Button>
+            {confirmDelete ? (
+              <div className="flex gap-2 text-sm justify-end">
+                <button onClick={handleDelete} disabled={deleting} className="font-bold text-destructive hover:underline">
+                  {deleting ? "Siliniyor..." : "Evet, sil"}
+                </button>
+                <button onClick={() => setConfirmDelete(false)} className="text-muted-foreground hover:underline">Vazgeç</button>
+              </div>
+            ) : (
+              <button onClick={() => setConfirmDelete(true)} className="inline-flex items-center justify-end gap-1 text-sm text-muted-foreground hover:text-destructive">
+                <Trash2 className="w-3.5 h-3.5" /> Bu mülakatı sil
+              </button>
+            )}
           </div>
-        </div>
+        )}
       </div>
+
+      {!isCompleted && (
+        <p className="text-sm text-muted-foreground bg-card border border-border rounded-2xl px-5 py-4">
+          Bu mülakat bitirilmediği için henüz puanlanmadı. Kaldığın yerden devam edip tamamladığında skorların ve
+          geri bildirimin burada görünür.
+        </p>
+      )}
 
       {/* YAPAY ZEKA GÖRSEL METRİKLER (STATS GRID) */}
       {analytics && (
@@ -239,7 +291,8 @@ export default function InterviewDetailPage() {
         </div>
       )}
 
-      {/* GRAFİKLER BÖLÜMÜ */}
+      {/* GRAFİKLER BÖLÜMÜ — yalnızca puanlanmış mülakatta (yarıda kalanda her şey 0 görünürdü) */}
+      {isCompleted && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Performans Radar Grafiği */}
@@ -276,11 +329,12 @@ export default function InterviewDetailPage() {
             Yapay Zeka Değerlendirmesi
           </h2>
           <div className="text-muted-foreground text-sm leading-relaxed overflow-y-auto max-h-[300px] whitespace-pre-wrap pr-4 scrollbar-thin">
-            {interview.feedback ? interview.feedback : "Henüz değerlendirme bulunmuyor. Mülakat tamamlanmamış olabilir."}
+            {interview.feedback ? interview.feedback : "Bu mülakat için yazılı geri bildirim oluşturulmamış."}
           </div>
         </div>
 
       </div>
+      )}
 
       {/* AI SES VE YÜZ ANALİZ DETAYLARI GRAFİKLERİ */}
       {analytics && (
@@ -395,7 +449,7 @@ export default function InterviewDetailPage() {
       )}
 
       {/* MESAJ GEÇMİŞİ */}
-      {interview.messages && interview.messages.length > 0 && (
+      {messages.length > 0 && (
         <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
           <div className="p-6 border-b border-border bg-muted/50">
             <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
@@ -404,12 +458,12 @@ export default function InterviewDetailPage() {
             </h2>
           </div>
           <div className="divide-y divide-border">
-            {interview.messages.map((msg: any, i: number) => (
+            {messages.map((msg: any, i: number) => (
               <div key={i} className={`p-6 transition-colors hover:bg-muted ${msg.role === 'model' ? 'bg-muted/30' : 'bg-card'}`}>
                 <div className="flex flex-col space-y-2">
                   <div className="flex items-center gap-2">
                     <span className={`text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md ${msg.role === 'model' ? 'bg-primary/10 text-primary' : 'bg-muted text-foreground'}`}>
-                      {msg.role === 'model' ? 'Yapay Zeka Sorusu' : 'Sizin Yanıtınız'}
+                      {msg.role === 'model' ? 'Mülakatçı' : 'Sizin yanıtınız'}
                     </span>
                   </div>
                   <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap font-medium">

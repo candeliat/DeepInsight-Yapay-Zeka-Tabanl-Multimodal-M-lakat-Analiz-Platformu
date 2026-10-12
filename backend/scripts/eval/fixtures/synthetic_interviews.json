@@ -1,0 +1,68 @@
+[
+  {
+    "id": "py-iyi", "role": "Backend Developer", "topic": "Python", "quality": 3,
+    "turns": [
+      ["Python'da list ile tuple arasındaki farkı ve hangisini ne zaman seçeceğinizi anlatır mısınız?",
+       "List değiştirilebilir, tuple değiştirilemez. Bu yüzden tuple hashlenebilir ve sözlük anahtarı ya da set elemanı olabilir. Sabit yapıdaki kayıtlar için, örneğin bir koordinat ya da fonksiyondan dönen birden çok değer için tuple kullanırım; eleman ekleyip çıkaracağım koleksiyonlar için list. Tuple biraz daha az bellek kullanır ve niyeti de belgeler: bu veri değişmeyecek."],
+      ["GIL nedir ve CPU yoğun bir işi hızlandırmanız gerekse ne yaparsınız?",
+       "GIL, CPython'da aynı anda yalnızca bir iş parçacığının Python bytecode çalıştırmasını sağlayan kilittir. Bu yüzden CPU yoğun işlerde threading paralellik sağlamaz. Böyle bir işte multiprocessing ya da concurrent.futures.ProcessPoolExecutor kullanırım; hesaplama numpy gibi C ile yazılmış bir kütüphanedeyse GIL zaten serbest bırakılır. G/Ç yoğun işlerde ise threading ya da asyncio yeterlidir. Geçen projemde bir rapor üretimini süreç havuzuna taşıyıp süreyi 40 saniyeden 12 saniyeye indirdim."],
+      ["Bir API'de yavaşlayan bir uç noktayı nasıl teşhis edersiniz?",
+       "Önce ölçerim: hangi uç nokta, hangi yüzdelikte yavaş. Sonra cProfile ya da py-spy ile profil çıkarır, veritabanı sorgularını loglarım. En sık sebep N+1 sorgu veya eksik indekstir; EXPLAIN ANALYZE ile kontrol ederim. Gerekirse sık okunan veriyi önbelleğe alırım ama önbelleği geçersiz kılma stratejisini de baştan planlarım. Değişiklikten sonra aynı ölçümle iyileşmeyi doğrularım."]
+    ]
+  },
+  {
+    "id": "py-orta", "role": "Backend Developer", "topic": "Python", "quality": 2,
+    "turns": [
+      ["Python'da list ile tuple arasındaki farkı ve hangisini ne zaman seçeceğinizi anlatır mısınız?",
+       "List değiştirilebilir, tuple değiştirilemez. Genelde list kullanıyorum, tuple'ı daha çok fonksiyondan birden fazla değer döndürürken görüyorum."],
+      ["GIL nedir ve CPU yoğun bir işi hızlandırmanız gerekse ne yaparsınız?",
+       "GIL bir kilit, aynı anda tek thread çalışıyor sanırım. Hızlandırmak için thread sayısını artırmayı ya da multiprocessing denemeyi düşünürdüm."],
+      ["Bir API'de yavaşlayan bir uç noktayı nasıl teşhis edersiniz?",
+       "Loglara bakarım, veritabanı sorgusu yavaş olabilir. Gerekirse cache eklerim."]
+    ]
+  },
+  {
+    "id": "py-zayif", "role": "Backend Developer", "topic": "Python", "quality": 1,
+    "turns": [
+      ["Python'da list ile tuple arasındaki farkı ve hangisini ne zaman seçeceğinizi anlatır mısınız?",
+       "İkisi de liste gibi şeyler, pek bir farkları yok bence."],
+      ["GIL nedir ve CPU yoğun bir işi hızlandırmanız gerekse ne yaparsınız?",
+       "Bilmiyorum, daha iyi bir bilgisayar kullanırdım."],
+      ["Bir API'de yavaşlayan bir uç noktayı nasıl teşhis edersiniz?",
+       "Sunucuyu yeniden başlatırım, genelde düzeliyor."]
+    ]
+  },
+  {
+    "id": "react-iyi", "role": "Frontend Developer", "topic": "React", "quality": 3,
+    "turns": [
+      ["useEffect'in bağımlılık dizisi ne işe yarar, yanlış kullanılırsa ne olur?",
+       "Bağımlılık dizisi efektin hangi değerler değişince yeniden çalışacağını belirler. Boş dizi yalnızca ilk render'da çalıştırır; dizi hiç verilmezse her render'da çalışır. Efekt içinde kullanılan bir state ya da prop diziye eklenmezse bayat değer (stale closure) okunur; efekt içinde güncellenen bir state diziye eklenirse sonsuz döngü oluşabilir. eslint'in exhaustive-deps kuralını açık tutar, fonksiyonları useCallback ile sabitlerim ve abonelikleri temizleme fonksiyonunda kapatırım."],
+      ["Büyük bir listede yeniden render performansını nasıl iyileştirirsiniz?",
+       "Önce React DevTools Profiler ile neyin neden render olduğunu ölçerim. Satır bileşenini React.memo ile sarar, prop olarak geçen fonksiyon ve nesneleri useCallback/useMemo ile sabitlerim, key olarak index yerine kalıcı id kullanırım. Binlerce satırda react-window ile sanallaştırma yaparım; bir projede 5000 satırlık tabloda ilk render süresini yaklaşık 1,2 saniyeden 150 ms'ye indirdik."],
+      ["State'i nerede tutacağınıza nasıl karar verirsiniz?",
+       "Önce state'i kullanan en yakın ortak ebeveyne koyarım. Sunucudan gelen veri için React Query gibi bir önbellek kullanırım, çünkü o aslında sunucu state'idir. Birçok uzak bileşenin paylaştığı istemci state'i için Context ya da Zustand; Context'te her değişiklik tüm tüketicileri render ettiği için sık değişen değerleri ayırırım. URL'de olması gereken filtreleri query parametrelerinde tutarım."]
+    ]
+  },
+  {
+    "id": "react-orta", "role": "Frontend Developer", "topic": "React", "quality": 2,
+    "turns": [
+      ["useEffect'in bağımlılık dizisi ne işe yarar, yanlış kullanılırsa ne olur?",
+       "Dizideki değerler değişince efekt tekrar çalışır. Boş bırakırsam bir kere çalışıyor. Yanlış olursa bazen sonsuz döngü oluyor."],
+      ["Büyük bir listede yeniden render performansını nasıl iyileştirirsiniz?",
+       "React.memo kullanırım ve key vermeye dikkat ederim."],
+      ["State'i nerede tutacağınıza nasıl karar verirsiniz?",
+       "Genelde bileşenin içinde useState ile tutuyorum, çok yerde lazım olursa Redux kullanırım."]
+    ]
+  },
+  {
+    "id": "react-zayif", "role": "Frontend Developer", "topic": "React", "quality": 1,
+    "turns": [
+      ["useEffect'in bağımlılık dizisi ne işe yarar, yanlış kullanılırsa ne olur?",
+       "useEffect sayfa açılınca çalışan bir şey. Dizi kısmını tam bilmiyorum."],
+      ["Büyük bir listede yeniden render performansını nasıl iyileştirirsiniz?",
+       "Listeyi kısaltırım."],
+      ["State'i nerede tutacağınıza nasıl karar verirsiniz?",
+       "Hepsini global bir değişkende tutarım, daha kolay oluyor."]
+    ]
+  }
+]

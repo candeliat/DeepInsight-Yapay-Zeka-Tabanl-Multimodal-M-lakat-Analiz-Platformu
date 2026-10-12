@@ -109,9 +109,10 @@ export default function WelcomeScreen() {
         </TouchableOpacity>
 
         <View style={styles.footerLinks}>
-          <Text style={styles.footerLink}>Gizlilik Politikası</Text>
-          <Text style={styles.footerDot}>·</Text>
-          <Text style={styles.footerLink}>Kullanım Koşulları</Text>
+          {/* Kullanım koşulları metni henüz yok; olmayan sayfaya bağlantı verilmez. */}
+          <Text style={styles.footerLink} onPress={() => router.push('/privacy')} accessibilityRole="link">
+            KVKK Aydınlatma Metni
+          </Text>
         </View>
       </View>
     </SafeAreaView>

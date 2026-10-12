@@ -21,6 +21,9 @@ class Settings:
     LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "https://integrate.api.nvidia.com/v1")
     SUPABASE_URL: str = os.getenv("SUPABASE_URL", "")
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
+    # Şifre sıfırlama e-postasındaki bağlantının açacağı web sayfası. Supabase panelinde
+    # Auth -> URL Configuration -> Redirect URLs listesine eklenmiş olmalı.
+    PASSWORD_RESET_REDIRECT: str = os.getenv("PASSWORD_RESET_REDIRECT", "http://localhost:3002/reset-password")
     WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "small")
     TEMP_UPLOAD_DIR: str = os.getenv("TEMP_UPLOAD_DIR", str(Path(__file__).resolve().parent.parent.parent / "temp_uploads"))
     ANALYSIS_FPS: int = int(os.getenv("ANALYSIS_FPS", "1"))

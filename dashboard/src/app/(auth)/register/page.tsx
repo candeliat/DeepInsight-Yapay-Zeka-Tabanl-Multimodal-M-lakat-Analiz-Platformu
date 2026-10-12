@@ -22,6 +22,7 @@ export default function RegisterPage() {
   const [target, setTarget] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorStr, setErrorStr] = useState("");
@@ -31,7 +32,15 @@ export default function RegisterPage() {
     setErrorStr("");
 
     if (password !== confirmPassword) {
-      setErrorStr("Şifreler eşleşmiyor!");
+      setErrorStr("Şifreler eşleşmiyor.");
+      return;
+    }
+    if (password.length < 8) {
+      setErrorStr("Şifre en az 8 karakter olmalı.");
+      return;
+    }
+    if (!privacyAccepted) {
+      setErrorStr("Devam etmek için aydınlatma metnini okuduğunuzu onaylayın.");
       return;
     }
 
@@ -47,10 +56,12 @@ export default function RegisterPage() {
         password,
         first_name,
         last_name,
-        target
+        target,
+        privacy_accepted: privacyAccepted,
       });
 
-      router.push("/login");
+      // Supabase e-posta doğrulaması açıksa kullanıcı önce e-postasını onaylamalı; giriş sayfası bunu söyler.
+      router.push("/login?registered=1");
     } catch (err: any) {
       setErrorStr(err.response?.data?.detail || "Kayıt olurken bir hata oluştu.");
     } finally {
@@ -88,7 +99,7 @@ export default function RegisterPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Örn: John Doe"
+                placeholder="Örn: Ayşe Yılmaz"
                 required
               />
             </div>
@@ -136,7 +147,9 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="En az 8 karakter"
+                minLength={8}
+                autoComplete="new-password"
                 required
               />
             </div>
@@ -156,6 +169,20 @@ export default function RegisterPage() {
                 required
               />
             </div>
+            <label className="flex items-start gap-3 text-sm text-muted-foreground cursor-pointer">
+              <input
+                type="checkbox"
+                checked={privacyAccepted}
+                onChange={(e) => setPrivacyAccepted(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-[var(--primary)]"
+                required
+              />
+              <span>
+                Kişisel verilerimin işlenmesine ilişkin{" "}
+                <Link href="/gizlilik" target="_blank" className="font-semibold text-primary underline">aydınlatma metnini</Link>{" "}
+                okudum.
+              </span>
+            </label>
             <Button type="submit" size="lg" disabled={isLoading} className="w-full">
               {isLoading ? "Hesap Oluşturuluyor..." : "Kayıt Ol"}
             </Button>

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { setStorageItemAsync, getStorageItemAsync, deleteStorageItemAsync } from '../utils/storage';
-import { api } from '../config/api';
+import { api, refreshAccessToken as refreshSession, setSessionExpiredHandler } from '../config/api';
 
 interface UserProfile {
   id: string;
@@ -12,6 +12,7 @@ interface UserProfile {
     target?: string;
     [key: string]: any;
   };
+  app_metadata?: { role?: string; [key: string]: any };
 }
 
 interface UserState {
@@ -20,6 +21,9 @@ interface UserState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  /** Kayıtlı oturum depodan okundu mu? Okunmadan oturum koruması karar vermemeli
+   * (web'de sayfa yenileme/derin bağlantı kullanıcıyı yanlışlıkla girişe atardı). */
+  hydrated: boolean;
   setToken: (token: string, refresh?: string) => Promise<void>;
   setUser: (user: UserProfile | null) => void;
   logout: () => Promise<void>;
@@ -38,13 +42,14 @@ export const useUserStore = create<UserState>((set, get) => ({
   refreshToken: null,
   isAuthenticated: false,
   isLoading: false,
-  
+  hydrated: false,
+
   setToken: async (token: string, refresh?: string) => {
     await setStorageItemAsync('token', token);
     if (refresh) await setStorageItemAsync('refresh_token', refresh);
     set({ token, refreshToken: refresh || get().refreshToken, isAuthenticated: true });
   },
-  
+
   setUser: (user: UserProfile | null) => {
     set({ user });
   },
@@ -56,18 +61,16 @@ export const useUserStore = create<UserState>((set, get) => ({
   },
 
   refreshAccessToken: async (): Promise<boolean> => {
-    const refresh = get().refreshToken;
-    if (!refresh) return false;
     try {
-      const { data } = await api.post('/api/v1/auth/refresh', { refresh_token: refresh });
-      if (data.access_token) {
-        await get().setToken(data.access_token, data.refresh_token || refresh);
-        return true;
+      const token = await refreshSession();
+      if (!token) {
+        await get().logout();
+        return false;
       }
-      return false;
+      set({ token, refreshToken: await getStorageItemAsync('refresh_token') });
+      return true;
     } catch {
-      await get().logout();
-      return false;
+      return false; // ağ hatası: oturum korunur
     }
   },
 
@@ -75,34 +78,48 @@ export const useUserStore = create<UserState>((set, get) => ({
     try {
       set({ isLoading: true });
       const tokenToUse = tokenOverride || get().token;
+      // 401'de yenileme ve tekrar deneme api interceptor'ında yapılır.
       const { data } = await api.get('/api/v1/users/me', {
         headers: tokenToUse ? { Authorization: `Bearer ${tokenToUse}` } : {},
       });
       set({ user: data, isAuthenticated: true });
     } catch (error: any) {
+      // Yalnızca oturum gerçekten geçersizse çıkış yapılır; ağ hatası ya da 503
+      // (kimlik servisine ulaşılamadı) geçicidir — kullanıcı oturumdan atılmaz.
       if (error.response?.status === 401) {
-        const refreshed = await get().refreshAccessToken();
-        if (refreshed) {
-          await get().fetchProfile();
-          return;
-        }
+        await get().logout();
       }
-      get().logout();
     } finally {
       set({ isLoading: false });
     }
   },
 
   initialize: async () => {
-    try {
-      const token = await getStorageItemAsync('token');
-      const refresh = await getStorageItemAsync('refresh_token');
-      if (token) {
-        set({ token, refreshToken: refresh || null });
-        await get().fetchProfile(token);
-      }
-    } catch {
-      // Başlangıç hatası — kullanıcı giriş ekranına yönlendirilir
+    // Kök layout ve karşılama ekranı birlikte çağırabilir: tek sefer çalışır.
+    if (!initializing) {
+      initializing = (async () => {
+        try {
+          const token = await getStorageItemAsync('token');
+          const refresh = await getStorageItemAsync('refresh_token');
+          if (token) {
+            set({ token, refreshToken: refresh || null, isAuthenticated: true });
+            await get().fetchProfile(token);
+          }
+        } catch {
+          // Başlangıç hatası — kullanıcı giriş ekranına yönlendirilir
+        } finally {
+          set({ hydrated: true });
+        }
+      })();
     }
+    return initializing;
   }
 }));
+
+let initializing: Promise<void> | null = null;
+
+// Yenileme reddedilirse (refresh token geçersiz) store da temizlenir; ekranlar
+// isAuthenticated=false görünce giriş ekranına yönlenir.
+setSessionExpiredHandler(() => {
+  useUserStore.setState({ user: null, token: null, refreshToken: null, isAuthenticated: false });
+});

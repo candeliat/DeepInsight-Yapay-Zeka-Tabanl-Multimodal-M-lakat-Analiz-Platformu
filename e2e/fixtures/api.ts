@@ -1,4 +1,5 @@
 import { test as base, expect, type BrowserContext, type Page, type Request, type Route } from '@playwright/test';
+import { careerState, installCareer, seedCareer } from './career';
 import { consent, INTERVIEWS, ongoingDetail, ONGOING_ID, PROGRESS, USER } from './data';
 
 /**
@@ -27,6 +28,8 @@ export class MockApi {
   readonly unhandled: string[] = [];
   /** Durum taşıyan varsayılanlar (ör. onam verilince sonraki GET'te de verili görünür). */
   state = { consentGranted: false, user: structuredClone(USER), interviews: structuredClone(INTERVIEWS) };
+  /** CV, ilan, kurum ve ödev durumu (fixtures/career.ts). */
+  readonly career = careerState();
 
   constructor() {
     this.installDefaults();
@@ -93,7 +96,6 @@ export class MockApi {
 
   private installDefaults() {
     const s = this.state;
-    const empty = { json: [] };
     this.on('GET', '/api/v1/users/me', () => ({ json: s.user }));
     this.on('PATCH', '/api/v1/users/me', ({ body }) => {
       s.user.user_metadata = { ...s.user.user_metadata, ...body };
@@ -114,11 +116,13 @@ export class MockApi {
     this.on('GET', '/api/v1/progress/me', { json: PROGRESS });
     // Yarıda kalan mülakatın video analizi yok: gerçek backend de 404 döner.
     this.on('GET', /^\/api\/v1\/analytics\/(results|status)\/[^/]+$/, { status: 404, json: { detail: 'Analiz bulunamadı.' } });
-    this.on('GET', '/api/v1/cv', empty);
-    this.on('GET', '/api/v1/jobs', empty);
-    this.on('GET', '/api/v1/organizations/me', empty);
-    this.on('GET', '/api/v1/organizations/invites/me', empty);
-    this.on('GET', '/api/v1/assignments/me', empty);
+    installCareer(this, this.career);
+  }
+
+  /** CV, ilan, kurum ve ödev için örnek veriyi yükler (varsayılan: hepsi boş, CV rızası yok). */
+  seedCareer(): this {
+    seedCareer(this.career);
+    return this;
   }
 }
 

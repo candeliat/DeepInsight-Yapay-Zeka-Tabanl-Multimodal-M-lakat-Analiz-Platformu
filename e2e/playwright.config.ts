@@ -14,10 +14,13 @@ import { defineConfig, devices } from '@playwright/test';
  * Tarayıcı indirilmez; kurulu Chrome kullanılır (channel: 'chrome').
  */
 
-// C: diski dolu: geçici dosyalar (Chrome profilleri vb.) ve çıktılar repo içinde, D:'de tutulur.
-const TMP = path.join(__dirname, '.tmp');
-fs.mkdirSync(TMP, { recursive: true });
-process.env.TMP = process.env.TEMP = process.env.TMPDIR = TMP;
+// Windows geliştirme makinesinde C: diski dolu: geçici dosyalar (Chrome profilleri vb.) repo içinde, D:'de
+// tutulur. Linux/CI'da yapılmaz: Chrome'un Unix soket yolu 108 karakteri aşar ve tarayıcı açılmaz.
+if (process.platform === 'win32') {
+  const TMP = path.join(__dirname, '.tmp');
+  fs.mkdirSync(TMP, { recursive: true });
+  process.env.TMP = process.env.TEMP = TMP;
+}
 
 const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3002';
 const MOBILE_URL = process.env.E2E_MOBILE_URL ?? 'http://localhost:8081';

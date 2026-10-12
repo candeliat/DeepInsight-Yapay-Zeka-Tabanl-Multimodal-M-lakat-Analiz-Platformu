@@ -123,8 +123,8 @@ def test_fetch_question_pool_returns_rows_above_threshold(monkeypatch):
     ))
 
     assert pool == [
-        {"id": "q1", "question_text": "Soru q1", "similarity": 0.8},
-        {"id": "q2", "question_text": "Soru q2", "similarity": 0.5},
+        {"id": "q1", "question_text": "Soru q1", "similarity": 0.8, "answer_points": []},
+        {"id": "q2", "question_text": "Soru q2", "similarity": 0.5, "answer_points": []},
     ]
     match_calls = _rpc_calls_named(fake_supabase, "match_questions")
     assert len(match_calls) == 1
@@ -172,7 +172,7 @@ def test_fetch_question_pool_falls_back_to_local_embedding_when_api_fails(monkey
 
     pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=5))
 
-    assert pool == [{"id": "q1", "question_text": "Soru q1", "similarity": 0.8}]
+    assert pool == [{"id": "q1", "question_text": "Soru q1", "similarity": 0.8, "answer_points": []}]
     match_calls = _rpc_calls_named(fake_supabase, "match_questions_local")
     assert len(match_calls) == 1
 
@@ -274,7 +274,7 @@ def test_fetch_question_pool_survives_when_increment_times_served_fails(monkeypa
 
     pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=1))
 
-    assert pool == [{"id": "q1", "question_text": "Soru q1", "similarity": 0.8}]
+    assert pool == [{"id": "q1", "question_text": "Soru q1", "similarity": 0.8, "answer_points": []}]
 
 
 # --------------------------------------------------------------------------
@@ -336,7 +336,7 @@ def test_fetch_question_pool_survives_when_gap_logging_fails(monkeypatch):
 
     pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=3))
 
-    assert pool == [{"id": "q1", "question_text": "Soru q1", "similarity": 0.8}]
+    assert pool == [{"id": "q1", "question_text": "Soru q1", "similarity": 0.8, "answer_points": []}]
 
 
 # --------------------------------------------------------------------------
@@ -389,7 +389,7 @@ def test_fetch_question_pool_falls_back_to_single_row_when_family_chain_lookup_e
 
     pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=3))
 
-    assert pool == [{"id": "fam-x", "question_text": "Soru fam-x", "similarity": 0.8}]
+    assert pool == [{"id": "fam-x", "question_text": "Soru fam-x", "similarity": 0.8, "answer_points": []}]
 
 
 def test_fetch_question_pool_expands_same_family_only_once(monkeypatch):

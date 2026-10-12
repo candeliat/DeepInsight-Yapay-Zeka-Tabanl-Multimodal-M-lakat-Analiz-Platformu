@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import math
+import random
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -8,12 +9,26 @@ from app.core.config import settings
 from app.core.database import supabase
 from app.services.llm_service import llm_service
 from app.services.local_embedding_service import embed_text_local
+from app.services.question_tags import interview_tags, related_tags
 
 logger = logging.getLogger(__name__)
 
 # Aile zincirlerini zorluk sırasına göre dizmek için (bkz. _fetch_family_chain).
 # Tanınmayan/boş zorluk en kolay kabul edilir.
 _DIFFICULTY_RANK = {"JUNIOR": 0, "ORTA": 1, "UZMAN": 2}
+
+# Etiket tabanlı sıralama ağırlıkları (bkz. _rank_by_tags).
+_TOPIC_TAG_WEIGHT = 3.0
+_WEAK_TAG_WEIGHT = 1.0
+_DIFFICULTY_BONUS = {0: 2.0, 1: 0.5, 2: -1.0}  # zorluk farkı -> puan
+_TAG_EXPOSURE_PENALTY = 0.3
+# Mülakatla ilgisiz her etiket için ceza: "tam bu konunun" sorusu, başka konunun içinde bu
+# konuya değen sorudan önce gelir (ör. Python mülakatında ML sorusu değil Python sorusu).
+_FOREIGN_TAG_PENALTY = 0.5
+_TIE_JITTER = 0.2  # eşit puanlı sorular arasında çeşitlilik (her mülakatta aynı sorular gelmesin)
+_rng = random.Random()
+
+_POOL_COLUMNS = "id, question_text, difficulty, family_id, times_served, tags, question_type, answer_points, org_id"
 
 
 async def fetch_question_pool(
@@ -50,6 +65,103 @@ async def fetch_question_pool(
     if not supabase or size <= 0:
         return []
 
+    # 1) Etiket örtüşmesi: konu metninden bilinen beceri etiketi çıktıysa soru seçimi buna
+    #    dayanır (embedding tek başına konu ayrımı yapamıyor, bkz. question_tags modül notu).
+    topic_tags, weak_tags = interview_tags(role, topic, skills_hint)
+    selected_rows: List[Dict[str, Any]] = []
+    if topic_tags:
+        tagged = await _fetch_tagged_rows(topic_tags | weak_tags, org_id)
+        ranked = _rank_by_tags(tagged, topic_tags, weak_tags, difficulty)
+        selected_rows = await _pack_pool_with_family_chains(ranked, size, org_id)
+
+    # 2) Yedek: etiketle dolmadıysa (konu tanınmadı ya da banka o konuda yetersiz)
+    #    semantik arama kalan yerleri doldurur. Etiketle dolduysa embedding çağrısı yapılmaz.
+    if len(selected_rows) < size:
+        semantic = await _semantic_candidates(role, topic, difficulty, size, org_id, skills_hint)
+        used = {row["id"] for row in selected_rows}
+        remaining = [row for row in semantic if row["id"] not in used]
+        extra = await _pack_pool_with_family_chains(remaining, size - len(selected_rows), org_id)
+        selected_rows += [row for row in extra if row["id"] not in used]
+
+    pool = [
+        {
+            "id": row["id"],
+            "question_text": row["question_text"],
+            "similarity": row.get("similarity"),
+            # Adaya gösterilmez; mülakat sonu değerlendirmesinde referans olarak kullanılır.
+            "answer_points": row.get("answer_points") or [],
+        }
+        for row in selected_rows[:size]
+    ]
+
+    logger.info(
+        "[question_bank_service] role=%s topic=%s difficulty=%s etiketler=%s/%s -> %d soru seçildi.",
+        role, topic, difficulty, sorted(topic_tags), sorted(weak_tags), len(pool),
+    )
+
+    if len(pool) < size:
+        await _log_question_bank_gap(role, topic, difficulty, missing_count=size - len(pool))
+
+    if pool:
+        await _increment_times_served([entry["id"] for entry in pool])
+
+    return pool
+
+
+async def _fetch_tagged_rows(tags: set, org_id: Optional[str]) -> List[Dict[str, Any]]:
+    """Etiketlerden en az biriyle örtüşen aktif sorular (global + istenirse kurumun kendi soruları).
+    Best-effort: hata/beklenmeyen yanıt durumunda boş liste."""
+    try:
+        query = (
+            supabase.table("question_bank").select(_POOL_COLUMNS)
+            .eq("is_active", True).overlaps("tags", sorted(tags))
+        )
+        query = query.or_(f"org_id.is.null,org_id.eq.{org_id}") if org_id else query.is_("org_id", "null")
+        data = query.execute().data
+    except Exception:
+        logger.warning("[question_bank_service] Etiket sorgusu başarısız (tags=%s).", sorted(tags), exc_info=True)
+        return []
+    return data if isinstance(data, list) else []
+
+
+def _rank_by_tags(
+    rows: List[Dict[str, Any]], topic_tags: set, weak_tags: set, difficulty: Optional[str],
+) -> List[Dict[str, Any]]:
+    """
+    Puan = 3 x konu etiketi örtüşmesi + 1 x rol/beceri etiketi örtüşmesi + zorluk uyumu
+    (tam +2, komşu +0.5, uzak -1) - 0.5 x mülakatla ilgisiz etiket - sık sorulma cezası
+    + küçük rastgele kırılım.
+    Konu etiketiyle örtüşmeyen sorular yalnızca rol etiketi varsa ve sona doğru yer alır.
+    Davranışsal sorular yalnızca konu davranışsal mülakatsa seçilir.
+    """
+    want_behavioral = "davranissal" in topic_tags
+    relevant = topic_tags | weak_tags | related_tags(topic_tags)
+    target = _DIFFICULTY_RANK.get(difficulty) if difficulty else None
+    scored = []
+    for row in rows:
+        if (row.get("question_type") == "davranissal") != want_behavioral:
+            continue
+        tags = set(row.get("tags") or [])
+        topic_hits, weak_hits = len(tags & topic_tags), len(tags & weak_tags)
+        if not topic_hits and not weak_hits:
+            continue
+        score = _TOPIC_TAG_WEIGHT * topic_hits + _WEAK_TAG_WEIGHT * weak_hits
+        score -= _FOREIGN_TAG_PENALTY * len(tags - relevant)
+        if target is not None:
+            score += _DIFFICULTY_BONUS[abs(_DIFFICULTY_RANK.get(row.get("difficulty"), 1) - target)]
+        score -= _TAG_EXPOSURE_PENALTY * math.log1p(row.get("times_served") or 0)
+        score += _rng.random() * _TIE_JITTER
+        scored.append((score, row))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [row for _, row in scored]
+
+
+async def _semantic_candidates(
+    role: str, topic: str, difficulty: Optional[str], size: int,
+    org_id: Optional[str], skills_hint: Optional[List[str]],
+) -> List[Dict[str, Any]]:
+    """Embedding benzerliğiyle aday sorular (eşik + sık sorulma cezası uygulanmış).
+    Best-effort: embedding ya da RPC başarısız olursa boş liste."""
     # role+topic (+ difficulty) tek bir sorgu embedding'ine gömülür — role/topic
     # serbest metin olduğu için SQL tarafında tam eşleşme değil, semantik
     # benzerlik aranır (bkz. sql/001_question_bank.sql'deki match_questions).
@@ -71,31 +183,26 @@ async def fetch_question_pool(
             rpc_name = "match_questions_local"
         except Exception:
             logger.warning(
-                "[question_bank_service] Yerel embedding fallback de başarısız (role=%s, topic=%s) — banka bu mülakat için atlanıyor.",
+                "[question_bank_service] Yerel embedding fallback de başarısız (role=%s, topic=%s) — semantik arama atlanıyor.",
                 role, topic, exc_info=True,
             )
             return []
 
-    # Exposure-control ile yeniden sıralayabilmek için `size`'dan daha fazla
-    # aday çekilir — yoksa cezalandırılan bir sorunun yerini alacak "ikinci
-    # en iyi" bir aday havuzu olmaz.
-    candidate_count = min(size * settings.QUESTION_BANK_CANDIDATE_POOL_MULTIPLIER, 30)
-
+    # Exposure-control ile yeniden sıralayabilmek için `size`'dan daha fazla aday çekilir.
     rpc_params: Dict[str, Any] = {
         "query_embedding": query_embedding,
         "filter_difficulty": difficulty,
-        "match_count": candidate_count,
+        "match_count": min(size * settings.QUESTION_BANK_CANDIDATE_POOL_MULTIPLIER, 30),
     }
     if org_id:
-        # Yalnızca kurum bağlamında gönderilir: verilmezse yalnızca global
-        # sorular aranır (SQL tarafında filter_org_id default null).
+        # Yalnızca kurum bağlamında gönderilir: verilmezse yalnızca global sorular aranır.
         rpc_params["filter_org_id"] = org_id
 
     try:
         result = supabase.rpc(rpc_name, rpc_params).execute()
     except Exception:
         logger.warning(
-            "[question_bank_service] %s RPC başarısız (role=%s, topic=%s) — banka bu mülakat için atlanıyor.",
+            "[question_bank_service] %s RPC başarısız (role=%s, topic=%s) — semantik arama atlanıyor.",
             rpc_name, role, topic, exc_info=True,
         )
         return []
@@ -105,26 +212,7 @@ async def fetch_question_pool(
         row for row in rows
         if row.get("similarity") is not None and row["similarity"] >= settings.QUESTION_BANK_MIN_SIMILARITY
     ]
-    ranked_rows = _rank_with_exposure_penalty(relevant_rows)
-    selected_rows = await _pack_pool_with_family_chains(ranked_rows, size, org_id)
-
-    pool = [
-        {"id": row["id"], "question_text": row["question_text"], "similarity": row.get("similarity")}
-        for row in selected_rows
-    ]
-
-    logger.info(
-        "[question_bank_service] role=%s topic=%s difficulty=%s -> %d/%d aday eşik (%.2f) üzerinde, %d tanesi seçildi.",
-        role, topic, difficulty, len(relevant_rows), len(rows), settings.QUESTION_BANK_MIN_SIMILARITY, len(pool),
-    )
-
-    if len(pool) < size:
-        await _log_question_bank_gap(role, topic, difficulty, missing_count=size - len(pool))
-
-    if selected_rows:
-        await _increment_times_served([row["id"] for row in selected_rows])
-
-    return pool
+    return _rank_with_exposure_penalty(relevant_rows)
 
 
 async def _pack_pool_with_family_chains(
@@ -190,7 +278,7 @@ async def _fetch_family_chain(
     try:
         result = (
             supabase.table("question_bank")
-            .select("id, question_text, difficulty, org_id")
+            .select("id, question_text, difficulty, org_id, answer_points")
             .eq("family_id", family_id)
             .eq("is_active", True)
             .execute()

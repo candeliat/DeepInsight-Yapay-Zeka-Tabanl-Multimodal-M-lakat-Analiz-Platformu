@@ -5,30 +5,12 @@ entegrasyon testi (Faz 4 — streaming yanıt).
 `client` fixture'ı ve mock yardımcıları test_interview_chat_flow.py'den
 yeniden kullanılıyor (aynı auth/dependency-override kurulumu).
 """
-import json
 from unittest.mock import AsyncMock
 
 from app.services.llm_service import llm_service
 import app.api.routes.interview as interview_route
 
-from test_interview_chat_flow import client, _mock_interview_service, _history_with_n_questions_asked  # noqa: F401
-
-
-def _parse_sse_events(raw_text: str) -> list[tuple[str, object]]:
-    events = []
-    for block in raw_text.replace("\r\n", "\n").strip().split("\n\n"):
-        if not block.strip():
-            continue
-        event_type = None
-        data_raw = None
-        for line in block.splitlines():
-            if line.startswith("event:"):
-                event_type = line[len("event:"):].strip()
-            elif line.startswith("data:"):
-                data_raw = line[len("data:"):].strip()
-        if event_type is not None and data_raw is not None:
-            events.append((event_type, json.loads(data_raw)))
-    return events
+from test_interview_chat_flow import client, _mock_interview_service, _history_with_n_questions_asked, _parse_sse_events  # noqa: F401
 
 
 async def _fake_stream_ok(*args, **kwargs):

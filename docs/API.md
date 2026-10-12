@@ -11,6 +11,8 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 | Yöntem | Yol | Yetki | Açıklama |
 |---|---|---|---|
 | DELETE | `/api/v1/account` | Giriş | Hesabı ve tüm kişisel veriyi kalıcı olarak siler (geri alınamaz). |
+| GET | `/api/v1/account/consents/{consent_type}` | Giriş | Onam durumu ve onam metni (ör. video_analysis). |
+| PUT | `/api/v1/account/consents/{consent_type}` | Giriş | Onam verir ya da geri çeker. Video onamı geri çekilirse video analizi sonuçları silinir. |
 | GET | `/api/v1/account/export` | Giriş | KVKK md. 11: hakkımda işlenen tüm verileri JSON olarak indir. |
 
 ## Analytics
@@ -31,9 +33,12 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 
 | Yöntem | Yol | Yetki | Açıklama |
 |---|---|---|---|
+| POST | `/api/v1/auth/change-password` | Giriş | Oturum açıkken şifre değiştirme; mevcut şifre doğrulanır. |
+| POST | `/api/v1/auth/forgot-password` | Herkese açık | Şifre sıfırlama e-postası gönderir. Hesap var olsun olmasın aynı yanıtı döner |
 | POST | `/api/v1/auth/login` | Herkese açık | Login endpoint expecting a JSON body (for mobile/web clients). |
 | POST | `/api/v1/auth/refresh` | Herkese açık | Supabase refresh token kullanarak yeni bir access token döndürür. |
 | POST | `/api/v1/auth/register` | Herkese açık | Register a new user using Supabase Authentication. |
+| POST | `/api/v1/auth/reset-password` | Herkese açık | E-postadaki bağlantının verdiği kurtarma token'ıyla yeni şifre belirler. |
 
 ## CV
 
@@ -59,12 +64,11 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 
 | Yöntem | Yol | Yetki | Açıklama |
 |---|---|---|---|
-| POST | `/api/v1/interview/chat` | Giriş | Kullanıcının son mesajını alıp anında DB'ye kaydeder, geçmişi DB'den okur |
-| POST | `/api/v1/interview/chat/stream` | Giriş | `/chat` ile aynı iş mantığı (sunucu taraflı soru sayacı dahil), ama |
-| GET | `/api/v1/interview/history/{user_id}` | Giriş | Belirli bir kullanıcının tüm mülakat geçmişini döndürür. |
+| POST | `/api/v1/interview/chat/stream` | Giriş | Adayın cevabını kaydeder ve sıradaki soruyu (sunucu taraflı soru sayacıyla) |
 | GET | `/api/v1/interview/me` | Giriş | Giriş yapmış kullanıcının geçmiş tüm mülakatlarının özetini liste halinde döndür. |
 | POST | `/api/v1/interview/start` | Giriş | Kullanıcının belirlediği rol ve konuya göre yeni bir mülakat oturumu başlatır. |
 | POST | `/api/v1/interview/transcribe` | Giriş | Kullanıcıdan gelen ses kaydını alır ve LLM servisi üzerinden metne çevirir. |
+| DELETE | `/api/v1/interview/{interview_id}` | Giriş | Yarıda kalmış (tamamlanmamış) kendi mülakatını siler. Tamamlanmış mülakatlar |
 | GET | `/api/v1/interview/{interview_id}` | Giriş | Belirli bir mülakatın tüm detaylarını döndür. |
 | POST | `/api/v1/interview/{interview_id}/finish` | Giriş | Adayın mülakatı MAX_INTERVIEW_QUESTIONS'a ulaşılmadan erken bitirmek |
 
@@ -152,3 +156,4 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 | Yöntem | Yol | Yetki | Açıklama |
 |---|---|---|---|
 | GET | `/api/v1/users/me` | Giriş | Get the currently logged-in user profile. |
+| PATCH | `/api/v1/users/me` | Giriş | Ad, soyad ve hedef pozisyonu günceller (hedef pozisyon mülakat kurulumunda rolü önceden doldurur). |

@@ -28,7 +28,7 @@ async def fetch_question_pool(
     Mülakat başında (yalnızca `/start`'ta) BİR KEZ çağrılır: role+topic
     (+ difficulty) için soru bankasından en iyi `size` adet eşleşen soruyu
     getirir. Dönen liste `interviews.question_pool` (jsonb) kolonuna yazılır
-    ve sonraki her tur (`/chat`, `/chat/stream`) mevcut `questions_asked`
+    ve sonraki her tur (`/chat/stream`) mevcut `questions_asked`
     sayacını index olarak kullanarak sırayla tüketir — bu yüzden bir "hangi
     sorular zaten soruldu" tablosuna/kolonuna ayrıca gerek yoktur.
 
@@ -140,7 +140,7 @@ async def _pack_pool_with_family_chains(
     olduğu gibi eklenir.
 
     Not: Bu fonksiyon `/start` sırasında TEK SEFERE çalışır — sonraki turlar
-    (`/chat`) yalnızca burada üretilen sabit listeyi index'e göre tüketir,
+    (`/chat/stream`) yalnızca burada üretilen sabit listeyi index'e göre tüketir,
     adayın cevap kalitesine göre gerçek zamanlı bir dallanma YAPMAZ (bkz.
     proje notları: bu kasıtlı bir kapsam kararı, ek LLM çağrısı gerektirmez).
     """

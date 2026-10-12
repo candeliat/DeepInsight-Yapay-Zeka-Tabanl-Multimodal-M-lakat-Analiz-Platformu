@@ -1,6 +1,6 @@
 """
 Gerçek çalışan backend'e (Supabase + gerçek LLM dahil) karşı tam uçtan uca
-mülakat akışı testi: kayıt -> giriş -> /start -> 5x /chat -> nihai
+mülakat akışı testi: kayıt -> giriş -> /start -> 5x /chat/stream -> nihai
 değerlendirme -> kalıcılık kontrolü -> temel girdi doğrulama sağlamlığı.
 
 Önce sunucuyu başlatın: `python -m uvicorn app.main:app --port 8123`
@@ -21,6 +21,27 @@ EMAIL = f"deepinsight.tester.{int(time.time())}@example.com"
 PASSWORD = "TestSifre!2026"
 
 client = httpx.Client(timeout=90)
+
+
+def send_answer(interview_id: str, message: str, headers: dict):
+    """/chat/stream'e cevap gönderir; (HTTP durumu, birleşik metin, son done/error olayı) döner."""
+    text, final = [], None
+    with client.stream("POST", f"{BASE}/interview/chat/stream",
+                       json={"interview_id": interview_id, "message": message}, headers=headers) as resp:
+        if resp.status_code != 200:
+            return resp.status_code, resp.read().decode(errors="replace"), None
+        event_type = None
+        for line in resp.iter_lines():
+            if line.startswith("event:"):
+                event_type = line[len("event:"):].strip()
+            elif line.startswith("data:"):
+                data = json.loads(line[len("data:"):].strip())
+                if event_type == "chunk":
+                    text.append(data)
+                else:
+                    final = (event_type, data)
+    return 200, "".join(text), final
+
 
 print(f"=== 1) Kayıt: {EMAIL} ===")
 r = client.post(f"{BASE}/auth/register", json={"email": EMAIL, "password": PASSWORD, "first_name": "Test", "last_name": "User", "privacy_accepted": True})
@@ -56,17 +77,16 @@ answers = [
 ]
 
 for i, answer in enumerate(answers, start=1):
-    print(f"\n=== 4.{i}) /chat - cevap {i} gönderiliyor ===")
-    r = client.post(f"{BASE}/interview/chat", json={"interview_id": interview_id, "message": answer}, headers=headers)
-    print(r.status_code)
-    if r.status_code != 200:
-        print("HATA:", r.text)
+    print(f"\n=== 4.{i}) /chat/stream - cevap {i} gönderiliyor ===")
+    status, text, final = send_answer(interview_id, answer, headers)
+    print(status)
+    if status != 200 or not final or final[0] == "error":
+        print("HATA:", text, final)
         break
-    data = r.json()
-    print("interview_complete:", data["interview_complete"])
-    print("response:", data["response"][:300])
-    if data["interview_complete"]:
-        print("EVALUATION:", json.dumps(data["evaluation"], ensure_ascii=False, indent=2))
+    print("interview_complete:", final[1]["interview_complete"])
+    print("response:", text[:300])
+    if final[1]["interview_complete"]:
+        print("EVALUATION:", json.dumps(final[1]["evaluation"], ensure_ascii=False, indent=2))
         break
 
 print("\n=== 5) Kalıcılık kontrolü: GET /interview/{id} ===")
@@ -83,7 +103,7 @@ print("\n=== 6) Ekstra sağlamlık testi: mesaj boyutu/injection reddi ===")
 r = client.post(f"{BASE}/interview/start", json={"role": "a" * 200, "topic": "test"}, headers=headers)
 print("cok uzun role ->", r.status_code, "(422 beklenir)")
 
-r = client.post(f"{BASE}/interview/chat", json={"interview_id": interview_id, "message": ""}, headers=headers)
+r = client.post(f"{BASE}/interview/chat/stream", json={"interview_id": interview_id, "message": ""}, headers=headers)
 print("bos mesaj (tamamlanmis mulakata) ->", r.status_code, "(400 veya 422 beklenir)")
 
 print("\n=== TAMAMLANDI ===")

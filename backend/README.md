@@ -100,7 +100,7 @@ Backend sunucusunu yerel ortamda çalıştırmak için aşağıdaki adımları u
 *   **Akademik ölçüm betikleri** (`scripts/eval/`): embedding karşılaştırması, LLM değerlendirici tutarlılığı, ATS dayanıklılığı — bkz. [`docs/evaluation`](../docs/evaluation/README.md).
 *   **Manuel canlı doğrulama script'leri** (gerçek `.env` + gerçek API çağrısı gerektirir, kota/kredi harcar, pytest'e dahil değildir):
     *   `python check_llm_live.py` — `llm_service`'i gerçek LLM sağlayıcısına karşı çalıştırıp soru üretme + JSON değerlendirme akışını doğrular (Supabase gerekmez).
-    *   `python check_interview_e2e.py` — çalışan bir sunucuya (`uvicorn app.main:app --port 8123`) karşı kayıt→giriş→5 soruluk mülakat→değerlendirme→kalıcılık akışının tamamını gerçek HTTP istekleriyle test eder.
+    *   `python check_interview_e2e.py` — çalışan bir sunucuya (`uvicorn app.main:app --port 8123`) karşı kayıt→giriş→5 soruluk mülakat (`/chat/stream`)→değerlendirme→kalıcılık akışının tamamını gerçek HTTP istekleriyle test eder.
     *   `python check_stream_e2e.py` — aynı akışı `/interview/chat/stream` SSE uç noktası üzerinden, gerçek token-token akışı konsola basarak test eder.
 
 ---

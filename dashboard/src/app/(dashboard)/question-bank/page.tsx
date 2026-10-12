@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, Check, X, AlertTriangle, Layers, Loader2, Database, Sparkles, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, X, XCircle, AlertTriangle, Layers, Loader2, Database, Sparkles, ThumbsUp, ThumbsDown } from "lucide-react";
 import {
   questionBankService,
   QuestionBankItem,
@@ -43,6 +43,11 @@ export default function QuestionBankPage() {
   const [editText, setEditText] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // İşlem hataları alert() yerine sayfanın üstünde; silme onayı satır içinde (confirm() yerine).
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const fail = (err: unknown, fallback: string) => setActionError(err instanceof Error ? err.message : fallback);
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
@@ -67,36 +72,39 @@ export default function QuestionBankPage() {
   }, [load]);
 
   const handleGenerateCandidates = async () => {
+    setActionError(null);
     setGenerating(true);
     try {
       await questionBankService.generateCandidates(5);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Öneri üretilemedi.");
+      fail(e, "Öneri üretilemedi.");
     } finally {
       setGenerating(false);
     }
   };
 
   const handleApproveCandidate = async (c: QuestionBankCandidateItem) => {
+    setActionError(null);
     setReviewingId(c.id);
     try {
       await questionBankService.approveCandidate(c.id);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Onaylanamadı.");
+      fail(e, "Onaylanamadı.");
     } finally {
       setReviewingId(null);
     }
   };
 
   const handleRejectCandidate = async (c: QuestionBankCandidateItem) => {
+    setActionError(null);
     setReviewingId(c.id);
     try {
       await questionBankService.rejectCandidate(c.id);
       await load();
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Reddedilemedi.");
+      fail(e, "Reddedilemedi.");
     } finally {
       setReviewingId(null);
     }
@@ -146,21 +154,23 @@ export default function QuestionBankPage() {
   };
 
   const handleToggleActive = async (q: QuestionBankItem) => {
+    setActionError(null);
     try {
       await questionBankService.updateQuestion(q.id, { is_active: !q.is_active });
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Güncellenemedi.");
+      fail(err, "Güncellenemedi.");
     }
   };
 
   const handleDelete = async (q: QuestionBankItem) => {
-    if (!confirm("Bu soruyu kalıcı olarak silmek istediğinize emin misiniz?")) return;
+    setActionError(null);
     try {
       await questionBankService.deleteQuestion(q.id);
+      setConfirmDeleteId(null);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Silinemedi.");
+      fail(err, "Silinemedi.");
     }
   };
 
@@ -171,13 +181,14 @@ export default function QuestionBankPage() {
 
   const saveEdit = async (q: QuestionBankItem) => {
     if (editText.trim().length < 10) return;
+    setActionError(null);
     setSavingEdit(true);
     try {
       await questionBankService.updateQuestion(q.id, { question_text: editText.trim() });
       setEditingId(null);
       await load();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Güncellenemedi.");
+      fail(err, "Güncellenemedi.");
     } finally {
       setSavingEdit(false);
     }
@@ -220,19 +231,28 @@ export default function QuestionBankPage() {
         </div>
         {!isEditing && (
           <div className="flex items-center gap-1 shrink-0">
-            <button onClick={() => startEdit(q)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors" title="Düzenle">
+            <button onClick={() => startEdit(q)} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors" title="Düzenle" aria-label="Soruyu düzenle">
               <Pencil className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => handleToggleActive(q)}
               className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground transition-colors"
               title={q.is_active ? "Pasifleştir" : "Aktifleştir"}
+              aria-label={q.is_active ? "Soruyu pasifleştir" : "Soruyu aktifleştir"}
             >
               {q.is_active ? <X className="w-3.5 h-3.5" /> : <Check className="w-3.5 h-3.5" />}
             </button>
-            <button onClick={() => handleDelete(q)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors" title="Sil">
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
+            {confirmDeleteId === q.id ? (
+              <span className="flex items-center gap-2 text-xs pl-1">
+                <span className="text-muted-foreground">Kalıcı olarak silinsin mi?</span>
+                <button onClick={() => handleDelete(q)} className="font-bold text-destructive hover:underline">Evet, sil</button>
+                <button onClick={() => setConfirmDeleteId(null)} className="text-muted-foreground hover:underline">Vazgeç</button>
+              </span>
+            ) : (
+              <button onClick={() => setConfirmDeleteId(q.id)} className="p-1.5 rounded-lg hover:bg-destructive/10 text-destructive transition-colors" title="Sil" aria-label="Soruyu sil">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -250,6 +270,16 @@ export default function QuestionBankPage() {
           Mülakat sorularını buradan ekleyin ve düzenleyin — embedding otomatik hesaplanır, SQL Editor&apos;e gerek kalmaz.
         </p>
       </div>
+
+      {actionError && (
+        <div role="alert" className="mb-6 flex items-start gap-3 bg-destructive/10 border border-destructive/20 text-destructive rounded-2xl px-4 py-3 text-sm font-semibold">
+          <XCircle className="w-5 h-5 shrink-0 mt-0.5" />
+          <span className="flex-1">{actionError}</span>
+          <button onClick={() => setActionError(null)} className="text-xs underline shrink-0">
+            Kapat
+          </button>
+        </div>
+      )}
 
       {/* Yeni Soru Formu */}
       <div className="bg-card border border-border rounded-3xl shadow-sm p-6 mb-8">
@@ -315,7 +345,7 @@ export default function QuestionBankPage() {
             </p>
           </div>
 
-          {formError && <p className="text-xs text-destructive font-semibold">{formError}</p>}
+          {formError && <p role="alert" className="text-xs text-destructive font-semibold">{formError}</p>}
 
           <Button type="submit" disabled={submitting}>
             {submitting ? (

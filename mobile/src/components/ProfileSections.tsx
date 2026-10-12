@@ -188,6 +188,7 @@ export function PasswordSection() {
 function VideoConsentRow() {
   const [consent, setConsent] = useState<AccountConsent | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -195,6 +196,12 @@ function VideoConsentRow() {
   }, []);
 
   const toggle = async (granted: boolean) => {
+    // Geri çekme veri siler: önce uygulama içi onay.
+    if (!granted && !confirmRevoke) {
+      setConfirmRevoke(true);
+      return;
+    }
+    setConfirmRevoke(false);
     setBusy(true);
     setError(null);
     try {
@@ -213,19 +220,32 @@ function VideoConsentRow() {
         <View style={{ flex: 1 }}>
           <Text style={typo.bodyStrong}>Video analizi onamı</Text>
           <Text style={[typo.small, { marginTop: 4 }]}>
-            {consent.granted
-              ? 'Verildi. Geri çekerseniz kayıtlı video analizi sonuçlarınız silinir; yazılı mülakat yapmaya devam edebilirsiniz.'
-              : 'Verilmedi. Görüntülü mülakat başlatırken onam istenir.'}
+            {busy
+              ? 'Güncelleniyor…'
+              : consent.granted
+                ? 'Verildi. Geri çekerseniz kayıtlı video analizi sonuçlarınız silinir; yazılı mülakat yapmaya devam edebilirsiniz.'
+                : 'Verilmedi. Görüntülü mülakat başlatırken onam istenir.'}
           </Text>
         </View>
         <Switch
           value={consent.granted}
           onValueChange={toggle}
-          disabled={busy}
+          disabled={busy || confirmRevoke}
           trackColor={{ true: Colors.secondary, false: Colors.outlineVariant }}
           accessibilityLabel="Video analizi onamı"
         />
       </View>
+      {confirmRevoke && (
+        <View style={styles.deleteBox}>
+          <Text style={typo.small}>
+            Onamı geri çekerseniz kayıtlı video analizi sonuçlarınız kalıcı olarak silinir. Emin misiniz?
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <PrimaryButton title="Geri çek ve sil" variant="danger" onPress={() => toggle(false)} style={{ flex: 1 }} />
+            <PrimaryButton title="Vazgeç" variant="outline" onPress={() => setConfirmRevoke(false)} style={{ flex: 1 }} />
+          </View>
+        </View>
+      )}
       {error && <View style={{ marginTop: 8 }}><Banner>{error}</Banner></View>}
       <View style={styles.divider} />
     </>

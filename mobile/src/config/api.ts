@@ -124,5 +124,9 @@ export function errorMessage(error: unknown, fallback = 'Bir hata oluştu.'): st
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail) && detail[0]?.msg) return String(detail[0].msg);
   if (e?.message === 'Network Error') return 'Sunucuya ulaşılamadı. Bağlantınızı kontrol edin.';
+  // call()/callOrNull() mesajı zaten çözülmüş düz bir Error'a koyar; onu koru.
+  if (!e?.isAxiosError && error instanceof Error && error.message && error.message !== 'Bir hata oluştu.') {
+    return error.message;
+  }
   return fallback;
 }

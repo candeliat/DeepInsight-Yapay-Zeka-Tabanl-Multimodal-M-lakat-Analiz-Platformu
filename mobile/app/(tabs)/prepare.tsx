@@ -8,7 +8,6 @@ import {
   StatusBar,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -87,6 +86,8 @@ export default function PrepareScreen() {
   // Kayıt sunucuya yüklenip analiz edildiği için görüntülü modda açık onam şart (web ile aynı).
   const [videoConsent, setVideoConsent] = useState<AccountConsent | null>(null);
   const [consentBusy, setConsentBusy] = useState(false);
+  // Başlatmayı engelleyen durum (onam, izin, sunucu hatası); alt çubukta gösterilir, mod değişince sıfırlanır.
+  const [startError, setStartError] = useState<string | null>(null);
   const [cvs, setCvs] = useState<CVItem[]>([]);
   const [jobs, setJobs] = useState<JobItem[]>([]);
 
@@ -111,9 +112,9 @@ export default function PrepareScreen() {
     setConsentBusy(true);
     try {
       setVideoConsent(await accountService.setVideoConsent(true));
-      setContextError(null);
+      setStartError(null);
     } catch (e) {
-      setContextError(errorMessage(e, 'Onam kaydedilemedi.'));
+      setStartError(errorMessage(e, 'Onam kaydedilemedi.'));
     } finally {
       setConsentBusy(false);
     }
@@ -192,33 +193,26 @@ export default function PrepareScreen() {
 
   const handleStart = async () => {
     if (mode === 'video' && !videoConsent?.granted) {
-      setContextError('Görüntülü mülakat için önce video analizi onamını verin ya da Yazılı modu seçin.');
+      setStartError('Görüntülü mülakat için önce video analizi onamını verin ya da Yazılı modu seçin.');
       return;
     }
     // İzin kontrolü (yalnızca görüntülü modda)
     if (mode === 'video' && !cameraPermission?.granted) {
       const result = await requestCameraPermission();
       if (!result.granted) {
-        Alert.alert(
-          'Kamera İzni Gerekli',
-          'Mülakata katılmak için kamera erişimi gereklidir.',
-          [{ text: 'Tamam' }]
-        );
+        setStartError('Görüntülü mülakat için kamera izni gerekli. İzin vermek istemiyorsanız Yazılı modu seçin.');
         return;
       }
     }
     if (mode === 'video' && !micPermission?.granted) {
       const result = await requestMicPermission();
       if (!result.granted) {
-        Alert.alert(
-          'Mikrofon İzni Gerekli',
-          'Mülakata katılmak için mikrofon erişimi gereklidir.',
-          [{ text: 'Tamam' }]
-        );
+        setStartError('Görüntülü mülakat için mikrofon izni gerekli. İzin vermek istemiyorsanız Yazılı modu seçin.');
         return;
       }
     }
 
+    setStartError(null);
     try {
       // NOT: Önceden zorluk seviyesi yanlışlıkla `topic` alanına, tek metin
       // girişi ise `role` alanına gönderiliyordu (gerçek bir konu alanı hiç
@@ -237,12 +231,12 @@ export default function PrepareScreen() {
     } catch (e) {
       // Kota (429), ödev/CV bulunamadı (404) gibi durumlarda sunucunun mesajı gösterilir.
       const msg = errorMessage(e, 'Mülakat başlatılamadı. Bağlantınızı kontrol edin.');
-      setContextError(msg);
-      Alert.alert('Mülakat başlatılamadı', msg);
+      setStartError(msg);
     }
   };
 
   const cameraOk = cameraPermission?.granted;
+  const needsConsent = mode === 'video' && !!videoConsent && !videoConsent.granted;
   const micOk = micPermission?.granted;
 
   return (
@@ -315,7 +309,7 @@ export default function PrepareScreen() {
           ] as const).map(([key, icon, label, sub]) => (
             <TouchableOpacity
               key={key}
-              onPress={() => setMode(key)}
+              onPress={() => { setMode(key); setStartError(null); }}
               style={[styles.modeBtn, mode === key && styles.modeBtnActive]}
               accessibilityRole="radio"
               accessibilityState={{ checked: mode === key }}
@@ -567,9 +561,16 @@ export default function PrepareScreen() {
 
       {/* Alt Aksiyon Barı */}
       <View style={styles.actionBar}>
-        <View>
+        <View style={{ flex: 1, marginRight: 12 }}>
           <Text style={styles.actionBarLabel}>BAŞLAMAYA HAZIR MISINIZ?</Text>
-          <Text style={styles.actionBarSub}>Oturumunuz hazır.</Text>
+          {/* Engelleyen durum ve hatalar burada da gösterilir: üstteki hata kutusu kaydırınca görünmeyebilir. */}
+          <Text
+            style={[styles.actionBarSub, (startError || needsConsent) && styles.actionBarWarn]}
+            numberOfLines={3}
+            accessibilityLiveRegion="polite"
+          >
+            {startError ?? (needsConsent ? 'Önce video analizi onamını verin ya da Yazılı modu seçin.' : 'Oturumunuz hazır.')}
+          </Text>
         </View>
         <TouchableOpacity
           style={[styles.startButton, isThinking && { opacity: 0.7 }]}
@@ -843,6 +844,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   actionBarLabel: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.5 },
+  actionBarWarn: { fontSize: 12, color: Colors.error, lineHeight: 16 },
   actionBarSub: { fontSize: 14, fontFamily: FontFamilies.sansSemibold, color: Colors.onSurface, marginTop: 2 },
   startButton: {
     flexDirection: 'row',

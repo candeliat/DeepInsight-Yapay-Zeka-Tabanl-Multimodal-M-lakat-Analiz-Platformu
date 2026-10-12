@@ -1,0 +1,57 @@
+[
+  {
+    "role": "Veri Analisti",
+    "topic": "Veri Analizi ve SQL",
+    "tags": ["verianalizi", "sql", "pandas"],
+    "questions": [
+      {"d": "JUNIOR", "q": "Bir veri setinde eksik değerlerle nasıl başa çıkarsınız?", "p": ["Önce eksikliğin nedenini ve oranını anlamak", "Satırı/sütunu çıkarmak, ortalama/medyan/mod ile doldurmak ya da eksikliği ayrı kategori yapmak", "Seçimin analizi nasıl etkilediğini belirtmek (yanlılık)"]},
+      {"d": "JUNIOR", "q": "Ortalama ve medyan arasındaki fark nedir? Maaş verisinde hangisini raporlarsınız?", "p": ["Ortalama uç değerlerden etkilenir, medyan etkilenmez", "Çarpık dağılımlarda (maaş) medyan daha temsilidir", "Dağılımı görselleştirmek (histogram, kutu grafiği)"]},
+      {"d": "JUNIOR", "q": "Bir satış tablosunda her ayın toplam satışını ve bir önceki aya göre değişimini veren sorguyu nasıl yazarsınız?", "p": ["Tarihi aya indirgeyip GROUP BY ile toplamak", "LAG pencere fonksiyonuyla önceki ay değerini almak", "Yüzde değişim hesabı ve sıfıra bölme kontrolü"]},
+      {"d": "JUNIOR", "q": "Bir panoda (dashboard) hangi grafik türünü ne zaman kullanırsınız?", "p": ["Zaman içindeki eğilim için çizgi", "Kategorik karşılaştırma için çubuk", "Dağılım için histogram/kutu, ilişki için dağılım (scatter)", "Pasta grafiğinin sınırlılıkları ve okunabilirlik"]},
+      {"d": "ORTA", "q": "Pencere fonksiyonları (`ROW_NUMBER`, `RANK`, `SUM OVER`) hangi analizlerde kullanılır? Her müşterinin son siparişini nasıl bulursunuz?", "p": ["Gruplamadan satır bazlı sıralama ve kümülatif hesaplar", "ROW_NUMBER() OVER (PARTITION BY müşteri ORDER BY tarih DESC) = 1", "RANK ile ROW_NUMBER'ın eşitlikteki farkı"]},
+      {"d": "ORTA", "q": "Bir A/B testinin sonucunu nasıl yorumlarsınız? İstatistiksel anlamlılık ne demektir?", "p": ["Hipotez, örneklem büyüklüğü ve test süresini önceden belirlemek", "p-değeri ve güven aralığı; anlamlılık pratik etkiyle aynı şey değil", "Erken bakıp durdurmanın (peeking) yanılttığı", "Segment ve yenilik etkisine dikkat"]},
+      {"d": "ORTA", "q": "pandas ile büyük bir CSV'yi işlerken bellek sorunlarını nasıl önlersiniz?", "p": ["Gerekli sütunları seçmek (usecols) ve uygun veri tipleri (category, int32)", "chunksize ile parça parça okumak", "Parquet gibi sütunlu formatlar", "Gerekirse veritabanı ya da Polars/DuckDB"]},
+      {"d": "ORTA", "q": "Korelasyon ile nedensellik arasındaki fark nedir? Bir iş kararında bu ayrım neden önemlidir?", "p": ["Korelasyon birlikte değişimi gösterir, nedeni kanıtlamaz", "Karıştırıcı değişkenler (confounder)", "Nedensellik için deney (A/B) ya da uygun yöntemler", "Somut bir yanlış karar örneği"]},
+      {"d": "UZMAN", "q": "Müşteri kaybı (churn) analizini uçtan uca nasıl kurgularsınız?", "p": ["Churn'ün iş tanımını netleştirmek", "Davranışsal öznitelikler ve kohort analizi", "Önemli faktörleri açıklanabilir biçimde sunmak", "Sonucu aksiyona dönüştürmek ve etkisini ölçmek"]},
+      {"d": "UZMAN", "q": "Farklı kaynaklardan gelen ve birbiriyle çelişen metrikleri (ör. iki raporda farklı gelir) nasıl uzlaştırırsınız?", "p": ["Metrik tanımlarını ve filtreleri karşılaştırmak (iade, vergi, saat dilimi)", "Veri soy ağacını (lineage) izlemek", "Tek bir doğruluk kaynağı ve metrik sözlüğü oluşturmak"]},
+      {"d": "UZMAN", "q": "Bir veri ambarında (data warehouse) yıldız şema (star schema) nedir? Olgu (fact) ve boyut (dimension) tablolarını açıklayın.", "p": ["Fact: ölçülebilir olaylar (satış tutarı, adet)", "Dimension: bağlam (müşteri, ürün, tarih)", "Analitik sorguları basitleştirir ve hızlandırır", "Yavaş değişen boyutlar (SCD) kavramı"]},
+      {"d": "UZMAN", "q": "Bir analizin sonucunu teknik olmayan yöneticilere nasıl sunarsınız?", "p": ["Önce sonuç ve öneri, sonra kanıt", "Basit görseller ve iş diliyle anlatım", "Belirsizliği ve varsayımları açıkça belirtmek", "Kararla bağlantı kurmak"]}
+    ]
+  },
+  {
+    "role": "Veri Bilimci",
+    "topic": "Makine Öğrenmesi",
+    "tags": ["machinelearning"],
+    "questions": [
+      {"d": "JUNIOR", "q": "Denetimli (supervised) ve denetimsiz (unsupervised) öğrenme arasındaki fark nedir? Her birine örnek verin.", "p": ["Denetimli: etiketli veriyle tahmin (sınıflandırma, regresyon)", "Denetimsiz: etiketsiz veride yapı bulma (kümeleme, boyut indirgeme)", "Örnekler: spam tespiti, müşteri segmentasyonu"]},
+      {"d": "JUNIOR", "q": "Veriyi neden eğitim, doğrulama ve test olarak ayırırız?", "p": ["Modeli görmediği veride değerlendirmek", "Doğrulama kümesi hiperparametre seçimi için, test son değerlendirme için", "Veri sızıntısını (leakage) önlemek; zaman serisinde zamana göre ayırmak"]},
+      {"d": "JUNIOR", "q": "Sınıflandırmada accuracy, precision ve recall nedir? Hangi durumda accuracy yanıltıcı olur?", "p": ["Precision: pozitif tahminlerin ne kadarı doğru", "Recall: gerçek pozitiflerin ne kadarı yakalandı", "Dengesiz veride accuracy yanıltıcıdır (ör. %99 negatif sınıf)", "F1 ve iş maliyetine göre metrik seçimi"]},
+      {"d": "ORTA", "q": "Bias-variance (yanlılık-varyans) ödünleşimini açıklayın.", "p": ["Yüksek yanlılık: model çok basit, underfitting", "Yüksek varyans: model veriyi ezberler, overfitting", "Düzenlileştirme, daha çok veri, model karmaşıklığını ayarlamak", "Öğrenme eğrileriyle teşhis"]},
+      {"d": "ORTA", "q": "Çapraz doğrulama (cross-validation) nedir ve neden kullanılır?", "p": ["Veriyi k parçaya bölüp her seferinde birini doğrulama yapmak", "Tek bir ayrıma bağlı şans etkisini azaltır", "Stratified k-fold dengesiz veride; zaman serisinde ileriye dönük bölme"]},
+      {"d": "ORTA", "q": "Özellik mühendisliği (feature engineering) nedir? Kategorik değişkenleri nasıl kodlarsınız?", "p": ["Ham veriden modele anlamlı girdiler üretmek", "One-hot, ordinal ve target encoding", "Yüksek kardinalitede target encoding'in sızıntı riski", "Ölçekleme (standardization) ve eksik değer işleme"]},
+      {"d": "UZMAN", "q": "Karar ağacı, random forest ve gradient boosting arasındaki farkları açıklayın.", "p": ["Karar ağacı: yorumlanabilir ama overfit eğilimli", "Random forest: bagging ile çok ağacın ortalaması, varyansı düşürür", "Gradient boosting: hataları sırayla düzelten ağaçlar, genelde daha isabetli ama ayar ister", "Tablo verisinde boosting'in güçlü bir başlangıç olduğu"]},
+      {"d": "UZMAN", "q": "Bir modelin tahminlerini paydaşlara nasıl açıklarsınız? SHAP gibi yöntemler ne sağlar?", "p": ["Global ve yerel açıklanabilirlik", "SHAP: her özelliğin tahmine katkısı", "Açıklamanın nedensellik olmadığını belirtmek", "Önyargı (bias) ve adalet kontrolleri"]},
+      {"d": "UZMAN", "q": "Bir modeli üretime alırken hangi adımları planlarsınız (MLOps)?", "p": ["Model ve veri sürümleme, tekrarlanabilir eğitim", "Servisleme (API ya da toplu), gecikme gereksinimleri", "İzleme: veri kayması (drift) ve performans", "Yeniden eğitim ve geri alma stratejisi"]}
+    ]
+  },
+  {
+    "role": "Tüm Roller",
+    "topic": "Davranışsal Mülakat",
+    "tags": ["davranissal"],
+    "type": "davranissal",
+    "questions": [
+      {"d": "JUNIOR", "q": "Kendinizi ve bu pozisyona neden başvurduğunuzu kısaca anlatır mısınız?", "p": ["Kısa geçmiş, ilgili beceri ve deneyimler", "Pozisyon ve şirketle somut bağlantı", "Ezber değil, 1-2 dakikalık odaklı anlatım"]},
+      {"d": "JUNIOR", "q": "Bir projede karşılaştığınız zor bir teknik problemi ve nasıl çözdüğünüzü anlatın.", "p": ["Durum ve görev net (STAR: Situation, Task)", "Kendi yaptığınız somut adımlar ('biz' değil 'ben')", "Ölçülebilir sonuç ve öğrenilen ders"]},
+      {"d": "JUNIOR", "q": "Bir ekip çalışmasında üstlendiğiniz rolü ve katkınızı bir örnekle anlatın.", "p": ["Ekibin hedefi ve sizin sorumluluğunuz", "İletişim ve iş birliği örnekleri", "Sonuca somut katkı"]},
+      {"d": "JUNIOR", "q": "Bilmediğiniz yeni bir teknolojiyi kısa sürede öğrenmeniz gereken bir durumu anlatın.", "p": ["Öğrenme yaklaşımı (belge, küçük deneme projesi, mentor)", "Zaman baskısını nasıl yönettiğiniz", "Öğrendiğinizi nasıl uyguladığınız ve sonucu"]},
+      {"d": "ORTA", "q": "Bir ekip arkadaşınızla teknik bir konuda anlaşmazlığa düştüğünüz bir durumu anlatın. Nasıl çözdünüz?", "p": ["Anlaşmazlığın konusu ve iki tarafın gerekçeleri", "Veriyle, denemeyle ya da ortak kriterle karar verme", "İlişkiyi koruyarak çözüm ve sonuç"]},
+      {"d": "ORTA", "q": "Bir hata yaptığınız ya da bir işin başarısız olduğu bir durumu anlatın. Ne öğrendiniz?", "p": ["Sorumluluk almak, suçlamamak", "Hatanın etkisini sınırlamak için yapılanlar", "Tekrarını önlemek için alınan kalıcı önlem"]},
+      {"d": "ORTA", "q": "Sıkışık bir teslim tarihinde önceliklendirme yapmanız gereken bir durumu anlatın.", "p": ["İşleri etki ve aciliyete göre sıralamak", "Paydaşlarla kapsamı ya da tarihi konuşmak", "Kaliteden ne kadar ödün verildiği ve sonuç"]},
+      {"d": "ORTA", "q": "Aldığınız yapıcı bir eleştiriyi ve sonrasında ne değiştirdiğinizi anlatın.", "p": ["Eleştiriyi savunmaya geçmeden dinlemek", "Somut değişiklik ve uygulama", "Sonucu ölçmek ya da geri bildirim istemek"]},
+      {"d": "UZMAN", "q": "Teknik bir kararın sorumluluğunu aldığınız ve sonradan yanlış çıktığı bir durumu anlatın.", "p": ["Kararın bağlamı ve gerekçesi", "Yanlışlığın nasıl fark edildiği ve rotanın nasıl düzeltildiği", "Karar alma sürecinde yaptığınız değişiklik"]},
+      {"d": "UZMAN", "q": "Daha deneyimsiz bir ekip arkadaşına mentorluk yaptığınız bir örneği anlatın.", "p": ["Kişinin ihtiyacını anlamak", "Doğrudan çözüm yerine yol göstermek, eşli çalışma, kod incelemesi", "Gözlemlenen gelişim"]},
+      {"d": "UZMAN", "q": "Bir projede kapsam ya da yön değişikliği için yöneticinizi ikna etmeniz gereken bir durumu anlatın.", "p": ["Sorunu veriyle ortaya koymak", "Alternatifleri ve riskleri karşılaştırmak", "Ortak karara varmak ve sonucu"]},
+      {"d": "UZMAN", "q": "Ekip içinde verimsiz bir süreci iyileştirdiğiniz bir örnek verin.", "p": ["Sorunun etkisini ölçmek (zaman, hata oranı)", "Çözümü küçük adımlarla ve ekiple birlikte uygulamak", "Sonucu ölçüp paylaşmak"]}
+    ]
+  }
+]

@@ -1,0 +1,78 @@
+[
+  {
+    "role": "Mobil Geliştirici",
+    "topic": "Flutter",
+    "tags": ["flutter", "dart"],
+    "questions": [
+      {"d": "JUNIOR", "q": "Flutter'da StatelessWidget ile StatefulWidget arasındaki fark nedir? `setState` ne işe yarar?", "p": ["Stateless: değişmeyen, yalnızca girdisine göre çizilen widget", "Stateful: değişebilen durumu State nesnesinde tutar", "setState durumu güncelleyip yeniden çizimi tetikler; yalnızca senkron güncelleme içinde kullanılmalı"]},
+      {"d": "JUNIOR", "q": "Flutter'da `const` constructor kullanmanın performansa etkisi nedir?", "p": ["const widget'lar derleme zamanında oluşturulur ve yeniden kullanılır", "Gereksiz yeniden oluşturma ve karşılaştırma azalır", "Lint kurallarıyla const kullanımını teşvik etmek"]},
+      {"d": "JUNIOR", "q": "Dart'ta `Future` ve `async/await` nasıl kullanılır? Bir ağ isteğinin sonucunu ekranda göstermek için hangi widget'tan yararlanırsınız?", "p": ["Future gelecekte tamamlanacak işlemi temsil eder; await ile beklenir", "FutureBuilder ile yükleniyor/hata/veri durumlarını çizmek", "Hataları try/catch ile ele almak"]},
+      {"d": "JUNIOR", "q": "Flutter'da bir ekrandan diğerine geçiş (navigation) ve veri aktarımı nasıl yapılır?", "p": ["Navigator.push/pop ya da isimli rotalar; go_router gibi paketler", "Constructor parametresiyle veri gönderme", "pop ile sonuç döndürme"]},
+      {"d": "ORTA", "q": "Flutter'da state management için Provider, Riverpod ve Bloc yaklaşımlarını karşılaştırın.", "p": ["Provider: basit, InheritedWidget üzerine", "Riverpod: derleme zamanı güvenliği, context'ten bağımsız", "Bloc: olay/durum akışıyla öngörülebilir, daha fazla şablon kod", "Seçimi uygulama büyüklüğü ve ekip deneyimine göre gerekçelendirmek"]},
+      {"d": "ORTA", "q": "Widget, Element ve RenderObject ağaçları arasındaki ilişkiyi açıklayın.", "p": ["Widget: değişmez yapılandırma", "Element: widget'ın ağaçtaki örneği, yaşam döngüsünü yönetir", "RenderObject: düzen ve çizim", "Yeniden build'in ucuz olmasının nedeni"]},
+      {"d": "ORTA", "q": "Uzun bir listeyi Flutter'da performanslı göstermek için ne yaparsınız?", "p": ["ListView.builder ile tembel oluşturma", "Sabit yükseklik (itemExtent) ve const widget'lar", "Görselleri önbelleğe alma ve boyutlandırma", "DevTools ile jank (takılma) analizi"]},
+      {"d": "ORTA", "q": "Flutter uygulamasında yerel veri saklama seçenekleri nelerdir? Hassas veriyi (token) nerede saklarsınız?", "p": ["shared_preferences: küçük ayarlar", "SQLite/drift, Hive/Isar: yapılandırılmış veri", "Token için flutter_secure_storage (Keychain/Keystore)", "Hassas veriyi düz metin olarak saklamamak"]},
+      {"d": "UZMAN", "q": "Flutter'da Isolate nedir? Ağır bir JSON ayrıştırmasını arayüzü dondurmadan nasıl yaparsınız?", "p": ["Dart tek iş parçacıklı olay döngüsünde çalışır; ağır iş UI'ı dondurur", "Isolate ayrı bellekli paralel yürütme birimi", "compute() ya da Isolate.run ile ayrıştırmayı taşımak", "Mesaj geçişinin kopyalama maliyetini bilmek"]},
+      {"d": "UZMAN", "q": "Platforma özgü bir özelliğe (ör. native SDK) erişmek için platform channel'ları nasıl kullanırsınız?", "p": ["MethodChannel ile Dart'tan native koda çağrı", "EventChannel ile native akışlar", "Pigeon ile tür güvenli kod üretimi", "Hata ve iş parçacığı yönetimine dikkat"]},
+      {"d": "UZMAN", "q": "Bir Flutter uygulamasında test stratejinizi anlatın: unit, widget ve integration testleri.", "p": ["Unit: iş mantığı", "Widget: tek widget'ın davranışı ve çizimi (pump, finder)", "Integration: gerçek cihaz/emülatörde uçtan uca akış", "Bağımlılıkları sahtelemek (mock) ve CI'da çalıştırmak"]},
+      {"d": "UZMAN", "q": "Uygulama boyutunu ve açılış süresini nasıl küçültürsünüz?", "p": ["Kullanılmayan paketleri ve kaynakları temizlemek", "Görsel sıkıştırma, ertelenmiş (deferred) yükleme", "split-debug-info ve obfuscation", "Açılışta ağır işi sonraya bırakmak"]}
+    ]
+  },
+  {
+    "role": "Mobil Geliştirici",
+    "topic": "Android ve Kotlin",
+    "tags": ["android", "kotlin"],
+    "questions": [
+      {"d": "JUNIOR", "q": "Kotlin'de null güvenliği nasıl sağlanır? `?.`, `?:` ve `!!` operatörleri ne işe yarar?", "p": ["Türler varsayılan olarak null olamaz; String? null olabilir", "?. güvenli çağrı, ?: varsayılan değer (Elvis)", "!! null ise istisna fırlatır; kaçınılmalı"]},
+      {"d": "JUNIOR", "q": "Android Activity yaşam döngüsünü (onCreate, onStart, onResume, onPause, onStop, onDestroy) açıklayın.", "p": ["Ekranın oluşturulması, görünür olması, etkileşime açılması", "Arka plana geçerken onPause/onStop", "Ekran döndürmede Activity'nin yeniden oluşturulması", "Kaynakları doğru aşamada açıp kapatmak"]},
+      {"d": "JUNIOR", "q": "Kotlin'de `data class` nedir? Ne zaman kullanılır?", "p": ["equals, hashCode, toString ve copy otomatik üretilir", "Veri taşıyan model sınıfları için", "Değişmez (val) alanlarla kullanım önerisi"]},
+      {"d": "JUNIOR", "q": "ViewModel neden kullanılır? Ekran döndürüldüğünde veriyi nasıl korur?", "p": ["UI ile ilgili durumu yaşam döngüsüne duyarlı biçimde tutar", "Yapılandırma değişikliklerinde (döndürme) hayatta kalır", "UI mantığını Activity/Fragment'tan ayırır"]},
+      {"d": "ORTA", "q": "Kotlin Coroutines nedir? `launch` ile `async` farkı ve `Dispatchers` seçimi nasıl yapılır?", "p": ["Hafif eşzamanlılık; askıya alınan (suspend) fonksiyonlar", "launch sonuç döndürmez (Job), async Deferred döner", "Dispatchers.Main UI, IO ağ/disk, Default CPU işi", "viewModelScope ile yaşam döngüsüne bağlı iptal"]},
+      {"d": "ORTA", "q": "Jetpack Compose'da state ve recomposition nasıl çalışır? `remember` ne işe yarar?", "p": ["State değişince ilgili composable'lar yeniden çalışır", "remember değeri recomposition'lar arasında korur; rememberSaveable döndürmede de", "State hoisting ile durumu üst bileşene taşımak", "Gereksiz recomposition'ı önlemek"]},
+      {"d": "ORTA", "q": "Android'de MVVM mimarisini Repository deseniyle birlikte anlatın.", "p": ["View: UI; ViewModel: durum ve olaylar; Repository: veri kaynaklarının soyutlaması", "Tek yönlü veri akışı (StateFlow/LiveData)", "Ağ ve yerel veritabanını (Room) repository'de birleştirmek", "Test edilebilirlik"]},
+      {"d": "ORTA", "q": "Room veritabanı ile çevrimdışı çalışan bir uygulamayı nasıl tasarlarsınız?", "p": ["Yerel veritabanını tek doğruluk kaynağı olarak kullanmak", "Ağdan gelen veriyi yerelde güncelleyip UI'ın Flow ile dinlemesi", "Çevrimdışı yapılan değişikliklerin kuyruğa alınıp senkronize edilmesi (WorkManager)", "Çakışma çözümü"]},
+      {"d": "UZMAN", "q": "Android'de bellek sızıntılarının yaygın nedenleri nelerdir ve nasıl tespit edilir?", "p": ["Activity/Context'e uzun ömürlü referanslar (statik alan, singleton)", "Kayıt silinmeyen dinleyiciler, iptal edilmeyen coroutine'ler", "LeakCanary ve Android Studio Profiler", "Uygulama context'i ile Activity context'ini doğru kullanmak"]},
+      {"d": "UZMAN", "q": "Bağımlılık enjeksiyonu için Hilt/Dagger kullanmanın faydaları ve maliyetleri nelerdir?", "p": ["Bağımlılık grafiğinin derleme zamanında doğrulanması", "Test için bağımlılıkları değiştirebilme", "Öğrenme eğrisi ve derleme süresi maliyeti", "Kapsamlar (Singleton, ViewModelScoped)"]},
+      {"d": "UZMAN", "q": "Mobil uygulamada API anahtarı ve kullanıcı verisi güvenliğini nasıl sağlarsınız?", "p": ["Gizli anahtarı uygulamaya gömmemek; sunucu tarafında tutmak", "Token'ları EncryptedSharedPreferences/Keystore'da saklamak", "TLS ve gerekirse sertifika sabitleme (pinning)", "R8 ile küçültme/karıştırma tek başına güvenlik değildir"]},
+      {"d": "UZMAN", "q": "Uzun süren bir arka plan işini (ör. büyük dosya yükleme) Android'de nasıl güvenilir çalıştırırsınız?", "p": ["WorkManager ile kısıtlar (ağ, şarj) ve yeniden deneme", "Kullanıcının fark etmesi gereken işler için foreground service", "Doze/arka plan kısıtlamalarını bilmek", "İlerlemeyi kalıcı tutup kaldığı yerden devam"]}
+    ]
+  },
+  {
+    "role": "DevOps Mühendisi",
+    "topic": "Docker, CI/CD ve Linux",
+    "tags": ["docker", "cicd", "linux", "kubernetes"],
+    "questions": [
+      {"d": "JUNIOR", "q": "Konteyner ile sanal makine (VM) arasındaki fark nedir?", "p": ["Konteyner ana makinenin çekirdeğini paylaşır, VM kendi işletim sistemini çalıştırır", "Konteyner daha hafif ve hızlı başlar", "VM daha güçlü izolasyon sağlar"]},
+      {"d": "JUNIOR", "q": "Dockerfile'da image katmanları nasıl oluşur? Derleme süresini kısaltmak için talimat sırasını nasıl düzenlersiniz?", "p": ["Her talimat bir katman üretir ve önbelleğe alınır", "Sık değişmeyen adımları (bağımlılık kurulumu) önce, kaynak kodu sonra kopyalamak", ".dockerignore ile gereksiz dosyaları dışarıda tutmak"]},
+      {"d": "JUNIOR", "q": "CI/CD nedir? Basit bir pipeline'da hangi adımlar olur?", "p": ["CI: her değişiklikte otomatik derleme ve test", "CD: onaylanan değişikliğin otomatik dağıtımı", "Adımlar: bağımlılık kurulumu, lint/test, derleme, image, dağıtım"]},
+      {"d": "JUNIOR", "q": "Linux'ta bir sürecin çok CPU tükettiğini fark ettiniz. Hangi komutlarla incelersiniz?", "p": ["top/htop ile süreçleri görmek", "ps ile ayrıntı, kill ile sonlandırma (önce SIGTERM)", "Logları (journalctl) incelemek", "Kök nedeni bulmadan süreci öldürmenin geçici olduğu"]},
+      {"d": "ORTA", "q": "Multi-stage Docker build nedir? Üretim image'ını küçültmenin faydaları nelerdir?", "p": ["Derleme araçları bir aşamada, yalnızca çıktı son aşamaya kopyalanır", "Küçük image: hızlı dağıtım, daha az güvenlik açığı yüzeyi", "Slim/distroless taban image'lar; root olmayan kullanıcı"]},
+      {"d": "ORTA", "q": "Kubernetes'te Pod, Deployment ve Service kavramlarını açıklayın.", "p": ["Pod: bir ya da birden çok konteynerin en küçük çalışma birimi", "Deployment: istenen replika sayısını ve güncellemeleri yönetir", "Service: değişen pod'lara sabit ağ erişimi ve yük dengeleme"]},
+      {"d": "ORTA", "q": "Uygulama yapılandırmasını ve gizli bilgileri konteynerlere nasıl verirsiniz?", "p": ["Ortam değişkenleri, ConfigMap ve Secret", "Gizli bilgiyi image'a gömmemek", "Gizli bilgi yöneticisi (Vault, bulut KMS) ve erişim sınırlaması", "Rotasyon planı"]},
+      {"d": "ORTA", "q": "Readiness ve liveness probe arasındaki fark nedir?", "p": ["Readiness: trafik almaya hazır mı; hazır değilse yük dengeleyiciden çıkarılır", "Liveness: sağlıklı mı; değilse yeniden başlatılır", "Yanlış yapılandırmanın yeniden başlatma döngüsüne yol açabileceği"]},
+      {"d": "UZMAN", "q": "Sıfır kesintili dağıtım (zero-downtime deployment) için hangi stratejileri uygularsınız?", "p": ["Rolling update ve hazırlık kontrolleri", "Blue-green ve canary", "Graceful shutdown: istekleri bitirip kapanmak", "Veritabanı değişikliklerinin geriye uyumlu yapılması"]},
+      {"d": "UZMAN", "q": "Altyapıyı kod olarak yönetmek (IaC) için Terraform ile Ansible arasındaki farkı açıklayın.", "p": ["Terraform: bildirimsel, kaynak sağlama (provisioning), durum dosyası", "Ansible: yapılandırma yönetimi, prosedürel görevler", "Durum dosyasının güvenli ve paylaşımlı saklanması", "Birlikte kullanılabilecekleri"]},
+      {"d": "UZMAN", "q": "Üretimde bir servisin yanıt süresi aniden arttı. Olay müdahalesinde (incident response) nasıl ilerlersiniz?", "p": ["Etkiyi ölçmek ve iletişim kurmak", "Son değişiklikleri (dağıtım, yapılandırma) kontrol etmek; gerekirse geri almak", "Metrik, log ve izlerle darboğazı bulmak (veritabanı, dış servis, kaynak)", "Sonrasında suçlamasız (blameless) değerlendirme ve kalıcı önlem"]},
+      {"d": "UZMAN", "q": "CI/CD pipeline'ında güvenliği (supply chain) nasıl sağlarsınız?", "p": ["Bağımlılık ve image taraması", "En az yetkili pipeline kimlik bilgileri, kısa ömürlü token (OIDC)", "Sabitlenmiş eylem/araç sürümleri", "İmzalı artefaktlar ve korunan dallar"]}
+    ]
+  },
+  {
+    "role": "Yazılım Test Mühendisi",
+    "topic": "Yazılım Testi ve Test Otomasyonu",
+    "tags": ["test", "unittesting", "testotomasyonu"],
+    "questions": [
+      {"d": "JUNIOR", "q": "Unit, entegrasyon ve uçtan uca (E2E) test arasındaki farklar nelerdir? Test piramidi neyi önerir?", "p": ["Unit: tek birim, hızlı ve izole", "Entegrasyon: bileşenlerin birlikte çalışması", "E2E: kullanıcı akışı, yavaş ve kırılgan", "Piramit: çok unit, daha az entegrasyon, az E2E"]},
+      {"d": "JUNIOR", "q": "Regresyon testi nedir? Ne zaman yapılır?", "p": ["Yeni değişikliğin mevcut işlevleri bozmadığını doğrulamak", "Her değişiklikten ya da sürümden önce", "Otomasyonla sürekli çalıştırmanın önemi"]},
+      {"d": "JUNIOR", "q": "Bir giriş (login) ekranı için hangi test senaryolarını yazarsınız?", "p": ["Doğru bilgilerle başarılı giriş", "Yanlış şifre, boş alanlar, geçersiz e-posta biçimi", "Hesap kilitlenmesi, şifremi unuttum, büyük/küçük harf", "Güvenlik: hata mesajının hesap varlığını sızdırmaması, SQL injection denemesi"]},
+      {"d": "JUNIOR", "q": "İyi bir hata raporu (bug report) hangi bilgileri içermelidir?", "p": ["Açık başlık ve yeniden üretme adımları", "Beklenen ve gerçekleşen sonuç", "Ortam bilgisi (sürüm, tarayıcı, cihaz)", "Ekran görüntüsü/log ve önem derecesi"]},
+      {"d": "ORTA", "q": "Sınır değer analizi (boundary value analysis) ve denklik sınıfı bölümlemesi (equivalence partitioning) nedir? Yaş alanı 18-65 kabul eden bir form için örnek verin.", "p": ["Girdileri aynı davranan sınıflara bölmek: <18, 18-65, >65", "Sınırları test etmek: 17, 18, 65, 66", "Az testle yüksek hata yakalama"]},
+      {"d": "ORTA", "q": "Kırılgan (flaky) testlerin nedenleri nelerdir ve nasıl düzeltilir?", "p": ["Zamanlamaya bağlı beklemeler (sabit sleep), yarış durumları", "Testler arası paylaşılan durum ve sıra bağımlılığı", "Dış servislere bağımlılık", "Koşul tabanlı bekleme, izolasyon ve sahte servisler"]},
+      {"d": "ORTA", "q": "Bir REST API'yi nasıl test edersiniz? Hangi senaryoları otomatikleştirirsiniz?", "p": ["Durum kodları, yanıt şeması ve iş kuralları", "Kimlik doğrulama ve yetki (başkasının kaynağına erişim)", "Geçersiz girdi, sınır değerler, idempotentlik", "Postman/REST Assured/pytest ile CI'da çalıştırmak"]},
+      {"d": "ORTA", "q": "Mock, stub ve fake arasındaki fark nedir?", "p": ["Stub: önceden belirlenmiş yanıt döner", "Mock: çağrıların beklentiye uygun yapıldığını da doğrular", "Fake: basitleştirilmiş çalışan uygulama (bellek içi veritabanı)", "Aşırı mock'lamanın gerçekçiliği düşürmesi"]},
+      {"d": "UZMAN", "q": "Test otomasyon çerçevesini sıfırdan kurarken hangi tasarım kararlarını verirsiniz?", "p": ["Page Object ya da benzeri soyutlama", "Test verisi yönetimi ve ortam izolasyonu", "Paralel çalıştırma ve raporlama", "CI entegrasyonu ve kırılgan test takibi"]},
+      {"d": "UZMAN", "q": "Performans testi türlerini (yük, stres, dayanıklılık) açıklayın. Bir API için performans testini nasıl planlarsınız?", "p": ["Yük: beklenen trafik; stres: sınırı bulmak; dayanıklılık (soak): uzun süre", "Hedef metrikler: p95/p99 gecikme, hata oranı, verim", "Gerçekçi senaryo ve veri; k6/JMeter/Gatling", "Darboğazı bulup tekrar ölçmek"]},
+      {"d": "UZMAN", "q": "Test kapsamı (coverage) yüzdesi tek başına neden yanıltıcı olabilir?", "p": ["Satırın çalışması doğru doğrulandığı anlamına gelmez", "Önemli olan kritik iş akışları ve risk bazlı test", "Mutasyon testi ile testlerin hata yakalama gücünü ölçmek"]},
+      {"d": "UZMAN", "q": "Sürekli teslimatta (continuous delivery) kaliteyi nasıl güvence altına alırsınız? 'Shift-left' yaklaşımı nedir?", "p": ["Testi geliştirme sürecinin başına almak", "Kod incelemesi, statik analiz, otomatik testler pipeline'da", "Feature flag ve canary ile üretimde kontrollü doğrulama", "Üretim izleme ve hızlı geri bildirim döngüsü"]}
+    ]
+  }
+]

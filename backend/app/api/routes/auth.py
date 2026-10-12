@@ -55,14 +55,15 @@ def register(user_data: UserCreate):
     """
     Register a new user using Supabase Authentication.
     """
+    # Önce istemci hatası: eksik onay, sunucu yapılandırmasından bağımsız olarak 422'dir.
+    if not user_data.privacy_accepted:
+        raise HTTPException(status_code=422, detail="Kayıt için aydınlatma metnini okuduğunuzu onaylamanız gerekir.")
+
     if not supabase:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database connection is not configured."
         )
-
-    if not user_data.privacy_accepted:
-        raise HTTPException(status_code=422, detail="Kayıt için aydınlatma metnini okuduğunuzu onaylamanız gerekir.")
 
     try:
         # User metadata can store additional profile info

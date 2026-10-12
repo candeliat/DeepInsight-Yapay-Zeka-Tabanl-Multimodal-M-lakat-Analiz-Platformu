@@ -649,14 +649,17 @@ class LLMService:
         history: list[dict] | None,
         role: str,
         topic: str,
+        reference: list[dict] | None = None,
     ) -> dict:
         """
-        Mülakat sonu değerlendirmesini üretir. Modelin geçerli JSON döndürmemesi,
+        Mülakat sonu değerlendirmesini üretir. `reference`: soru bankasından sorulan
+        soruların "iyi cevap noktaları" ([{question, points}]); puanlama ölçütü olarak
+        prompta eklenir (bkz. prompts.interview_v1._reference_block). Modelin geçerli JSON döndürmemesi,
         tüm modellerin başarısız olması gibi durumlarda bile HER ZAMAN geçerli bir
         değerlendirme sözlüğü döner — böylece mülakat asla "tamamlanamayan" bir
         durumda takılı kalmaz.
         """
-        system_prompt = build_evaluation_prompt(role, topic)
+        system_prompt = build_evaluation_prompt(role, topic, reference)
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
         messages.append({

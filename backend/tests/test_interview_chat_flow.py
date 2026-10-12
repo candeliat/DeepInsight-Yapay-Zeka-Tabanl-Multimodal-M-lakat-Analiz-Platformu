@@ -162,3 +162,29 @@ def test_returns_400_when_interview_already_completed(client, monkeypatch):
 
     assert resp.status_code == 400
     interview_route.save_message.assert_not_awaited()
+
+
+def test_final_evaluation_receives_answer_points_of_asked_bank_questions(client, monkeypatch):
+    """Havuzdaki sorulmuş banka sorularının 'iyi cevap noktaları' değerlendirmeye referans
+    olarak gider; sorulmamış (havuzun sonundaki) soruların noktaları gitmez."""
+    _mock_interview_service(monkeypatch, _history_with_n_questions_asked(3))
+    pool = [
+        {"id": "q1", "question_text": "Birinci", "answer_points": ["a", "b"]},
+        {"id": "q2", "question_text": "İkinci", "answer_points": []},
+        {"id": "q3", "question_text": "Üçüncü", "answer_points": ["c"]},
+        {"id": "q4", "question_text": "Sorulmadı", "answer_points": ["d"]},
+    ]
+    monkeypatch.setattr(
+        interview_route, "get_interview",
+        AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python",
+                                "status": "ongoing", "question_pool": pool}),
+    )
+    eval_mock = AsyncMock(return_value=InterviewEvaluation().model_dump())
+    monkeypatch.setattr(llm_service, "get_final_evaluation", eval_mock)
+
+    _stream_events(client, "Son cevap.")
+
+    assert eval_mock.await_args.kwargs["reference"] == [
+        {"question": "Birinci", "points": ["a", "b"]},
+        {"question": "Üçüncü", "points": ["c"]},
+    ]

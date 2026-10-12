@@ -181,7 +181,32 @@ vocabulary_score (Kelime Kullanımı & İletişim):
 feedback alanında, her kriter için hangi bandı neden seçtiğini kısaca gerekçelendir."""
 
 
-def build_evaluation_prompt(role: str, topic: str) -> str:
+def _reference_block(reference: list[dict] | None) -> str:
+    """Soru bankasından gelen soruların "iyi bir cevap neleri içermeli" notları (kürasyonlu
+    içerik, adaya gösterilmez). Puanlamayı soru bazında tutarlı kılmak için referanstır."""
+    items = [r for r in (reference or []) if r.get("points")]
+    if not items:
+        return ""
+    lines = []
+    for i, r in enumerate(items, start=1):
+        points = "; ".join(str(p) for p in r["points"])
+        lines.append(f"{i}. Soru: {r['question']}\n   Güçlü bir cevapta beklenenler: {points}")
+    joined = "\n".join(lines)
+    return f"""
+REFERANS (yalnızca senin için; adaya gösterme, geri bildirimde aynen kopyalama):
+Aşağıdaki sorular soru bankasından seçildi; adaya kendi cümlelerinle iletilmiş olabilir.
+Bir soru geçmişte gerçekten sorulduysa teknik puanı verirken bu noktaları ölçüt olarak kullan:
+noktaların çoğunu doğru ve gerekçeli karşılayan cevap yüksek, yalnızca birine değinen orta,
+hiçbirine değinmeyen ya da yanlış bilgi içeren düşük bant. Noktalar eksiksiz bir liste
+değildir; doğru ve gerekçeli farklı bir yaklaşımı cezalandırma. Geçmişte sorulmamış bir
+sorunun referansını yok say.
+<reference>
+{joined}
+</reference>
+"""
+
+
+def build_evaluation_prompt(role: str, topic: str, reference: list[dict] | None = None) -> str:
     """Mülakat sonu değerlendirmesini üretmek için kullanılan sistem promptu."""
     return f"""Sen profesyonel bir İnsan Kaynakları ve <role>{role}</role> pozisyonu için Teknik Mülakat uzmanısın.
 Konumuz: <topic>{topic}</topic>. Mülakat az önce tamamlandı. Yukarıdaki tüm soru-cevapları dikkate alarak adayı değerlendir.
@@ -189,6 +214,7 @@ Konumuz: <topic>{topic}</topic>. Mülakat az önce tamamlandı. Yukarıdaki tüm
 {_ANTI_INJECTION_RULE}
 
 {_EVALUATION_RUBRIC}
+{_reference_block(reference)}
 
 Cevabını SADECE aşağıdaki JSON formatında ver. JSON dışında hiçbir açıklama, markdown ya da metin ekleme:
 {{

@@ -312,7 +312,7 @@ export default function PrepareScreen() {
               onPress={() => { setMode(key); setStartError(null); }}
               style={[styles.modeBtn, mode === key && styles.modeBtnActive]}
               accessibilityRole="radio"
-              accessibilityState={{ checked: mode === key }}
+              aria-checked={mode === key}
             >
               <Ionicons name={icon} size={20} color={mode === key ? Colors.secondary : Colors.outline} />
               <View>
@@ -432,7 +432,7 @@ export default function PrepareScreen() {
                       onPress={() => router.setParams({ cv: c.id || undefined })}
                       style={[styles.topicChip, active && styles.topicChipActive]}
                       accessibilityRole="radio"
-                      accessibilityState={{ checked: active }}
+                      aria-checked={active}
                     >
                       <Text numberOfLines={1} style={[styles.topicChipText, active && styles.topicChipTextActive]}>{c.label}</Text>
                     </TouchableOpacity>
@@ -454,7 +454,7 @@ export default function PrepareScreen() {
                       onPress={() => router.setParams({ job: j.id || undefined })}
                       style={[styles.topicChip, active && styles.topicChipActive]}
                       accessibilityRole="radio"
-                      accessibilityState={{ checked: active }}
+                      aria-checked={active}
                     >
                       <Text numberOfLines={1} style={[styles.topicChipText, active && styles.topicChipTextActive]}>{j.label}</Text>
                     </TouchableOpacity>
@@ -519,7 +519,7 @@ export default function PrepareScreen() {
                     onPress={() => setOrgId(o.id)}
                     style={[styles.topicChip, orgId === o.id && styles.topicChipActive]}
                     accessibilityRole="radio"
-                    accessibilityState={{ checked: orgId === o.id }}
+                    aria-checked={orgId === o.id}
                   >
                     <Text style={[styles.topicChipText, orgId === o.id && styles.topicChipTextActive]}>{o.name}</Text>
                   </TouchableOpacity>

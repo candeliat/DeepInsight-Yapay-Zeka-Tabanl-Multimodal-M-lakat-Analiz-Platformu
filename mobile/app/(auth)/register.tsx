@@ -172,7 +172,7 @@ export default function RegisterScreen() {
               <TouchableOpacity
                 onPress={() => setPrivacyAccepted((v) => !v)}
                 accessibilityRole="checkbox"
-                accessibilityState={{ checked: privacyAccepted }}
+                aria-checked={privacyAccepted}
                 accessibilityLabel="Aydınlatma metnini okudum"
                 hitSlop={8}
               >

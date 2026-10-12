@@ -194,7 +194,7 @@ export function PrimaryButton({
       disabled={disabled || loading}
       activeOpacity={0.85}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !!(disabled || loading) }}
+      aria-disabled={!!(disabled || loading)}
       style={[
         s.btn,
         { backgroundColor: bg, borderWidth: variant === 'outline' ? 1.5 : 0, borderColor: Colors.secondary },
@@ -220,7 +220,7 @@ export function LikertRow({ label, value, onChange }: { label: string; value?: n
             key={n}
             onPress={() => onChange(n)}
             accessibilityRole="radio"
-            accessibilityState={{ checked: value === n }}
+            aria-checked={value === n}
             accessibilityLabel={`${n} — ${LIKERT[n - 1]}`}
             style={[s.likertBtn, value === n && s.likertBtnOn]}
           >

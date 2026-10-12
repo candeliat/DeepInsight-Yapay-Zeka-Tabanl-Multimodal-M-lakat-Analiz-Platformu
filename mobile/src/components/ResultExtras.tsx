@@ -22,7 +22,7 @@ export function ConversationCard({ messages }: { messages: Message[] | undefined
   if (turns.length === 0) return null;
   return (
     <View style={styles.card}>
-      <TouchableOpacity onPress={() => setOpen((v) => !v)} style={styles.head} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+      <TouchableOpacity onPress={() => setOpen((v) => !v)} style={styles.head} accessibilityRole="button" aria-expanded={open}>
         <Ionicons name="chatbubbles-outline" size={20} color={Colors.secondary} />
         <Text style={[typo.cardTitle, { flex: 1 }]}>Mülakat dökümü</Text>
         <Text style={typo.small}>{turns.length} mesaj</Text>

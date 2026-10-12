@@ -140,7 +140,7 @@ export default function JobDetailScreen() {
                     onPress={() => setCvId(cv.id)}
                     style={[styles.cvChip, cvId === cv.id && styles.cvChipOn]}
                     accessibilityRole="radio"
-                    accessibilityState={{ checked: cvId === cv.id }}
+                    aria-checked={cvId === cv.id}
                   >
                     <Text style={[styles.cvChipText, cvId === cv.id && { color: '#fff' }]} numberOfLines={1}>{cv.original_filename}</Text>
                   </TouchableOpacity>
@@ -182,7 +182,7 @@ export default function JobDetailScreen() {
                   <SectionTitle>Öğrenme yol haritası</SectionTitle>
                   {match.roadmap.map((r, i) => (
                     <Card key={r.skill}>
-                      <TouchableOpacity onPress={() => setOpenRoadmap(openRoadmap === i ? null : i)} style={styles.roadHead} accessibilityState={{ expanded: openRoadmap === i }}>
+                      <TouchableOpacity onPress={() => setOpenRoadmap(openRoadmap === i ? null : i)} style={styles.roadHead} accessibilityRole="button" aria-expanded={openRoadmap === i}>
                         <View style={{ flex: 1 }}>
                           <Text style={typo.bodyStrong}>{r.skill}</Text>
                           <View style={[styles.chips, { marginTop: 6 }]}>

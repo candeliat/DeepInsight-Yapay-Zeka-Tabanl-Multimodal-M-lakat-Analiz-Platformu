@@ -565,11 +565,13 @@ export default function PrepareScreen() {
           <Text style={styles.actionBarLabel}>BAŞLAMAYA HAZIR MISINIZ?</Text>
           {/* Engelleyen durum ve hatalar burada da gösterilir: üstteki hata kutusu kaydırınca görünmeyebilir. */}
           <Text
-            style={[styles.actionBarSub, (startError || needsConsent) && styles.actionBarWarn]}
+            style={[styles.actionBarSub, !isThinking && (startError || needsConsent) && styles.actionBarWarn]}
             numberOfLines={3}
             accessibilityLiveRegion="polite"
           >
-            {startError ?? (needsConsent ? 'Önce video analizi onamını verin ya da Yazılı modu seçin.' : 'Oturumunuz hazır.')}
+            {isThinking
+              ? 'Mülakat hazırlanıyor… (CV/ilanla 30-60 sn sürebilir)'
+              : startError ?? (needsConsent ? 'Önce video analizi onamını verin ya da Yazılı modu seçin.' : 'Oturumunuz hazır.')}
           </Text>
         </View>
         <TouchableOpacity

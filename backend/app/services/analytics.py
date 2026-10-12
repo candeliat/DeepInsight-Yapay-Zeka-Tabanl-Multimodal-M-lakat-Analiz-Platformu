@@ -709,25 +709,9 @@ def save_analytics_to_db(data: Dict[str, Any]) -> None:
         
         record = _convert_to_native(raw_record)
 
-        # Mevcut kayıt varsa güncelle, yoksa yeni ekle
-        existing = (
-            supabase.table("interview_analytics")
-            .select("id")
-            .eq("interview_id", data["interview_id"])
-            .execute()
-        )
-
-        if existing.data:
-            supabase.table("interview_analytics") \
-                .update(record) \
-                .eq("interview_id", data["interview_id"]) \
-                .execute()
-            logger.info("Analiz güncellendi: interview_id=%s", data["interview_id"])
-        else:
-            supabase.table("interview_analytics") \
-                .insert(record) \
-                .execute()
-            logger.info("Analiz kaydedildi: interview_id=%s", data["interview_id"])
+        # Mülakat başına tek satır (unique interview_id, bkz. sql/016): tek atomik upsert.
+        supabase.table("interview_analytics").upsert(record, on_conflict="interview_id").execute()
+        logger.info("Analiz kaydedildi: interview_id=%s", data["interview_id"])
 
     except Exception as e:
         logger.error("Supabase kayıt hatası: %s", e, exc_info=True)
@@ -747,29 +731,15 @@ def _update_analysis_status(
 
     try:
         record = {
+            "interview_id": interview_id,
             "analysis_status": status,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
         if error_message:
             record["error_message"] = error_message
 
-        existing = (
-            supabase.table("interview_analytics")
-            .select("id")
-            .eq("interview_id", interview_id)
-            .execute()
-        )
-
-        if existing.data:
-            supabase.table("interview_analytics") \
-                .update(record) \
-                .eq("interview_id", interview_id) \
-                .execute()
-        else:
-            record["interview_id"] = interview_id
-            supabase.table("interview_analytics") \
-                .insert(record) \
-                .execute()
+        # Yalnızca verilen kolonlar güncellenir (ON CONFLICT DO UPDATE); diğerleri korunur.
+        supabase.table("interview_analytics").upsert(record, on_conflict="interview_id").execute()
 
     except Exception as e:
         logger.error("Durum güncelleme hatası: %s", e)

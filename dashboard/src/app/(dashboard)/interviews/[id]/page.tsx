@@ -7,6 +7,8 @@ import { chatService } from "@/services/chatService";
 import { BAND_BADGE, scoreBand } from "@/lib/scoreBand";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { StarCoachingCard, StarSummary } from "@/components/interview/StarCoaching";
+import type { StarAnalysis } from "@/services/chatService";
 import {
   Loader2,
   Brain,
@@ -448,6 +450,13 @@ export default function InterviewDetailPage() {
         </div>
       )}
 
+      {/* STAR özeti (davranışsal mülakat) */}
+      {messages.some((m: { coaching?: StarAnalysis | null }) => m.coaching) && (
+        <StarSummary
+          analyses={messages.flatMap((m: { coaching?: StarAnalysis | null }) => (m.coaching ? [m.coaching] : []))}
+        />
+      )}
+
       {/* MESAJ GEÇMİŞİ */}
       {messages.length > 0 && (
         <div className="bg-card border border-border rounded-3xl shadow-sm overflow-hidden">
@@ -469,6 +478,7 @@ export default function InterviewDetailPage() {
                   <p className="text-muted-foreground text-sm leading-relaxed whitespace-pre-wrap font-medium">
                     {msg.content}
                   </p>
+                  {msg.coaching && <StarCoachingCard star={msg.coaching} />}
                 </div>
               </div>
             ))}

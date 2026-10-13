@@ -18,7 +18,7 @@ import {
 import { assignmentService, MyAssignment } from "@/services/assignmentService";
 import { pilotService, PilotStatus } from "@/services/pilotService";
 import { PostInterviewSurvey } from "@/components/pilot/PostInterviewSurvey";
-import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
+import { chatService, StarAnalysis, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { cvService, CVDetail, CVItem } from "@/services/cvService";
@@ -27,6 +27,7 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { orgService, MyOrganization } from "@/services/orgService";
 import { Button } from "@/components/ui/Button";
 import { ScoreCard } from "@/components/interview/ScoreCard";
+import { BEHAVIORAL_TOPIC, isBehavioralTopic, StarCoachingCard, StarSummary } from "@/components/interview/StarCoaching";
 import { useInterviewTurns } from "@/hooks/useInterviewTurns";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -36,6 +37,8 @@ type InterviewState = "SETUP" | "INTERVIEWING" | "RESULTS";
 type TranscriptMessage = {
   role: "ai" | "user";
   content: string;
+  /** Davranışsal mülakatta kullanıcının cevabına verilen STAR koçluğu. */
+  star?: StarAnalysis | null;
 };
 
 export default function TextInterviewPage() {
@@ -124,7 +127,7 @@ function TextInterviewContent() {
           router.replace(`/interviews/${resumeParam}`);
           return;
         }
-        type Msg = { role: string; content: string };
+        type Msg = { role: string; content: string; coaching?: StarAnalysis | null };
         const history = ((detail.messages ?? []) as Msg[]).filter(
           (m, i) => !(i === 0 && m.role === "user" && m.content === "Mülakatı başlat."),
         );
@@ -132,7 +135,7 @@ function TextInterviewContent() {
         setTopic(detail.topic);
         if (detail.difficulty) setDifficulty(detail.difficulty);
         setInterviewId(resumeParam);
-        setMessages(history.map((m) => ({ role: m.role === "model" ? "ai" : "user", content: m.content })));
+        setMessages(history.map((m) => ({ role: m.role === "model" ? "ai" : "user", content: m.content, star: m.coaching })));
         setCurrentState("INTERVIEWING");
       })
       .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "Mülakat yüklenemedi."))
@@ -252,6 +255,9 @@ function TextInterviewContent() {
     setMessages((prev) => [...prev, { role: "user", content: currentAnswer }, { role: "ai", content: "" }]);
 
     await sendAnswer(currentAnswer, {
+      // Analiz, yeni soru akmadan önce gelir: eklenen kullanıcı baloncuğuna (sondan ikinci) bağlanır.
+      onStar: (star) =>
+        setMessages((prev) => prev.map((m, i) => (i === prev.length - 2 && m.role === "user" ? { ...m, star } : m))),
       onText: (streamed) =>
         setMessages((prev) => {
           const next = [...prev];
@@ -369,6 +375,23 @@ function TextInterviewContent() {
                 readOnly={!!assignment}
                 required
               />
+              {!assignment && (
+                <button
+                  type="button"
+                  onClick={() => setTopic(BEHAVIORAL_TOPIC)}
+                  aria-pressed={isBehavioralTopic(topic)}
+                  className={`ml-1 text-xs font-semibold rounded-full px-3 py-1 border transition-colors ${
+                    isBehavioralTopic(topic) ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Davranışsal (STAR) mülakat
+                </button>
+              )}
+              {isBehavioralTopic(topic) && (
+                <p className="text-xs text-muted-foreground ml-1 leading-relaxed">
+                  &quot;Bana ... bir zamanı anlat&quot; türü sorular. Her cevabınızdan sonra Durum, Görev, Eylem ve Sonuç öğelerine göre koçluk notu alırsınız.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -536,8 +559,11 @@ function TextInterviewContent() {
                 </div>
               ) : (
                 <div key={i} className="flex justify-end animate-in fade-in slide-in-from-bottom-2 duration-500">
-                  <div className="max-w-[85%] bg-muted border border-border rounded-2xl rounded-tr-sm px-4 py-3">
-                    <p className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                  <div className="max-w-[85%]">
+                    <div className="bg-muted border border-border rounded-2xl rounded-tr-sm px-4 py-3">
+                      <p className="text-[15px] text-foreground leading-relaxed whitespace-pre-wrap">{m.content}</p>
+                    </div>
+                    {m.star && <StarCoachingCard star={m.star} />}
                   </div>
                 </div>
               )
@@ -608,7 +634,7 @@ function TextInterviewContent() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-            <ScoreCard title="Teknik Bilgi" score={evaluation.technical_score} icon={<Brain className="w-4 h-4 text-primary" />} tone="primary" />
+            <ScoreCard title={isBehavioralTopic(topic) ? "STAR Yapısı" : "Teknik Bilgi"} score={evaluation.technical_score} icon={<Brain className="w-4 h-4 text-primary" />} tone="primary" />
             <ScoreCard title="Özgüven Skoru" score={evaluation.confidence_score} icon={<Target className="w-4 h-4 text-success" />} tone="success" />
             <ScoreCard title="İletişim & Kelime" score={evaluation.vocabulary_score} icon={<MessageSquare className="w-4 h-4 text-warning" />} tone="warning" />
           </div>
@@ -621,6 +647,12 @@ function TextInterviewContent() {
               {evaluation.feedback}
             </p>
           </div>
+
+          {messages.some((m) => m.star) && (
+            <div className="mt-6">
+              <StarSummary analyses={messages.flatMap((m) => (m.star ? [m.star] : []))} />
+            </div>
+          )}
 
           {pilot?.consent && (
             <div className="mt-6">

@@ -46,7 +46,21 @@ export interface ChatStreamDoneData {
   evaluation: EvaluationData | null;
 }
 
+export type StarComponent = "situation" | "task" | "action" | "result";
+
+/** Davranışsal mülakatta bir cevabın kural tabanlı STAR analizi (bkz. backend star_service). */
+export interface StarAnalysis {
+  components: Record<StarComponent, boolean>;
+  score: number;
+  voice: "ben" | "biz" | "karisik";
+  quantified_result: boolean;
+  word_count: number;
+  tips: string[];
+}
+
 export interface ChatStreamHandlers {
+  /** Davranışsal mülakatta, adayın az önce gönderdiği cevabın STAR analizi (yeni sorudan önce gelir). */
+  onStar?: (star: StarAnalysis) => void;
   /** Yeni bir metin parçası üretildiğinde çağrılır (art arda birleştirilmeli). */
   onChunk: (text: string) => void;
   /** Akış başarıyla tamamlandığında bir kez çağrılır. */
@@ -106,7 +120,7 @@ export const chatService = {
   async sendMessageStream(
     interview_id: string,
     message: string,
-    { onChunk, onDone, onError }: ChatStreamHandlers
+    { onStar, onChunk, onDone, onError }: ChatStreamHandlers
   ): Promise<void> {
     const token = Cookies.get("token");
     const baseURL = api.defaults.baseURL ?? "";
@@ -168,7 +182,9 @@ export const chatService = {
           continue;
         }
 
-        if (eventType === "chunk") {
+        if (eventType === "star") {
+          onStar?.(parsed as StarAnalysis);
+        } else if (eventType === "chunk") {
           onChunk(parsed as string);
         } else if (eventType === "done") {
           onDone(parsed as ChatStreamDoneData);

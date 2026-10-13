@@ -1,13 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { chatService, ChatStreamDoneData, EvaluationData } from "@/services/chatService";
+import { chatService, ChatStreamDoneData, EvaluationData, StarAnalysis } from "@/services/chatService";
 
 const PARTIAL_SAVED = "Yanıt üretimi yarıda kesildi, ama o ana kadarki kısım kaydedildi. Lütfen tekrar deneyin.";
 const CONNECTION_LOST = "Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz.";
 const FINISH_FAILED = "Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.";
 
 export interface AnswerHandlers {
+  /** Davranışsal mülakatta gönderilen cevabın STAR analizi. */
+  onStar?: (star: StarAnalysis) => void;
   /** Akış boyunca o ana kadar gelen metnin tamamı. */
   onText: (streamed: string) => void;
   onDone: (data: ChatStreamDoneData, streamed: string) => void;
@@ -31,6 +33,7 @@ export function useInterviewTurns(interviewId: string) {
     let streamed = "";
     try {
       await chatService.sendMessageStream(interviewId, answer, {
+        onStar: handlers.onStar,
         onChunk: (text) => {
           streamed += text;
           handlers.onText(streamed);

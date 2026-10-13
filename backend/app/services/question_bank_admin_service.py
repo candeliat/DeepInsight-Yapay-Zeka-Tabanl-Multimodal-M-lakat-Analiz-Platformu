@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from app.core.database import run, aw, supabase
 from app.services.llm_service import llm_service
-from app.services.local_embedding_service import embed_text_local
+from app.services.local_embedding_service import embed_text_local_if_ready
 
 logger = logging.getLogger(__name__)
 
@@ -53,13 +53,13 @@ def _strip_embedding(row: Dict[str, Any]) -> Dict[str, Any]:
 async def _embed_local_best_effort(question_text: str) -> Optional[List[float]]:
     """
     Yerel fallback embedding'i hesaplar (bkz. local_embedding_service.py).
-    Best-effort: model henüz yüklenmemiş/kurulmamışsa ya da hata verirse
-    None döner — asıl yazma işlemini (API embedding'iyle) ASLA engellemez,
+    Best-effort: model henüz yüklenmemişse (yüklemeyi arka planda başlatır),
+    kurulmamışsa ya da hata verirse None döner — asıl yazma işlemini (API embedding'iyle) ASLA engellemez,
     yalnızca o satır için `embedding_local` boş kalır (sonradan backfill
     script'iyle doldurulabilir, bkz. scripts/backfill_local_embeddings.py).
     """
     try:
-        return await asyncio.to_thread(embed_text_local, question_text, "passage")
+        return await asyncio.to_thread(embed_text_local_if_ready, question_text, "passage")
     except Exception:
         logger.warning(
             "[question_bank_admin_service] Yerel embedding hesaplanamadı — embedding_local boş bırakılıyor.",

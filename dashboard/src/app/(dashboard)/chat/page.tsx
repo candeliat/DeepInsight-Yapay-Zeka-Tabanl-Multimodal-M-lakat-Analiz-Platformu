@@ -23,6 +23,8 @@ import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chat
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
+import { ScoreCard } from "@/components/interview/ScoreCard";
+import { useInterviewTurns } from "@/hooks/useInterviewTurns";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import Link from "next/link";
@@ -56,9 +58,6 @@ export default function InterviewRoomPage() {
   const [startError, setStartError] = useState<string | null>(null);
   // Kamera izni penceresi beklenirken düğmede ayrı mesaj (önceden yalnızca "Hazırlanıyor...").
   const [waitingCamera, setWaitingCamera] = useState(false);
-  // Mülakat sırasındaki hatalar alert() yerine satır içinde gösterilir.
-  const [chatError, setChatError] = useState<string | null>(null);
-  const [confirmEnd, setConfirmEnd] = useState(false);
   const { user } = useAuthStore();
   const target = user?.user_metadata?.target as string | undefined;
 
@@ -74,7 +73,8 @@ export default function InterviewRoomPage() {
   const [interviewId, setInterviewId] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [userAnswer, setUserAnswer] = useState("");
-  const [isThinking, setIsThinking] = useState(false);
+  // Gönderim/bitirme ve satır içi hata/onay durumu iki mülakat sayfasında ortak (bkz. useInterviewTurns).
+  const { isThinking, setIsThinking, chatError, confirmEnd, setConfirmEnd, sendAnswer, finishEarly } = useInterviewTurns(interviewId);
   const [isListening, setIsListening] = useState(false);
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -350,91 +350,49 @@ export default function InterviewRoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interviewId]);
 
-  const handleSendAnswer = async () => {
-    if (!userAnswer.trim() || isThinking) return;
-
+  // Konuşma sentezi ve ses tanıma, cevap gönderilirken/mülakat biterken susturulur.
+  const silenceVoice = () => {
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       setSpokenWordIndex(-1);
     }
-
     if (isListening && recognitionRef.current) {
       recognitionRef.current.stop();
       setIsListening(false);
     }
+  };
+
+  const handleSendAnswer = async () => {
+    if (!userAnswer.trim() || isThinking) return;
+    silenceVoice();
 
     const currentAnswer = userAnswer;
     const previousQuestion = currentQuestion;
     setUserAnswer("");
-    setChatError(null);
-    setIsThinking(true);
-    // Yeni cevap gönderilirken ekranı temizle — chunk'lar geldikçe burası
-    // token-token dolacak (typewriter efekti).
+    // Yeni cevap gönderilirken ekranı temizle — chunk'lar geldikçe burası token-token dolar.
     setCurrentQuestion("");
 
-    let streamedText = "";
-
-    try {
-      await chatService.sendMessageStream(interviewId, currentAnswer, {
-        onChunk: (text) => {
-          streamedText += text;
-          setCurrentQuestion(streamedText);
-        },
-        onDone: (data: ChatStreamDoneData) => {
-          if (data.interview_complete && data.evaluation) {
-            finalizeInterview(data.evaluation);
-          } else {
-            speakText(streamedText);
-          }
-        },
-        onError: (detail, partialSaved) => {
-          console.error("Stream hatası:", detail, "kısmi metin kaydedildi mi:", partialSaved);
-          if (!partialSaved) {
-            // Cevap kaybolmasın: kutuya geri konur, soru da eski haline döner.
-            setUserAnswer(currentAnswer);
-            if (!streamedText) setCurrentQuestion(previousQuestion);
-          }
-          setChatError(
-            partialSaved
-              ? "Yanıt üretimi yarıda kesildi, ama o ana kadarki kısım kaydedildi. Lütfen tekrar deneyin."
-              : "Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz."
-          );
-        },
-      });
-    } catch (error) {
-      console.error("Cevap gönderilemedi:", error);
-      setUserAnswer(currentAnswer);
-      if (!streamedText) setCurrentQuestion(previousQuestion);
-      setChatError("Bağlantı hatası oluştu; cevabınız kutuda duruyor, tekrar gönderebilirsiniz.");
-    } finally {
-      setIsThinking(false);
-    }
+    await sendAnswer(currentAnswer, {
+      onText: setCurrentQuestion,
+      onDone: (data: ChatStreamDoneData, streamed) => {
+        if (data.interview_complete && data.evaluation) {
+          finalizeInterview(data.evaluation);
+        } else {
+          speakText(streamed);
+        }
+      },
+      // Cevap kaybolmasın: kutuya geri konur, soru da eski haline döner.
+      restore: (streamed) => {
+        setUserAnswer(currentAnswer);
+        if (!streamed) setCurrentQuestion(previousQuestion);
+      },
+    });
   };
 
-  const handleEndInterviewManual = async () => {
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-      setSpokenWordIndex(-1);
-    }
-    if (isListening && recognitionRef.current) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    }
-
-    setConfirmEnd(false);
-    setChatError(null);
-    setIsThinking(true);
-    try {
-      // Soru sayısına bakmaksızın o ana kadarki cevaplarla nihai
-      // değerlendirmeyi zorlayan özel uç nokta (bkz. chatService.ts notu).
-      const response = await chatService.finishInterviewEarly(interviewId);
-      finalizeInterview(response.evaluation ?? null);
-    } catch (e) {
-      console.error("Mülakatı bitirme hatası:", e);
-      setChatError("Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.");
-    } finally {
-      setIsThinking(false);
-    }
+  const handleEndInterviewManual = () => {
+    silenceVoice();
+    // Soru sayısına bakmaksızın o ana kadarki cevaplarla nihai değerlendirmeyi zorlar.
+    return finishEarly(finalizeInterview);
   };
 
   // AI Analiz Durumu Sorgulama (Polling)
@@ -907,37 +865,6 @@ export default function InterviewRoomPage() {
 }
 
 // Yardımcı Bileşenler
-const scoreToneClasses = {
-  primary: { text: "text-primary", bg: "bg-primary/5", border: "border-primary/15" },
-  success: { text: "text-success", bg: "bg-success/5", border: "border-success/15" },
-  warning: { text: "text-warning", bg: "bg-warning/5", border: "border-warning/15" },
-} as const;
-
-function ScoreCard({
-  title,
-  score,
-  icon,
-  tone,
-}: {
-  title: string;
-  score: number;
-  icon: React.ReactNode;
-  tone: keyof typeof scoreToneClasses;
-}) {
-  const { text, bg, border } = scoreToneClasses[tone];
-
-  return (
-    <div className={`border rounded-2xl p-5 text-center shadow-sm hover:shadow transition-all relative overflow-hidden group ${bg} ${border}`}>
-      <div className="flex items-center justify-center w-8 h-8 bg-background rounded-full mx-auto mb-3 shadow-sm">
-        {icon}
-      </div>
-      <h3 className="text-xs font-bold text-muted-foreground mb-1">{title}</h3>
-      <div className={`font-serif text-3xl ${text}`}>
-        {score}<span className="font-sans text-sm text-muted-foreground font-normal">/100</span>
-      </div>
-    </div>
-  );
-}
 
 function UserCameraIcon() {
   return (

@@ -4,6 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
+from app.core.rate_limit import ai_rate_limit
 from app.api.schemas.job import JobCreate, JobDetail, JobItem, JobMatch, MatchRequest
 from app.api.schemas.user import UserProfile
 from app.services import job_service
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("", response_model=JobDetail)
+@router.post("", response_model=JobDetail, dependencies=[Depends(ai_rate_limit)])
 async def create_job(
     payload: JobCreate,
     token: str = Depends(oauth2_scheme),
@@ -58,7 +59,7 @@ async def delete_job(
     return {"status": "deleted"}
 
 
-@router.post("/{job_id}/match", response_model=JobMatch)
+@router.post("/{job_id}/match", response_model=JobMatch, dependencies=[Depends(ai_rate_limit)])
 async def match_job(
     job_id: str,
     payload: MatchRequest,

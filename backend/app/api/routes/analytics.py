@@ -13,6 +13,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
+from app.core.rate_limit import ai_rate_limit
 from app.api.schemas.user import UserProfile
 from app.api.schemas.analytics import (
     AnalyticsResponse,
@@ -55,7 +56,7 @@ async def _require_own_interview(interview_id: str, user_id: str) -> str:
     return interview_id
 
 
-@router.post("/analyze/{interview_id}", response_model=AnalyticsStartResponse)
+@router.post("/analyze/{interview_id}", response_model=AnalyticsStartResponse, dependencies=[Depends(ai_rate_limit)])
 async def start_analysis(
     interview_id: str,
     file: UploadFile = File(...),

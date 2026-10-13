@@ -64,6 +64,13 @@ class Settings:
     LLM_BREAKER_MAX_COOLDOWN: float = float(os.getenv("LLM_BREAKER_MAX_COOLDOWN", "900"))
     # Her LLM denemesi llm_usage tablosuna yazılır (sql/019); kapatmak için false.
     LLM_USAGE_PERSIST: bool = os.getenv("LLM_USAGE_PERSIST", "true").lower() == "true"
+    # Kullanıcı başına istek sınırı: yapay zekâ/OCR/Whisper/video analizi yapan uç noktalar
+    # (bkz. app/core/rate_limit.py). 0 = o pencere için sınır yok.
+    RATE_LIMIT_AI_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_AI_PER_MINUTE", "20"))
+    RATE_LIMIT_AI_PER_HOUR: int = int(os.getenv("RATE_LIMIT_AI_PER_HOUR", "200"))
+    # Kayıt ve şifre değişikliğinde HaveIBeenPwned k-anonimlik kontrolü (bkz. password_breach).
+    PASSWORD_BREACH_CHECK: bool = os.getenv("PASSWORD_BREACH_CHECK", "true").lower() == "true"
+    PASSWORD_BREACH_TIMEOUT: float = float(os.getenv("PASSWORD_BREACH_TIMEOUT", "3"))
 
     # --- Soru Bankası / RAG ---
     # `nvidia/nemotron-3-embed-1b` — build.nvidia.com kataloğunda canlı istekle

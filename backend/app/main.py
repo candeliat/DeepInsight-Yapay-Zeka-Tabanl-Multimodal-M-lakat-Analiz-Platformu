@@ -44,6 +44,8 @@ app.add_middleware(
     allow_credentials=False, # True iken wildcard kullanılamaz
     allow_methods=["*"],  # Allows all HTTP methods
     allow_headers=["*"],  # Allows all headers
+    # İstek sınırı aşılınca istemci ne kadar bekleyeceğini okuyabilsin (bkz. rate_limit).
+    expose_headers=["Retry-After"],
 )
 
 # Include the interview router

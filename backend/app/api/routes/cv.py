@@ -4,6 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
+from app.core.rate_limit import ai_rate_limit
 from app.api.schemas.cv import ConsentStatus, CVAnalysis, CVDetail, CVItem
 from app.api.schemas.user import UserProfile
 from app.services import cv_analysis_service, cv_service, cv_text_service, organization_service
@@ -48,7 +49,7 @@ async def revoke_consent(
     return {"status": "revoked", "deleted_cvs": await cv_service.revoke_consent(current_user.id)}
 
 
-@router.post("", response_model=CVItem)
+@router.post("", response_model=CVItem, dependencies=[Depends(ai_rate_limit)])
 async def upload_cv(
     file: UploadFile = File(...),
     org_id: Optional[str] = Form(default=None),
@@ -92,7 +93,7 @@ async def get_my_cv(
     return cv
 
 
-@router.post("/{cv_id}/analyze", response_model=CVAnalysis)
+@router.post("/{cv_id}/analyze", response_model=CVAnalysis, dependencies=[Depends(ai_rate_limit)])
 async def analyze_my_cv(
     cv_id: str,
     token: str = Depends(oauth2_scheme),

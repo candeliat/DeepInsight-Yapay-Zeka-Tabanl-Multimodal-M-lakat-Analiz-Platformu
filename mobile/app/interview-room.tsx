@@ -297,10 +297,21 @@ export default function InterviewRoomScreen() {
       setUploadStatus('Yapay Zeka performansı inceliyor. Lütfen ayrılmayın...');
       
       // Polling
+      // Sırada beklenen süre 2 dakikalık analiz bekleme süresinden sayılmaz (en çok 30 dk).
       let isDone = false;
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0, polls = 0; i < 60 && polls < 900; i++, polls++) {
         await new Promise(res => setTimeout(res, 2000));
         const stat = await analyticsService.getAnalysisStatus(interviewId);
+        if (stat.analysis_status === 'queued') {
+          i--;
+          setUploadStatus(stat.queue_position
+            ? `Analiz sırada: önünüzde ${stat.queue_position} analiz var. Lütfen ayrılmayın...`
+            : 'Analiz sırada; birazdan başlayacak. Lütfen ayrılmayın...');
+          continue;
+        }
+        if (stat.analysis_status === 'processing') {
+          setUploadStatus('Yapay Zeka performansı inceliyor. Lütfen ayrılmayın...');
+        }
         if (stat.analysis_status === 'completed') {
           isDone = true;
           break;

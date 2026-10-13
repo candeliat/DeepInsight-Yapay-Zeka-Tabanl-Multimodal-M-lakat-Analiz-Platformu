@@ -68,7 +68,7 @@ def test_cannot_read_someone_elses_video_analysis(client, monkeypatch, path):
 def test_cannot_upload_analysis_for_someone_elses_interview(client, monkeypatch):
     monkeypatch.setattr(analytics_route, "supabase", _analytics_db("someone-else"))
     run = MagicMock()
-    monkeypatch.setattr(analytics_route, "run_full_analysis", run)
+    monkeypatch.setattr(analytics_route.analysis_queue, "submit", run)
     resp = client.post(f"/api/v1/analytics/analyze/{OTHER_UUID}", files={"file": ("a.webm", b"x", "video/webm")})
     assert resp.status_code == 404
     run.assert_not_called()

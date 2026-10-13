@@ -78,42 +78,56 @@ class VideoAnalyzer:
     GAZE_THRESHOLD = 0.28
 
     @staticmethod
-    def extract_frames(video_path: str, fps: int = 1) -> list[np.ndarray]:
-        """
-        Videodan belirli FPS aralığıyla kare çıkarır.
+    def _downscale(frame: np.ndarray, max_width: int) -> np.ndarray:
+        h, w = frame.shape[:2]
+        if w <= max_width:
+            return frame
+        return cv2.resize(frame, (max_width, round(h * max_width / w)), interpolation=cv2.INTER_AREA)
 
-        Args:
-            video_path: Video dosyasının yolu
-            fps: Saniyede kaç kare alınacağı (varsayılan: 1)
+    @staticmethod
+    def extract_frames(video_path: str, fps: int = 1, max_frames: int = 300, max_width: int = 640) -> list[np.ndarray]:
+        """
+        Videodan saniyede `fps` kare örnekler; bellek videonun süresinden bağımsız kalır.
+
+        - Örnekleme kare sayacına değil zaman damgasına göre yapılır: tarayıcının kaydettiği
+          webm dosyalarında CAP_PROP_FPS çoğu zaman 0 ya da 1000 gibi anlamsız döner.
+        - Kareler `max_width` genişliğine küçültülür (yüz/duygu modelleri için yeterli;
+          720p bir kare ~2,7 MB iken 640 px ~0,7 MB).
+        - `max_frames` aşılınca her ikinci kare atılıp aralık ikiye katlanır: uzun videoda
+          kareler yine tüm süreye eşit yayılır, bellek en çok max_frames kare kadar olur.
 
         Returns:
             BGR formatında numpy dizileri listesi
         """
-        frames = []
+        frames: list[np.ndarray] = []
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             logger.error("Video açılamadı: %s", video_path)
             return frames
 
         video_fps = cap.get(cv2.CAP_PROP_FPS)
-        if video_fps <= 0:
-            video_fps = 30.0  # varsayılan
-        frame_interval = int(video_fps / fps)
-        if frame_interval < 1:
-            frame_interval = 1
-
-        frame_count = 0
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            if frame_count % frame_interval == 0:
-                frames.append(frame)
-            frame_count += 1
+        fallback_fps = video_fps if 0 < video_fps <= 120 else 30.0
+        interval_ms = 1000.0 / fps
+        next_ms = 0.0
+        index = 0
+        while cap.grab():
+            pos_ms = cap.get(cv2.CAP_PROP_POS_MSEC)
+            if pos_ms <= 0 and index > 0:  # zaman damgası yoksa kare sırasından tahmin
+                pos_ms = index * 1000.0 / fallback_fps
+            index += 1
+            if pos_ms + 1e-6 < next_ms:
+                continue
+            ok, frame = cap.retrieve()
+            if not ok:
+                continue
+            frames.append(VideoAnalyzer._downscale(frame, max_width))
+            next_ms = pos_ms + interval_ms
+            if len(frames) > max_frames:
+                frames = frames[::2]
+                interval_ms *= 2
 
         cap.release()
-        logger.info("Video'dan %d kare çıkarıldı (toplam %d kare, interval=%d).",
-                     len(frames), frame_count, frame_interval)
+        logger.info("Video'dan %d kare çıkarıldı (toplam %d kare, aralık=%.0f ms).", len(frames), index, interval_ms)
         return frames
 
     @staticmethod
@@ -564,10 +578,9 @@ def run_full_analysis(
     file_type: str = "video",
 ) -> None:
     """
-    Tüm analiz pipeline'ını çalıştırır (BackgroundTask olarak çağrılır).
+    Tüm analiz pipeline'ını çalıştırır (analysis_queue'nun iş parçacığında çağrılır).
 
-    Bu fonksiyon senkrondur — BackgroundTasks senkron fonksiyonları
-    ayrı bir thread'de çalıştırır.
+    Senkron ve CPU/bellek yoğundur; aynı anda kaç tanesinin çalışacağını kuyruk belirler.
 
     Args:
         file_path: Video veya ses dosyasının yolu
@@ -589,7 +602,10 @@ def run_full_analysis(
         # --- Video işleme ---
         if file_type == "video":
             logger.info("Video karelerini çıkarıyorum...")
-            frames = VideoAnalyzer.extract_frames(file_path, fps=settings.ANALYSIS_FPS)
+            frames = VideoAnalyzer.extract_frames(
+                file_path, fps=settings.ANALYSIS_FPS,
+                max_frames=settings.ANALYSIS_MAX_FRAMES, max_width=settings.ANALYSIS_FRAME_WIDTH,
+            )
 
             logger.info("Video'dan ses çıkarıyorum...")
             audio_path = AudioAnalyzer.extract_audio_from_video(file_path)

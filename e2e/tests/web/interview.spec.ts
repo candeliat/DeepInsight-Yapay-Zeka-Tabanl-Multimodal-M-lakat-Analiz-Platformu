@@ -77,6 +77,38 @@ test.describe('görüntülü mülakat', () => {
     expect(api.callsTo('POST', '/api/v1/interview/start')).toHaveLength(1);
   });
 
+  test('bitince kayıt yüklenir; analiz sıradaysa önündeki iş sayısı gösterilir, bitince sonuçlar açılır', async ({ authedPage: page, api }) => {
+    api.state.consentGranted = true;
+    api.on('POST', '/api/v1/interview/start', { json: { interview_id: 'int-new', first_message: FIRST_QUESTION } });
+    api.on('POST', '/api/v1/interview/int-new/finish', {
+      json: { response: '', interview_complete: true,
+        evaluation: { technical_score: 74, confidence_score: 60, vocabulary_score: 70, feedback: 'Hook kurallarını iyi açıkladınız.' } },
+    });
+    api.on('POST', '/api/v1/analytics/analyze/int-new', { json: { interview_id: 'int-new', status: 'queued', queue_position: 2 } });
+    const statuses = [
+      { analysis_status: 'queued', queue_position: 2 },
+      { analysis_status: 'processing' },
+      { analysis_status: 'completed' },
+    ];
+    api.on('GET', '/api/v1/analytics/status/int-new', () => ({ json: { interview_id: 'int-new', ...(statuses.length > 1 ? statuses.shift() : statuses[0]) } }));
+    api.on('GET', '/api/v1/analytics/results/int-new', {
+      json: { interview_id: 'int-new', confidence_pct: 81, eye_contact_pct: 70, pause_count: 2, filler_word_count: 3, filler_words_detail: {},
+        speech_rate_wpm: 120, dominant_emotion: 'neutral', emotion_distribution: {}, transcript: '', analysis_status: 'completed' },
+    });
+
+    await page.goto('/chat');
+    await page.getByRole('button', { name: 'Görüntülü mülakata başla' }).click();
+    await expect(page.getByText('Kaydediliyor')).toBeVisible();
+    await page.waitForTimeout(1500); // MediaRecorder birkaç parça üretsin
+    await page.getByRole('button', { name: 'Mülakatı Bitir' }).click();
+    await page.getByRole('button', { name: 'Bitir', exact: true }).click();
+
+    await expect(page.getByText('Analiz sırada: önünüzde 2 analiz var', { exact: false })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText('Hook kurallarını iyi açıkladınız.')).toBeVisible({ timeout: 15_000 });
+    expect(api.callsTo('POST', '/api/v1/analytics/analyze/int-new')).toHaveLength(1);
+    expect(api.callsTo('GET', '/api/v1/analytics/results/int-new')).toHaveLength(1);
+  });
+
   test('kamera izni reddedilirse mülakat analizsiz sürer ve "Kayıt yok" gösterilir', async ({ authedPage: page, api }) => {
     await page.addInitScript(() => {
       navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('denied', 'NotAllowedError'));

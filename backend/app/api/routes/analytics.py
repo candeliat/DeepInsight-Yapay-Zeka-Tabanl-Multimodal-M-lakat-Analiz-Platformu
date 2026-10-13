@@ -5,12 +5,13 @@ Video/ses dosyası yükleyerek AI analiz pipeline'ını arka planda başlatır.
 Analiz durumunu ve sonuçlarını sorgulamak için endpoint'ler sağlar.
 """
 
+import asyncio
 import os
 import uuid
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
 from app.api.schemas.user import UserProfile
 from app.api.schemas.analytics import (
@@ -18,7 +19,7 @@ from app.api.schemas.analytics import (
     AnalyticsStatusResponse,
     AnalyticsStartResponse,
 )
-from app.services.analytics import run_full_analysis
+from app.services import analysis_queue
 from app.services import account_service
 from app.core.config import settings
 from app.core.database import run, aw, supabase
@@ -57,7 +58,6 @@ async def _require_own_interview(interview_id: str, user_id: str) -> str:
 @router.post("/analyze/{interview_id}", response_model=AnalyticsStartResponse)
 async def start_analysis(
     interview_id: str,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     token: str = Depends(oauth2_scheme),
     current_user: UserProfile = Depends(get_current_user),
@@ -68,7 +68,7 @@ async def start_analysis(
     - **interview_id**: Mülakatın UUID'si
     - **file**: Video (.mp4, .avi, .mov, .mkv, .webm) veya Ses (.wav, .mp3, .m4a, .ogg) dosyası
 
-    Sunucuyu kilitlemez — analiz arka planda çalışır.
+    Sunucuyu kilitlemez — analiz arka planda, sınırlı bir kuyrukta çalışır (bkz. analysis_queue).
     Sonucu `GET /status/{interview_id}` ve `GET /results/{interview_id}` ile sorgulayın.
     """
     # --- Validasyonlar ---
@@ -130,20 +130,23 @@ async def start_analysis(
         logger.error("Dosya kaydetme hatası: %s", e)
         raise HTTPException(status_code=500, detail=f"Dosya kaydedilemedi: {str(e)}")
 
-    # --- Arka plan görevi başlat ---
-    background_tasks.add_task(
-        run_full_analysis,
-        file_path=temp_path,
-        interview_id=interview_id,
-        file_type=file_type,
-    )
+    # --- Kuyruğa ekle ---
+    try:
+        ahead = await asyncio.to_thread(analysis_queue.submit, temp_path, interview_id, file_type)
+    except (analysis_queue.QueueFull, analysis_queue.AlreadyQueued) as e:
+        os.remove(temp_path)
+        if isinstance(e, analysis_queue.AlreadyQueued):
+            raise HTTPException(status_code=409, detail="Bu mülakatın analizi zaten sürüyor.")
+        raise HTTPException(status_code=503, detail="Analiz kuyruğu şu an dolu. Lütfen birkaç dakika sonra tekrar deneyin.")
 
-    logger.info("Analiz arka planda başlatıldı: interview_id=%s", interview_id)
+    logger.info("Analiz kuyruğa eklendi: interview_id=%s, önünde=%d", interview_id, ahead)
 
     return AnalyticsStartResponse(
         interview_id=interview_id,
-        status="processing",
-        message="Analiz arka planda başlatıldı. Sonuçları /status ve /results endpoint'lerinden sorgulayabilirsiniz.",
+        status="queued" if ahead else "processing",
+        queue_position=ahead or None,
+        message=(f"Analiz sırada; önünüzde {ahead} analiz var." if ahead else "Analiz başlatıldı.")
+        + " Sonuçları /status ve /results uç noktalarından sorgulayabilirsiniz.",
     )
 
 
@@ -158,6 +161,7 @@ async def get_analysis_status(
 
     Durumlar:
     - **pending**: Henüz başlatılmadı
+    - **queued**: Sırada bekliyor (`queue_position`: önündeki analiz sayısı)
     - **processing**: Analiz devam ediyor
     - **completed**: Analiz tamamlandı
     - **failed**: Analiz hata verdi
@@ -183,6 +187,7 @@ async def get_analysis_status(
             interview_id=row["interview_id"],
             analysis_status=row["analysis_status"],
             error_message=row.get("error_message"),
+            queue_position=analysis_queue.position(interview_id) if row["analysis_status"] == "queued" else None,
         )
 
     except Exception as e:
@@ -226,7 +231,7 @@ async def get_analysis_results(
 
         row = result.data[0]
 
-        if row["analysis_status"] == "processing":
+        if row["analysis_status"] in ("queued", "processing"):
             raise HTTPException(
                 status_code=202,
                 detail="Analiz hâlâ devam ediyor. Lütfen daha sonra tekrar deneyin.",

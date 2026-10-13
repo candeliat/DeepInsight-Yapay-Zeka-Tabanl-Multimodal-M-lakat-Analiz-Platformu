@@ -6,6 +6,7 @@
 -- bunlar mesaj/analiz kayıtlarıyla birlikte silinir.
 -- Hesap silindiğinde mülakatlar ve mesajları veritabanında da zincirleme silinir
 -- (account_service zaten açıkça siliyor; bu ikinci emniyet).
+-- Canlıya uygulandı: 2026-10-13 (27 sahipsiz satır silindi, 92 mülakat kaldı).
 
 begin;
 
@@ -16,6 +17,9 @@ where i.user_id !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12
 
 delete from public.interview_messages where interview_id in (select id from _orphan_interviews);
 delete from public.interviews where id in (select id from _orphan_interviews);  -- analytics/anket zincirleme
+
+-- Eski varsayılan 'anonymous' uuid'ye dönüşemez; backend user_id'yi her zaman açıkça yazar.
+alter table public.interviews alter column user_id drop default;
 
 alter table public.interviews
   alter column user_id type uuid using user_id::uuid,

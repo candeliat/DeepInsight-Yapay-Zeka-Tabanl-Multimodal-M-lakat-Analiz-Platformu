@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.core.database import supabase
+from app.core.database import run, supabase
 from app.services import ats_service, cv_service, skill_matching
 from app.services.llm_service import llm_service
 from app.services.prompts.job_v1 import (
@@ -116,32 +116,32 @@ async def create_job(user_id: str, text: str, title: Optional[str] = None, compa
     if not reqs["required_skills"] and not reqs["nice_to_have_skills"]:
         raise ValueError("İlandan beceri gereksinimi çıkarılamadı. Metnin bir iş ilanı olduğundan emin olun.")
 
-    result = _db().table("job_postings").insert({
+    result = (await run(_db().table("job_postings").insert({
         "user_id": user_id,
         "title": (title or "").strip()[:150] or reqs["title"],
         "company": (company or "").strip()[:150] or reqs["company"],
         "raw_text": text,
         "requirements": reqs,
-    }).execute()
+    })))
     if not result.data:
         raise RuntimeError("İlan kaydedilemedi")
     return result.data[0]
 
 
 async def list_jobs(user_id: str) -> List[Dict[str, Any]]:
-    result = _db().table("job_postings").select(_LIST_COLUMNS).eq("user_id", user_id).order("created_at", desc=True).execute()
+    result = (await run(_db().table("job_postings").select(_LIST_COLUMNS).eq("user_id", user_id).order("created_at", desc=True)))
     return result.data or []
 
 
 async def get_job(user_id: str, job_id: str) -> Optional[Dict[str, Any]]:
-    result = _db().table("job_postings").select("*").eq("id", job_id).eq("user_id", user_id).execute()
+    result = (await run(_db().table("job_postings").select("*").eq("id", job_id).eq("user_id", user_id)))
     return result.data[0] if result.data else None
 
 
 async def delete_job(user_id: str, job_id: str) -> bool:
     if not await get_job(user_id, job_id):
         return False
-    _db().table("job_postings").delete().eq("id", job_id).eq("user_id", user_id).execute()
+    (await run(_db().table("job_postings").delete().eq("id", job_id).eq("user_id", user_id)))
     return True
 
 
@@ -238,7 +238,7 @@ async def match_job_with_cv(user_id: str, job_id: str, cv_id: str) -> Dict[str, 
 
     breakdown = {k: match[k] for k in ("required", "nice_to_have", "experience", "components", "missing_required", "missing_nice", "underlisted")}
     breakdown["interview_focus"] = interview_focus
-    saved = _db().table("job_matches").insert({
+    saved = (await run(_db().table("job_matches").insert({
         "user_id": user_id,
         "job_id": job_id,
         "cv_id": cv_id,
@@ -246,7 +246,7 @@ async def match_job_with_cv(user_id: str, job_id: str, cv_id: str) -> Dict[str, 
         "breakdown": breakdown,
         "roadmap": roadmap,
         "summary": summary,
-    }).execute()
+    })))
 
     return {
         "match_id": saved.data[0]["id"] if saved.data else None,
@@ -265,8 +265,8 @@ async def latest_match(user_id: str, job_id: str, cv_id: str) -> Optional[Dict[s
     if not await get_job(user_id, job_id):
         raise ValueError("İlan bulunamadı")
     rows = (
-        _db().table("job_matches").select("*").eq("job_id", job_id).eq("cv_id", cv_id).eq("user_id", user_id)
-        .order("created_at", desc=True).limit(1).execute().data or []
+        (await run(_db().table("job_matches").select("*").eq("job_id", job_id).eq("cv_id", cv_id).eq("user_id", user_id)
+        .order("created_at", desc=True).limit(1))).data or []
     )
     if not rows:
         return None

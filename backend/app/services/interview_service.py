@@ -1,7 +1,7 @@
 import json
 import logging
 from datetime import datetime, timezone
-from app.core.database import supabase
+from app.core.database import run, supabase
 from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ async def create_interview(
     if assignment_id:
         record["assignment_id"] = assignment_id
 
-    result = client.table("interviews").insert(record).execute()
+    result = (await run(client.table("interviews").insert(record)))
     if not result.data:
         raise RuntimeError("Failed to create interview record")
 
@@ -75,7 +75,7 @@ async def save_message(interview_id: str, role: str, content: str, token: str = 
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
-    result = client.table("interview_messages").insert(record).execute()
+    result = (await run(client.table("interview_messages").insert(record)))
     if not result.data:
         raise RuntimeError("Failed to save interview message")
 
@@ -90,11 +90,10 @@ async def get_interview_history(interview_id: str, token: str = None) -> List[Di
     if not client:
         raise RuntimeError("Supabase client is not initialized")
 
-    result = client.table("interview_messages")\
+    result = (await run(client.table("interview_messages")\
         .select("role, content, created_at")\
         .eq("interview_id", interview_id)\
-        .order("created_at", desc=False)\
-        .execute()
+        .order("created_at", desc=False)))
 
     return result.data or []
 
@@ -120,11 +119,10 @@ async def try_claim_interview_finalization(interview_id: str, token: str = None)
         raise RuntimeError("Supabase client is not initialized")
 
     result = (
-        client.table("interviews")
+        (await run(client.table("interviews")
         .update({"status": "completed"})
         .eq("id", interview_id)
-        .eq("status", "ongoing")
-        .execute()
+        .eq("status", "ongoing")))
     )
     return bool(result.data)
 
@@ -145,7 +143,7 @@ async def release_interview_finalization_claim(interview_id: str, token: str = N
     if not client:
         return
     try:
-        client.table("interviews").update({"status": "ongoing"}).eq("id", interview_id).execute()
+        (await run(client.table("interviews").update({"status": "ongoing"}).eq("id", interview_id)))
     except Exception:
         logger.exception(
             "Mülakat claim'i geri alınamadı (interview_id=%s) — 'completed' durumunda takılı kalmış olabilir.",
@@ -170,11 +168,10 @@ async def get_completed_confidence_map(interview_ids: List[str], token: str = No
         return {}
 
     result = (
-        client.table("interview_analytics")
+        (await run(client.table("interview_analytics")
         .select("interview_id, confidence_pct, analysis_status")
         .in_("interview_id", interview_ids)
-        .eq("analysis_status", "completed")
-        .execute()
+        .eq("analysis_status", "completed")))
     )
     return {
         row["interview_id"]: row["confidence_pct"]
@@ -200,7 +197,7 @@ async def finish_interview_and_evaluate(interview_id: str, evaluation_data: Dict
         "feedback": evaluation_data.get("feedback", ""),
     }
 
-    result = client.table("interviews").update(record).eq("id", interview_id).execute()
+    result = (await run(client.table("interviews").update(record).eq("id", interview_id)))
     if not result.data:
         raise RuntimeError("Failed to update interview with evaluation")
 
@@ -214,7 +211,7 @@ async def get_interview(interview_id: str, token: str = None) -> dict:
     if not client:
         raise RuntimeError("Supabase client is not initialized")
 
-    result = client.table("interviews").select("*").eq("id", interview_id).execute()
+    result = (await run(client.table("interviews").select("*").eq("id", interview_id)))
     if not result.data:
         raise ValueError("Interview not found")
         
@@ -225,8 +222,8 @@ async def delete_ongoing_interview(interview_id: str) -> None:
     client = supabase
     if not client:
         raise RuntimeError("Supabase client is not initialized")
-    client.table("interview_messages").delete().eq("interview_id", interview_id).execute()
-    client.table("interviews").delete().eq("id", interview_id).neq("status", "completed").execute()
+    (await run(client.table("interview_messages").delete().eq("interview_id", interview_id)))
+    (await run(client.table("interviews").delete().eq("id", interview_id).neq("status", "completed")))
 
 
 async def get_user_interviews(user_id: str, token: str = None) -> List[Dict[str, Any]]:
@@ -237,5 +234,5 @@ async def get_user_interviews(user_id: str, token: str = None) -> List[Dict[str,
     if not client:
         raise RuntimeError("Supabase client is not initialized")
 
-    result = client.table("interviews").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
+    result = (await run(client.table("interviews").select("*").eq("user_id", user_id).order("created_at", desc=True)))
     return result.data or []

@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from app.core.database import supabase
+from app.core.database import run, supabase
 from app.services import cv_text_service
 
 logger = logging.getLogger(__name__)
@@ -70,20 +70,20 @@ def ensure_bucket() -> None:
 
 async def has_consent(user_id: str) -> bool:
     rows = (
-        _db().table("user_consents").select("revoked_at")
-        .eq("user_id", user_id).eq("consent_type", CONSENT_TYPE).execute().data or []
+        (await run(_db().table("user_consents").select("revoked_at")
+        .eq("user_id", user_id).eq("consent_type", CONSENT_TYPE))).data or []
     )
     return bool(rows) and rows[0].get("revoked_at") is None
 
 
 async def grant_consent(user_id: str) -> None:
-    _db().table("user_consents").upsert({
+    (await run(_db().table("user_consents").upsert({
         "user_id": user_id,
         "consent_type": CONSENT_TYPE,
         "version": CONSENT_VERSION,
         "granted_at": datetime.now(timezone.utc).isoformat(),
         "revoked_at": None,
-    }, on_conflict="user_id,consent_type").execute()
+    }, on_conflict="user_id,consent_type")))
 
 
 async def revoke_consent(user_id: str) -> int:
@@ -92,9 +92,9 @@ async def revoke_consent(user_id: str) -> int:
     for cv in await list_cvs(user_id):
         await delete_cv(user_id, cv["id"])
         deleted += 1
-    _db().table("user_consents").update({
+    (await run(_db().table("user_consents").update({
         "revoked_at": datetime.now(timezone.utc).isoformat(),
-    }).eq("user_id", user_id).eq("consent_type", CONSENT_TYPE).execute()
+    }).eq("user_id", user_id).eq("consent_type", CONSENT_TYPE)))
     return deleted
 
 
@@ -105,15 +105,15 @@ _LIST_COLUMNS = "id, org_id, original_filename, mime_type, size_bytes, extractio
 
 async def list_cvs(user_id: str) -> List[Dict[str, Any]]:
     result = (
-        _db().table("cvs").select(_LIST_COLUMNS)
-        .eq("user_id", user_id).order("created_at", desc=True).execute()
+        (await run(_db().table("cvs").select(_LIST_COLUMNS)
+        .eq("user_id", user_id).order("created_at", desc=True)))
     )
     return result.data or []
 
 
 async def get_cv(user_id: str, cv_id: str) -> Optional[Dict[str, Any]]:
     """Yalnızca sahibine döner; başkasının CV'si 'bulunamadı' gibi davranır."""
-    result = _db().table("cvs").select("*").eq("id", cv_id).eq("user_id", user_id).execute()
+    result = (await run(_db().table("cvs").select("*").eq("id", cv_id).eq("user_id", user_id)))
     return result.data[0] if result.data else None
 
 
@@ -133,7 +133,7 @@ async def create_cv(user_id: str, data: bytes, original_filename: str, org_id: O
     _db().storage.from_(BUCKET).upload(path, data, {"content-type": mime})
 
     try:
-        result = _db().table("cvs").insert({
+        result = (await run(_db().table("cvs").insert({
             "user_id": user_id,
             "org_id": org_id,
             "storage_path": path,
@@ -144,7 +144,7 @@ async def create_cv(user_id: str, data: bytes, original_filename: str, org_id: O
             "extraction_method": method,
             "extraction_stats": stats,
             "status": "parsed",
-        }).execute()
+        })))
         if not result.data:
             raise RuntimeError("CV kaydedilemedi")
     except Exception:
@@ -159,5 +159,5 @@ async def delete_cv(user_id: str, cv_id: str) -> bool:
     if not cv:
         return False
     _db().storage.from_(BUCKET).remove([cv["storage_path"]])
-    _db().table("cvs").delete().eq("id", cv_id).eq("user_id", user_id).execute()
+    (await run(_db().table("cvs").delete().eq("id", cv_id).eq("user_id", user_id)))
     return True

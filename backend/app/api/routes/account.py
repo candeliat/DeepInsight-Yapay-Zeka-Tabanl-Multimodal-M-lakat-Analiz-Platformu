@@ -4,7 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
-from app.api.dependencies.auth import get_current_user, oauth2_scheme
+from app.core.database import aw
+from app.api.dependencies.auth import fetch_user_profile, get_current_user, oauth2_scheme
 from app.api.schemas.user import UserProfile
 from app.services import account_service, organization_service
 
@@ -29,7 +30,7 @@ async def get_consent(
     """Onam durumu ve onam metni (ör. video_analysis)."""
     if consent_type not in account_service.CONSENTS:
         raise HTTPException(status_code=404, detail="Bilinmeyen onam türü")
-    return account_service.consent_status(current_user.id, consent_type)
+    return (await aw(account_service.consent_status(current_user.id, consent_type)))
 
 
 @router.put("/consents/{consent_type}")
@@ -42,7 +43,7 @@ async def update_consent(
     """Onam verir ya da geri çeker. Video onamı geri çekilirse video analizi sonuçları silinir."""
     if consent_type not in account_service.CONSENTS:
         raise HTTPException(status_code=404, detail="Bilinmeyen onam türü")
-    status = account_service.set_consent(current_user.id, consent_type, payload.granted)
+    status = (await aw(account_service.set_consent(current_user.id, consent_type, payload.granted)))
     await organization_service.log_audit(current_user.id, None, f"consent.{consent_type}", "user", current_user.id,
                                          {"granted": payload.granted})
     return status
@@ -54,10 +55,11 @@ async def export_my_data(
     current_user: UserProfile = Depends(get_current_user),
 ):
     """KVKK md. 11: hakkımda işlenen tüm verileri JSON olarak indir."""
-    data = account_service.export_user_data(
+    profile = await fetch_user_profile(current_user.id)  # token'da created_at yok
+    data = (await aw(account_service.export_user_data(
         current_user.id, current_user.email,
-        {"created_at": current_user.created_at, "profile": current_user.user_metadata},
-    )
+        {"created_at": profile.created_at, "profile": profile.user_metadata},
+    )))
     await organization_service.log_audit(current_user.id, None, "account.export", "user", current_user.id)
     return Response(
         content=json.dumps(data, ensure_ascii=False, indent=2, default=str).encode("utf-8"),

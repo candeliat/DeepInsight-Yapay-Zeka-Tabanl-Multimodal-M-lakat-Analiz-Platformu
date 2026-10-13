@@ -11,7 +11,9 @@ tamamlanmışsa OBJEKTİF confidence_pct, yoksa LLM'in metin tabanlı tahmini.
 """
 from typing import Any, Dict, List, Optional
 
-from app.core.database import supabase
+# Bu modül senkron yazılmıştır: iş parçacığına özel senkron istemciyi kullanır ve asenkron
+# koddan asyncio.to_thread ile çağrılır (bkz. app/core/database.py).
+from app.core.database import sync_supabase as supabase
 from app.services.ats_service import fold
 
 METRICS = ("technical", "confidence", "vocabulary")

@@ -213,6 +213,17 @@ async def _candidate_context_for(interview: Dict[str, Any], user_id: str) -> Opt
         return None
 
 
+def _evaluation_reference(interview: Dict[str, Any], questions_asked: int) -> List[Dict[str, Any]]:
+    """Mülakatta sorulmuş olan banka sorularının "iyi cevap noktaları" (havuz sırayla
+    tüketildiği için ilk `questions_asked` kayıt). Değerlendirmede referans olarak kullanılır."""
+    pool = interview.get("question_pool") or []
+    return [
+        {"question": entry.get("question_text", ""), "points": entry.get("answer_points") or []}
+        for entry in pool[:questions_asked]
+        if entry.get("answer_points")
+    ]
+
+
 async def _owned_interview(interview_id: str, user_id: str) -> Dict[str, Any]:
     """
     Mülakatı getirir ve sahibinin istek yapan kullanıcı olduğunu doğrular.
@@ -403,6 +414,7 @@ async def chat_with_ai_stream(
                         history=[{"role": m["role"], "content": m["content"]} for m in history_records],
                         role=role,
                         topic=topic,
+                        reference=_evaluation_reference(interview, questions_asked),
                     )
                     feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
                     tech_score = evaluation_data.get("technical_score", 0)
@@ -546,6 +558,9 @@ async def finish_interview_early(
                 history=[{"role": m["role"], "content": m["content"]} for m in history_records],
                 role=role,
                 topic=topic,
+                reference=_evaluation_reference(
+                    interview, sum(1 for m in history_records if m.get("role") == "model"),
+                ),
             )
 
             feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")

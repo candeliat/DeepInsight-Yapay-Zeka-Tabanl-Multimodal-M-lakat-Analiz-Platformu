@@ -146,7 +146,7 @@ export function QuestionsPanel({ orgId, onError }: { orgId: string; onError: (me
               </div>
               {editingId === q.id ? (
                 <div className="flex flex-col gap-2">
-                  <Textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={3} maxLength={2000} aria-label="Soru metnini düzenle" />
+                  <Textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={3} maxLength={2000} aria-label="Soru metnini düzenle" autoFocus />
                   <div className="flex gap-2 justify-end">
                     <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="w-3.5 h-3.5" /> Vazgeç</Button>
                     <Button

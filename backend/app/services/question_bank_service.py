@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Optional
 from app.core.config import settings
 from app.core.database import run, supabase
 from app.services.llm_service import llm_service
-from app.services.local_embedding_service import embed_text_local
+from app.services.local_embedding_service import embed_text_local_if_ready
 from app.services.question_tags import interview_tags, related_tags
 
 logger = logging.getLogger(__name__)
@@ -179,8 +179,12 @@ async def _semantic_candidates(
             role, topic, exc_info=True,
         )
         try:
-            query_embedding = await asyncio.to_thread(embed_text_local, query_text)
+            query_embedding = await asyncio.to_thread(embed_text_local_if_ready, query_text)
             rpc_name = "match_questions_local"
+            if query_embedding is None:
+                # Model soğuk: mülakat başlangıcı ~75 sn yükleme beklemesin; bu sefer LLM üretir.
+                logger.warning("[question_bank_service] Yerel embedding modeli henüz yüklenmedi — semantik arama atlanıyor.")
+                return []
         except Exception:
             logger.warning(
                 "[question_bank_service] Yerel embedding fallback de başarısız (role=%s, topic=%s) — semantik arama atlanıyor.",

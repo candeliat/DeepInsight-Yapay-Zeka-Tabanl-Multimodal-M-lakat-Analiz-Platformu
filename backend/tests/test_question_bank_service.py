@@ -152,7 +152,7 @@ def test_fetch_question_pool_drops_rows_below_threshold(monkeypatch):
 
 def test_fetch_question_pool_returns_empty_when_embedding_and_local_fallback_both_fail(monkeypatch):
     monkeypatch.setattr(llm_service, "embed_text", AsyncMock(side_effect=RuntimeError("AI servisi ile iletişim kurulamadı.")))
-    monkeypatch.setattr(question_bank_service, "embed_text_local", MagicMock(side_effect=RuntimeError("yerel model yüklenemedi")))
+    monkeypatch.setattr(question_bank_service, "embed_text_local_if_ready", MagicMock(side_effect=RuntimeError("yerel model yüklenemedi")))
     fake_supabase = _fake_supabase([])
     monkeypatch.setattr(question_bank_service, "supabase", fake_supabase)
 
@@ -165,7 +165,7 @@ def test_fetch_question_pool_returns_empty_when_embedding_and_local_fallback_bot
 def test_fetch_question_pool_falls_back_to_local_embedding_when_api_fails(monkeypatch):
     monkeypatch.setattr(question_bank_service.settings, "QUESTION_BANK_MIN_SIMILARITY", 0.1)
     monkeypatch.setattr(llm_service, "embed_text", AsyncMock(side_effect=RuntimeError("AI servisi ile iletişim kurulamadı.")))
-    monkeypatch.setattr(question_bank_service, "embed_text_local", MagicMock(return_value=[0.1, 0.2, 0.3]))
+    monkeypatch.setattr(question_bank_service, "embed_text_local_if_ready", MagicMock(return_value=[0.1, 0.2, 0.3]))
 
     fake_supabase = _fake_supabase([_row("q1", 0.8)])
     monkeypatch.setattr(question_bank_service, "supabase", fake_supabase)
@@ -418,3 +418,17 @@ def test_fetch_question_pool_expands_same_family_only_once(monkeypatch):
     assert sorted(p["id"] for p in pool) == ["fam-a", "fam-b"]
     question_bank_table = fake_supabase.table("question_bank")
     assert question_bank_table.select.call_count == 1
+
+
+
+def test_fetch_question_pool_skips_local_fallback_while_model_is_cold(monkeypatch):
+    # API çöktü ve yerel model henüz yüklenmedi: mülakat başlangıcı ~75 sn yükleme beklemez.
+    monkeypatch.setattr(llm_service, "embed_text", AsyncMock(side_effect=RuntimeError("AI servisi ile iletişim kurulamadı.")))
+    monkeypatch.setattr(question_bank_service, "embed_text_local_if_ready", MagicMock(return_value=None))
+    fake_supabase = _fake_supabase([_row("q1", 0.8)])
+    monkeypatch.setattr(question_bank_service, "supabase", fake_supabase)
+
+    pool = run(question_bank_service.fetch_question_pool(role="X", topic="Y", difficulty=None, size=5))
+
+    assert pool == []
+    fake_supabase.rpc.assert_not_called()

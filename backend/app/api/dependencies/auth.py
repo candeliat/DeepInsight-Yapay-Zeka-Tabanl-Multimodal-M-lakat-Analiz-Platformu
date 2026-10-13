@@ -10,6 +10,7 @@ from supabase_auth.errors import AuthRetryableError
 from app.core.config import settings
 from app.core.database import aw, supabase
 from app.api.schemas.user import UserProfile
+from app.services.llm_service import current_user_id
 from app.services import organization_service
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,14 @@ async def _get_user(token: str):
 
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> UserProfile:
+    """Token'ı doğrulayıp kullanıcıyı döner; kullanıcı kimliği LLM kullanım kaydı için
+    isteğin bağlamına yazılır (bkz. llm_service.current_user_id)."""
+    user = await _resolve_user(token)
+    current_user_id.set(user.id)
+    return user
+
+
+async def _resolve_user(token: str) -> UserProfile:
     """
     Validate the token from the Authorization header and return the user profile.
     Raises HTTPException if the token is invalid or user is not found.

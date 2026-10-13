@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 from app.api.schemas.user import PRIVACY_NOTICE_VERSION, UserCreate, UserLogin, TokenResponse, UserProfile
 from app.core.database import aw, supabase
+from app.services import password_breach
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -58,8 +59,14 @@ def refresh_token(body: RefreshTokenRequest):
         )
 
 
+async def _reject_breached_password(password: str) -> None:
+    """Sızıntılarda görülmüş şifreyi reddeder (bkz. password_breach; servis yoksa geçer)."""
+    if await password_breach.is_breached(password):
+        raise HTTPException(status_code=422, detail=password_breach.BREACHED_MESSAGE)
+
+
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
-def register(user_data: UserCreate):
+async def register(user_data: UserCreate):
     """
     Register a new user using Supabase Authentication.
     """
@@ -72,6 +79,7 @@ def register(user_data: UserCreate):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database connection is not configured."
         )
+    await _reject_breached_password(user_data.password)
 
     try:
         # User metadata can store additional profile info
@@ -90,8 +98,9 @@ def register(user_data: UserCreate):
         from supabase import create_client
         from app.core.config import settings
         temp_client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-        
-        response = temp_client.auth.sign_up({
+
+        # Senkron istemci: olay döngüsünü bloklamasın.
+        response = await asyncio.to_thread(temp_client.auth.sign_up, {
             "email": user_data.email,
             "password": user_data.password,
             "options": {
@@ -178,6 +187,7 @@ async def reset_password(body: ResetPasswordRequest):
         user = None
     if not user:
         raise HTTPException(status_code=401, detail="Bağlantının süresi dolmuş ya da geçersiz. Yeniden sıfırlama isteyin.")
+    await _reject_breached_password(body.new_password)
     await aw(supabase.auth.admin.update_user_by_id(user.id, {"password": body.new_password}))
     return {"message": "Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz."}
 
@@ -197,6 +207,7 @@ async def change_password(body: ChangePasswordRequest, current_user: UserProfile
         await asyncio.to_thread(_check_current_password)
     except Exception:
         raise HTTPException(status_code=400, detail="Mevcut şifreniz hatalı.")
+    await _reject_breached_password(body.new_password)
     await aw(supabase.auth.admin.update_user_by_id(current_user.id, {"password": body.new_password}))
     return {"message": "Şifreniz güncellendi."}
 

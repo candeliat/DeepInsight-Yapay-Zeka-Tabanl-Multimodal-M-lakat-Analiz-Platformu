@@ -61,6 +61,20 @@ silme. Yazılamazsa asıl işlemi engellemez (best-effort).
 - Mülakat sonu ve puanlar sunucu tarafında belirlenir; LLM'in "mülakat bitti" demesi ya da
   kendi skorunu bildirmesi akışı değiştirmez.
 - Kurum başına aylık mülakat kotası LLM maliyetini sınırlar.
+- Kullanıcı başına istek sınırı (`app/core/rate_limit.py`): yapay zekâ, OCR, Whisper ve video
+  analizi yapan uç noktalarda varsayılan dakikada 20, saatte 200 istek. Aşılınca 429 ve
+  `Retry-After`. Süreç içi sayaçtır; birden çok backend örneğinde paylaşılan sayaca (Redis) taşınmalı.
+- Her LLM denemesi `llm_usage` tablosuna yazılır (kullanıcı, amaç, model, sonuç, gecikme, token;
+  içerik yazılmaz). RLS açık ve politika yok: yalnızca backend erişir. Kullanıcı silinince
+  `user_id` boşaltılır.
+
+## Şifre güvenliği
+
+- Kayıt, şifre sıfırlama ve şifre değiştirmede yeni şifre HaveIBeenPwned "Pwned Passwords"
+  listesinde aranır (`app/services/password_breach.py`). k-anonimlik: yalnızca SHA-1 özetinin ilk
+  5 karakteri gönderilir, eşleşme sunucuda yerelde aranır; `Add-Padding` yanıt boyutundan çıkarımı
+  engeller. Sızıntıda görülen şifre 422 ile reddedilir. Servise ulaşılamazsa işlem engellenmez.
+  (Supabase'in yerleşik eşdeğeri Pro planda.)
 
 ## Güvenlik taraması (2026-10-11) ve sonuçları
 
@@ -79,4 +93,5 @@ silme. Yazılamazsa asıl işlemi engellemez (best-effort).
   httpOnly oturum çerezine geçilmesi önerilir.
 - Bazı 500 hataları iç hata metnini istemciye döndürür; üretimde genel mesaja çevrilmeli.
 - Mobil uygulamada API adresi sabit ve token yenileme yok (mobil fazında ele alınacak).
-- Supabase Auth'ta "sızdırılmış şifre koruması" panelden açılmalıdır.
+- Sızdırılmış şifre kontrolü backend'de yapılır; Supabase Auth'a doğrudan (backend'i atlayarak)
+  yapılan kayıtlarda çalışmaz. Pro plana geçilirse panelden de açılmalıdır.

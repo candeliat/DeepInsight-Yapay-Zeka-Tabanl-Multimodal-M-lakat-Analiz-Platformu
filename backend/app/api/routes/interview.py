@@ -22,6 +22,7 @@ from app.services.interview_service import (
 )
 from fastapi import Depends
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
+from app.core.rate_limit import ai_rate_limit
 from app.api.schemas.user import UserProfile
 from app.api.schemas.interview import InterviewSummary, InterviewDetail
 
@@ -241,7 +242,7 @@ async def _owned_interview(interview_id: str, user_id: str) -> Dict[str, Any]:
 
 # --- Endpoints ---
 
-@router.post("/start", response_model=StartInterviewResponse)
+@router.post("/start", response_model=StartInterviewResponse, dependencies=[Depends(ai_rate_limit)])
 async def start_interview(
     request: StartInterviewRequest,
     token: str = Depends(oauth2_scheme),
@@ -361,7 +362,7 @@ def _sse(event: str, data: Any) -> str:
     return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
 
 
-@router.post("/chat/stream")
+@router.post("/chat/stream", dependencies=[Depends(ai_rate_limit)])
 async def chat_with_ai_stream(
     request: ChatRequest,
     token: str = Depends(oauth2_scheme),
@@ -517,7 +518,7 @@ async def chat_with_ai_stream(
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
-@router.post("/{interview_id}/finish", response_model=ChatResponse)
+@router.post("/{interview_id}/finish", response_model=ChatResponse, dependencies=[Depends(ai_rate_limit)])
 async def finish_interview_early(
     interview_id: str,
     token: str = Depends(oauth2_scheme),
@@ -611,7 +612,7 @@ async def abandon_interview(
     return {"status": "deleted"}
 
 
-@router.post("/transcribe")
+@router.post("/transcribe", dependencies=[Depends(ai_rate_limit)])
 async def transcribe_audio_endpoint(
     file: UploadFile = File(...),
     token: str = Depends(oauth2_scheme),

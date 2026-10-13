@@ -4,6 +4,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.api.dependencies.auth import oauth2_scheme, require_admin
+from app.core.rate_limit import ai_rate_limit
 from app.api.schemas.question_bank_admin import (
     GenerateCandidatesRequest,
     QuestionBankCandidateItem,
@@ -86,7 +87,7 @@ async def list_gaps(
     return await admin_service.list_gaps()
 
 
-@router.post("/candidates/generate", response_model=List[QuestionBankCandidateItem])
+@router.post("/candidates/generate", response_model=List[QuestionBankCandidateItem], dependencies=[Depends(ai_rate_limit)])
 async def generate_candidates(
     payload: GenerateCandidatesRequest,
     token: str = Depends(oauth2_scheme),

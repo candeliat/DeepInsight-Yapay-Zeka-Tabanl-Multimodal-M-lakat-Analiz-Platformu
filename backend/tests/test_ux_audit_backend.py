@@ -40,7 +40,7 @@ def test_video_upload_requires_consent(client, monkeypatch):
     monkeypatch.setattr(analytics_route, "supabase", own)
     monkeypatch.setattr(account_service, "has_video_consent", lambda uid: False)
     run = MagicMock()
-    monkeypatch.setattr(analytics_route, "run_full_analysis", run)
+    monkeypatch.setattr(analytics_route.analysis_queue, "submit", run)
     resp = client.post(f"/api/v1/analytics/analyze/{INTERVIEW_ID}", files={"file": ("a.webm", b"x", "video/webm")})
     assert resp.status_code == 403
     run.assert_not_called()

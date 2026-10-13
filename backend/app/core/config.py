@@ -28,6 +28,13 @@ class Settings:
     WHISPER_MODEL: str = os.getenv("WHISPER_MODEL", "small")
     TEMP_UPLOAD_DIR: str = os.getenv("TEMP_UPLOAD_DIR", str(Path(__file__).resolve().parent.parent.parent / "temp_uploads"))
     ANALYSIS_FPS: int = int(os.getenv("ANALYSIS_FPS", "1"))
+    # Aynı anda çalışan video analizi sayısı (her biri GB'larca bellek kullanır) ve sırada
+    # bekleyebilecek en fazla iş; fazlası 503 ile reddedilir (bkz. analysis_queue).
+    ANALYSIS_MAX_CONCURRENCY: int = int(os.getenv("ANALYSIS_MAX_CONCURRENCY", "1"))
+    ANALYSIS_MAX_QUEUE: int = int(os.getenv("ANALYSIS_MAX_QUEUE", "20"))
+    # Kareler bu genişliğe küçültülür ve en fazla bu kadar kare tutulur: uzun videoda bellek sabit kalır.
+    ANALYSIS_FRAME_WIDTH: int = int(os.getenv("ANALYSIS_FRAME_WIDTH", "640"))
+    ANALYSIS_MAX_FRAMES: int = int(os.getenv("ANALYSIS_MAX_FRAMES", "300"))
 
     # --- LLM Mülakat Motoru ---
     MAX_INTERVIEW_QUESTIONS: int = int(os.getenv("MAX_INTERVIEW_QUESTIONS", "5"))

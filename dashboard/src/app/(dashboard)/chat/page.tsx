@@ -447,9 +447,12 @@ export default function InterviewRoomPage() {
     // temizleme useEffect'i bu interval'i durdurabilsin — aksi halde
     // unmount olmuş component'te setState çağrılmaya devam eder ve
     // kullanıcı ayrıldıktan sonra bile arka planda gereksiz istek atılır.
+    let polls = 0;
     pollIntervalRef.current = setInterval(async () => {
       attempts++;
-      if (attempts > maxAttempts) {
+      polls++;
+      // Sırada beklenen süre analiz süresinden sayılmaz; yine de 30 dakikada bir üst sınır var.
+      if (attempts > maxAttempts || polls > 720) {
         clearInterval(pollIntervalRef.current!);
         pollIntervalRef.current = null;
         setEvaluation(initialEvaluation);
@@ -461,7 +464,17 @@ export default function InterviewRoomPage() {
         const response = await api.get(`/api/v1/analytics/status/${id}`);
         const status = response.data.analysis_status;
 
-        if (status === "completed") {
+        if (status === "queued") {
+          attempts--;
+          const ahead = response.data.queue_position;
+          setAnalyzingStatusText(
+            ahead
+              ? `Analiz sırada: önünüzde ${ahead} analiz var. Sıranız gelince otomatik başlayacak; lütfen ayrılmayın.`
+              : "Analiz sırada; birazdan başlayacak. Lütfen ayrılmayın.",
+          );
+        } else if (status === "processing") {
+          setAnalyzingStatusText("Yapay Zekamız mülakat performansını, göz temasını ve konuşma tonunu inceliyor. Lütfen ayrılmayın...");
+        } else if (status === "completed") {
           clearInterval(pollIntervalRef.current!);
           pollIntervalRef.current = null;
           // Analiz bitti! Detayları alıp sonuçlar ekranına yansıt

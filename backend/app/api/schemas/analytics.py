@@ -27,10 +27,12 @@ class AnalyticsStatusResponse(BaseModel):
     interview_id: str
     analysis_status: str
     error_message: Optional[str] = None
+    queue_position: Optional[int] = None  # "queued" iken önündeki analiz sayısı
 
 
 class AnalyticsStartResponse(BaseModel):
     """Analiz başlatma yanıtı."""
     interview_id: str
     status: str = "processing"
+    queue_position: Optional[int] = None
     message: str = "Analiz arka planda başlatıldı."

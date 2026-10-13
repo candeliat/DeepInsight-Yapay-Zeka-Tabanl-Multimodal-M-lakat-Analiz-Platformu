@@ -9,11 +9,23 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 
+from contextlib import asynccontextmanager  # noqa: E402
+
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 from app.api.routes import interview, auth, users, analytics, question_bank_admin, organizations, cv, jobs, progress, assignments, pilot, account  # noqa: E402
 
+@asynccontextmanager
+async def lifespan(_app):
+    import asyncio
+    from app.services import analysis_queue
+    # Önceki süreçte yarıda kalan analizler sonsuza kadar "işleniyor" görünmesin.
+    await asyncio.to_thread(analysis_queue.recover_after_restart)
+    yield
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="DeepInsight Backend API",
     description="Centralized Python Backend for DeepInsight built with FastAPI",
     version="1.0.0"

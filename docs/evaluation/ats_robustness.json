@@ -1,70 +1,104 @@
 [
   {
     "profile": "CV1",
-    "base_score": 85,
+    "base_score": 92,
     "base_method": "pdf_text",
     "deterministic": true,
     "variants": {
       "taranmis": {
-        "score": 71,
-        "delta": -14,
+        "score": 77,
+        "delta": -15,
         "method": "ocr",
         "changed_checks": {
-          "text_layer": -14
+          "text_layer": -10,
+          "file_size": -5
         },
         "text_similarity": 0.872,
         "content_checks_preserved": 1.0
       },
       "standart_disi_baslik": {
-        "score": 72,
-        "delta": -13,
+        "score": 75,
+        "delta": -17,
         "method": "pdf_text",
         "changed_checks": {
-          "sections": -13
+          "sections": -17
         }
       },
       "sayisiz_tarihsiz": {
-        "score": 70,
-        "delta": -15,
+        "score": 85,
+        "delta": -7,
         "method": "pdf_text",
         "changed_checks": {
-          "dates": -10,
-          "quantified": -5
+          "dates": -5,
+          "quantified": -2
+        }
+      },
+      "fotografli": {
+        "score": 89,
+        "delta": -3,
+        "method": "pdf_text",
+        "changed_checks": {
+          "formatting": -3
+        }
+      },
+      "gizli_metin": {
+        "score": 87,
+        "delta": -5,
+        "method": "pdf_text",
+        "changed_checks": {
+          "hidden_text": -5
         }
       }
     }
   },
   {
     "profile": "CV2",
-    "base_score": 85,
+    "base_score": 92,
     "base_method": "pdf_text",
     "deterministic": true,
     "variants": {
       "taranmis": {
-        "score": 71,
-        "delta": -14,
+        "score": 77,
+        "delta": -15,
         "method": "ocr",
         "changed_checks": {
-          "text_layer": -14
+          "text_layer": -10,
+          "file_size": -5
         },
         "text_similarity": 0.636,
         "content_checks_preserved": 1.0
       },
       "standart_disi_baslik": {
-        "score": 72,
-        "delta": -13,
+        "score": 75,
+        "delta": -17,
         "method": "pdf_text",
         "changed_checks": {
-          "sections": -13
+          "sections": -17
         }
       },
       "sayisiz_tarihsiz": {
-        "score": 70,
-        "delta": -15,
+        "score": 85,
+        "delta": -7,
         "method": "pdf_text",
         "changed_checks": {
-          "dates": -10,
-          "quantified": -5
+          "dates": -5,
+          "quantified": -2
+        }
+      },
+      "fotografli": {
+        "score": 89,
+        "delta": -3,
+        "method": "pdf_text",
+        "changed_checks": {
+          "formatting": -3
+        }
+      },
+      "gizli_metin": {
+        "score": 87,
+        "delta": -5,
+        "method": "pdf_text",
+        "changed_checks": {
+          "hidden_text": -5
         }
       }
     }

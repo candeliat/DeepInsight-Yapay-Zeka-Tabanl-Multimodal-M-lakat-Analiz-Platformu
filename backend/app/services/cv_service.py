@@ -55,14 +55,14 @@ def _db():
 _bucket_ready = False
 
 
-def ensure_bucket() -> None:
+async def ensure_bucket() -> None:
     """Özel bucket yoksa oluşturur (idempotent; süreç başına bir kez kontrol eder)."""
     global _bucket_ready
     if _bucket_ready:
         return
-    existing = {b.name for b in _db().storage.list_buckets()}
+    existing = {b.name for b in await _db().storage.list_buckets()}
     if BUCKET not in existing:
-        _db().storage.create_bucket(BUCKET, options={"public": False})
+        await _db().storage.create_bucket(BUCKET, options={"public": False})
     _bucket_ready = True
 
 
@@ -128,9 +128,9 @@ async def create_cv(user_id: str, data: bytes, original_filename: str, org_id: O
     if len(text.strip()) < 30:
         raise ValueError("CV'den okunabilir metin çıkarılamadı. Daha net bir dosya deneyin.")
 
-    ensure_bucket()
+    await ensure_bucket()
     path = f"{user_id}/{uuid.uuid4()}.{_EXT_BY_MIME[mime]}"
-    _db().storage.from_(BUCKET).upload(path, data, {"content-type": mime})
+    await _db().storage.from_(BUCKET).upload(path, data, {"content-type": mime})
 
     try:
         result = (await run(_db().table("cvs").insert({
@@ -149,7 +149,7 @@ async def create_cv(user_id: str, data: bytes, original_filename: str, org_id: O
             raise RuntimeError("CV kaydedilemedi")
     except Exception:
         # Yetim dosya bırakma.
-        _db().storage.from_(BUCKET).remove([path])
+        await _db().storage.from_(BUCKET).remove([path])
         raise
     return result.data[0]
 
@@ -158,6 +158,6 @@ async def delete_cv(user_id: str, cv_id: str) -> bool:
     cv = await get_cv(user_id, cv_id)
     if not cv:
         return False
-    _db().storage.from_(BUCKET).remove([cv["storage_path"]])
+    await _db().storage.from_(BUCKET).remove([cv["storage_path"]])
     (await run(_db().table("cvs").delete().eq("id", cv_id).eq("user_id", user_id)))
     return True

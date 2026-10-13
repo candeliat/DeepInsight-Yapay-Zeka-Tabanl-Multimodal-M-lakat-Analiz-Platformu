@@ -29,6 +29,9 @@ _TRANSIENT = (httpx.TransportError, AuthRetryableError, TimeoutError, OSError)
 _JWKS_TTL = 600          # anahtar listesi 10 dakikada bir yenilenir
 _JWKS_MIN_REFRESH = 30   # bilinmeyen kid için en sık yenileme aralığı (anahtar rotasyonu)
 _LOCAL_ALGS = {"ES256", "RS256", "EdDSA"}
+# Sunucu saatleri arasındaki küçük kayma: yeni yenilenen bir token'ın iat'i makine saatinden
+# birkaç saniye ileride olabiliyor; paysız doğrulama tam oturum yenilemesinde 401 veriyordu.
+_CLOCK_SKEW = 60
 _jwks: Dict[str, Any] = {"keys": {}, "fetched_at": 0.0}
 
 
@@ -76,7 +79,7 @@ async def _verify_locally(token: str) -> Optional[Dict[str, Any]]:
         return jwt.decode(
             token, key, algorithms=[alg], audience="authenticated",
             issuer=f"{settings.SUPABASE_URL}/auth/v1",
-            options={"require": ["exp", "sub", "aud", "iss"]},
+            options={"require": ["exp", "sub", "aud", "iss"]}, leeway=_CLOCK_SKEW,
         )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -85,9 +88,10 @@ async def _verify_locally(token: str) -> Optional[Dict[str, Any]]:
             headers={"WWW-Authenticate": "Bearer"},
         )
     except jwt.PyJWTError as e:
+        logger.info("Token yerelde reddedildi: %s", e)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Could not validate credentials: {e}",
+            detail="Oturum doğrulanamadı. Lütfen tekrar giriş yapın.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 

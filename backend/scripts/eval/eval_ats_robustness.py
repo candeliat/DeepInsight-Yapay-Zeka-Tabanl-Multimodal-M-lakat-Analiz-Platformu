@@ -7,6 +7,8 @@ Bu betik kuralların amaçlandığı gibi davrandığını gösterir:
 - Duyarlılık: aynı içerik kasıtlı bozulduğunda (standart dışı başlıklar;
   sayısal başarı ve tarih aralıkları çıkarılmış) skor ilgili kontrolde ve
   yalnızca orada düşmeli.
+- Ayrıştırma riskleri: fotoğraf eklenince yalnızca "tablo, görsel ve özel karakter",
+  beyaz yazıyla gizli anahtar kelime eklenince yalnızca "gizli metin" düşmeli.
 - Dayanıklılık: CV taranmış (yalnızca görüntü) olarak yüklendiğinde metin OCR ile
   geri kazanılır. "Metin katmanı" kontrolü bilerek düşer (birçok gerçek ATS
   taranmış CV'yi okuyamaz); içerik kontrolleri ise mümkün olduğunca aynı kalmalı.
@@ -62,6 +64,8 @@ PROFILES = [
     },
 ]
 
+CONTENT_CHECKS = ("contact", "sections", "length", "dates", "quantified", "acronyms")
+
 HEADINGS = {"standard": ("Deneyim", "Eğitim", "Beceriler"), "nonstandard": ("Neler Yaptım", "Okul Hayatım", "Yeteneklerim")}
 
 
@@ -101,6 +105,22 @@ def scanned_pdf(pdf: bytes, dpi: int = 150) -> bytes:
     return out.tobytes()
 
 
+def with_photo(pdf: bytes) -> bytes:
+    """Sağ üst köşeye vesikalık boyutunda bir fotoğraf ekler (Türkiye'de yaygın)."""
+    doc = fitz.open(stream=pdf, filetype="pdf")
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 90, 120), 0)
+    pix.set_rect(pix.irect, (180, 160, 150))
+    doc[0].insert_image(fitz.Rect(455, 40, 545, 160), stream=pix.tobytes("png"))
+    return doc.tobytes()
+
+
+def with_hidden_keywords(pdf: bytes) -> bytes:
+    """Sayfa altına beyaz yazıyla anahtar kelime doldurur (ATS'yi kandırma girişimi)."""
+    doc = fitz.open(stream=pdf, filetype="pdf")
+    doc[0].insert_text((50, 830), "Kubernetes Terraform Kafka Spark Airflow Snowflake", fontsize=9, color=(1, 1, 1))
+    return doc.tobytes()
+
+
 def evaluate(data: bytes) -> Dict[str, Any]:
     text, method, _, stats = extract_cv_text(data)
     result = score_cv(text, stats, method)
@@ -122,6 +142,8 @@ def main() -> None:
             "taranmis": evaluate(scanned_pdf(base_pdf)),
             "standart_disi_baslik": evaluate(text_pdf(cv_html(p, headings=HEADINGS["nonstandard"]))),
             "sayisiz_tarihsiz": evaluate(text_pdf(cv_html(p, quantified=False, dates=False))),
+            "fotografli": evaluate(with_photo(base_pdf)),
+            "gizli_metin": evaluate(with_hidden_keywords(base_pdf)),
         }
         row = {
             "profile": f"CV{i}", "base_score": base["score"], "base_method": base["method"],
@@ -133,7 +155,9 @@ def main() -> None:
             entry = {"score": v["score"], "delta": v["score"] - base["score"], "method": v["method"], "changed_checks": changed}
             if name == "taranmis":
                 entry["text_similarity"] = similarity(base["text"], v["text"])
-                content = [k for k in base["checks"] if k != "text_layer"]
+                # Yalnızca CV içeriğine bağlı kontroller; dosya biçimine bağlı olanlar (metin katmanı,
+                # dosya boyutu: taranmış PDF genelde 2,5 MB'ı aşar) taranmış sürümde haklı olarak değişir.
+                content = [k for k in CONTENT_CHECKS if k in base["checks"]]
                 entry["content_checks_preserved"] = sum(v["checks"][k] == base["checks"][k] for k in content) / len(content)
             row["variants"][name] = entry
         rows.append(row)
@@ -146,7 +170,8 @@ def main() -> None:
 
 
 def render_markdown(rows: List[Dict[str, Any]]) -> str:
-    names = {"taranmis": "Taranmış (OCR)", "standart_disi_baslik": "Standart dışı başlıklar", "sayisiz_tarihsiz": "Sayısız ve tarihsiz"}
+    names = {"taranmis": "Taranmış (OCR)", "standart_disi_baslik": "Standart dışı başlıklar", "sayisiz_tarihsiz": "Sayısız ve tarihsiz",
+             "fotografli": "Fotoğraflı", "gizli_metin": "Beyaz yazıyla gizli anahtar kelime"}
     lines = ["# ATS skorunun duyarlılığı ve dayanıklılığı", "",
              "Kurgusal profillerden üretilen CV'ler; her varyant yalnızca bir özelliği değiştirir.", "",
              "| CV | Varyant | Skor | Fark | Değişen kontroller | OCR metin benzerliği | İçerik kontrolleri korunan |",
@@ -161,7 +186,9 @@ def render_markdown(rows: List[Dict[str, Any]]) -> str:
                          f"{'—' if sim is None else sim} | {'—' if kept is None else f'{kept:.0%}'} |")
     det = all(r["deterministic"] for r in rows)
     lines += ["", f"Determinizm: aynı dosya iki kez puanlandı — {'tüm CV’lerde birebir aynı sonuç' if det else 'FARK VAR'}.",
-              "", "Not: Taranmış varyantta 'text_layer' kontrolünün düşmesi tasarım gereğidir (birçok ATS görüntü CV'yi okuyamaz)."]
+              "", "Not: Taranmış varyantta 'text_layer' kontrolünün düşmesi tasarım gereğidir (birçok ATS görüntü CV'yi okuyamaz); "
+              "taranmış PDF 2,5 MB'ı aştığında 'file_size' da düşer (Greenhouse bu boyutu ayrıştırmaz). "
+              "'İçerik kontrolleri korunan' yalnızca içeriğe bağlı kontrolleri sayar: " + ", ".join(CONTENT_CHECKS) + "."]
     return "\n".join(lines) + "\n"
 
 

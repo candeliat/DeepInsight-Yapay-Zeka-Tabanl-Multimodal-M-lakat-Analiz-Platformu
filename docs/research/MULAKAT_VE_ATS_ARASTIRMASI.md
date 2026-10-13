@@ -98,11 +98,13 @@ Kaynakların önemli kısmı kariyer blogları ve aday yorumlarıdır. Bu yüzde
 | Tablo ve özel karakter | R | Var (`formatting`) |
 | Ölçülebilir başarılar | Ç (işe alımcı tarafı) | Var (`quantified`) |
 | İlan anahtar kelime örtüşmesi | Ç | İlan eşleştirmede var (`skill_matching`), ATS skorunda yok |
-| İletişim bilgisinin üst/alt bilgide olması | R + Ç | **Yok**: sonraki PR |
-| Fotoğraf ya da grafik | R | **Yok**: sonraki PR |
-| Dosya boyutu (> 2,5 MB) | R | **Yok**: sonraki PR |
-| Kısaltma ve açılım | Ç | **Yok**: sonraki PR (öneri olarak) |
-| Gizli ya da beyaz metin | Ç | **Yok**: sonraki PR |
+| İletişim bilgisinin üst/alt bilgide olması | R + Ç | Var (`header_footer`, DOCX) |
+| Fotoğraf ya da grafik | R | Var (`formatting`, 40 pt'den büyük görseller) |
+| Dosya boyutu (> 2,5 MB) | R | Var (`file_size`) |
+| Kısaltma ve açılım | Ç | Var (`acronyms`, 15 yaygın kısaltma) |
+| Gizli ya da beyaz metin | Ç | Var (`hidden_text`: beyaz, saydam ya da 3 pt'den küçük yazı; renkli zeminde değil) |
+
+Ağırlıklar (toplam 100): içerik 55 (iletişim 15, bölüm başlıkları 25, uzunluk 5, tarih 5, ölçülebilir başarı 5), ayrıştırma riski 45 (metin katmanı 15, tek sütun 5, tablo/görsel/özel karakter 5, dosya boyutu 5, üst/alt bilgi 5, gizli metin 5, kısaltma 5). Risk kontrolleri sorun bulunmadığında tam puan verdiği için içerik ağırlığı yüksek tutuldu; aksi halde neredeyse boş bir CV bile orta skor alıyordu. CV'den profil ve öneri çıkaran LLM istemi de bu bölüme dayanır: biçim sorunlarını tekrarlamaz, fotoğraf, grafik ve iki sütunlu şablon önermez.
 
 ATS skoru bir **tahmindir**: her şirketin sistemi farklıdır. Arayüz bunu zaten belirtiyor; yeni kontroller de bu çerçevede açıklanabilir öneriler olarak eklenecek.
 

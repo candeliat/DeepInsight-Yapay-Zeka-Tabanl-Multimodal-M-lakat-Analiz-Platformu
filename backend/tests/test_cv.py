@@ -67,6 +67,8 @@ def test_extract_scanned_pdf_falls_back_to_ocr(monkeypatch):
 
     assert method == "ocr" and stats["has_text_layer"] is False
     assert "FastAPI" in text
+    # Sayfa görüntüsü CV'nin kendisi: ayrıca "fotoğraf/grafik" diye cezalandırılmaz.
+    assert stats["graphic_count"] == 0
 
 
 def test_extract_rejects_oversized_file():
@@ -102,8 +104,13 @@ def _fake_db(cv_rows=None, consent=True):
         return _Q(cv_rows if cv_rows is not None else [], calls)
 
     fake.table.side_effect = _table
-    fake.storage.list_buckets.return_value = [MagicMock(name="cvs")]
-    fake.storage.list_buckets.return_value[0].name = "cvs"
+    # Gerçek istemci AsyncClient: Storage çağrıları beklenmezse hiç çalışmaz (PR #6'da kaçan hata).
+    bucket = MagicMock()
+    bucket.name = "cvs"
+    fake.storage.list_buckets = AsyncMock(return_value=[bucket])
+    fake.storage.create_bucket = AsyncMock()
+    fake._bucket = MagicMock(upload=AsyncMock(), remove=AsyncMock())
+    fake.storage.from_.return_value = fake._bucket
     fake._calls = calls
     return fake
 
@@ -131,6 +138,32 @@ def test_create_cv_rejects_unreadable_text_and_stores_nothing(monkeypatch):
     with pytest.raises(ValueError):
         asyncio.run(cv_service.create_cv("user-a", b"\x89PNG\r\n\x1a\n", "scan.png"))
     fake.storage.from_.assert_not_called()
+
+
+def test_create_cv_uploads_file_and_delete_removes_it(monkeypatch):
+    import asyncio
+    fake = _fake_db(cv_rows=[{"id": "cv1", "user_id": "user-a", "storage_path": "user-a/x.pdf"}])
+    monkeypatch.setattr(cv_service, "supabase", fake)
+    monkeypatch.setattr(cv_service, "_bucket_ready", False)
+
+    asyncio.run(cv_service.create_cv("user-a", _pdf(), "cv.pdf"))
+    fake.storage.list_buckets.assert_awaited_once()
+    fake._bucket.upload.assert_awaited_once()
+    assert fake._bucket.upload.await_args.args[0].startswith("user-a/")
+
+    assert asyncio.run(cv_service.delete_cv("user-a", "cv1")) is True
+    fake._bucket.remove.assert_awaited_once_with(["user-a/x.pdf"])
+
+
+def test_failed_db_insert_removes_uploaded_file(monkeypatch):
+    import asyncio
+    fake = _fake_db(cv_rows=[])  # insert boş döner -> "CV kaydedilemedi"
+    monkeypatch.setattr(cv_service, "supabase", fake)
+    monkeypatch.setattr(cv_service, "_bucket_ready", True)
+    with pytest.raises(RuntimeError):
+        asyncio.run(cv_service.create_cv("user-a", _pdf(), "cv.pdf"))
+    path = fake._bucket.upload.await_args.args[0]
+    fake._bucket.remove.assert_awaited_once_with([path])
 
 
 # --- HTTP katmanı ---

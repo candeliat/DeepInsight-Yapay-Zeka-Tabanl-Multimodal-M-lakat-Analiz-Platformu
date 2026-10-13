@@ -55,12 +55,19 @@ Kalitesi bilinen 6 sentetik döküm (Python ve React; iyi/orta/zayıf), her biri
 
 ## 3. ATS skoru: duyarlılık, dayanıklılık, determinizm
 
-Kurgusal 2 profilden üretilen CV'ler; her varyant tek bir özelliği değiştirir.
+Kurgusal 2 profilden üretilen CV'ler; her varyant tek bir özelliği değiştirir. Güncel
+sonuçlar [ats_robustness.md](ats_robustness.md) dosyasında (2026-10-13: araştırmaya dayalı
+4 yeni kontrol ve yeniden dengelenen ağırlıklarla yeniden ölçüldü).
 
-- **Duyarlılık:** standart dışı başlıklar yalnızca "bölüm başlıkları" kontrolünü (−13),
-  sayısal başarı ve tarihlerin çıkarılması yalnızca ilgili iki kontrolü (−15) düşürdü.
+- **Duyarlılık:** standart dışı başlıklar yalnızca "bölüm başlıkları" kontrolünü (−17),
+  sayısal başarı ve tarihlerin çıkarılması yalnızca ilgili iki kontrolü (−7), vesikalık
+  fotoğraf yalnızca "tablo, görsel ve özel karakter" kontrolünü (−3), beyaz yazıyla gizlenen
+  anahtar kelimeler yalnızca "gizli metin" kontrolünü (−5) düşürdü.
 - **Determinizm:** aynı dosya iki kez puanlandığında sonuç birebir aynı.
-- **Dayanıklılık (OCR) ve ölçümün bulduğu hata:** ilk ölçümde taranmış CV'ler tasarım
+- **Dayanıklılık (OCR):** taranmış CV metin katmanı (−10) ve 2,5 MB'ı aşan dosya boyutu
+  (−5) için puan kaybeder; içerik kontrollerinin %100'ü korunur. Ölçüm, taranmış sayfanın
+  kendisinin "fotoğraf/grafik" sayılıp ikinci kez cezalandırıldığını da yakaladı; düzeltildi.
+- **İlk ölçümün bulduğu hata:** ilk ölçümde taranmış CV'ler tasarım
   gereği olan "metin katmanı" cezasının (−14) üstüne **haksız yere** 10–15 puan daha kaybediyordu:
 
   | | Taranmış CV skoru | İçerik kontrolleri korunan |

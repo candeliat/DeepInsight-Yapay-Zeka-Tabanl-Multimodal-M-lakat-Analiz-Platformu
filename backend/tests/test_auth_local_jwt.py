@@ -49,7 +49,7 @@ def test_valid_token_is_verified_locally_without_network(key):
 
 
 @pytest.mark.parametrize("overrides", [
-    {"exp": int(time.time()) - 10},          # süresi dolmuş
+    {"exp": int(time.time()) - 120},         # süresi dolmuş (saat payının dışında)
     {"aud": "anon"},                          # yanlış kitle
     {"iss": "https://baska.supabase.co/auth/v1"},  # başka proje
 ])
@@ -105,3 +105,17 @@ def test_fetch_user_profile_returns_fresh_record(key):
     auth.supabase.auth.admin.get_user_by_id.return_value = MagicMock(user=remote)
     profile = asyncio.run(auth.fetch_user_profile("u1"))
     assert profile.created_at == "2026-01-01T10:00:00" and profile.user_metadata == {"target": "QA"}
+
+
+def test_token_issued_slightly_in_the_future_is_accepted(key):
+    # Supabase'in saati birkaç saniye ileride olabilir: yeni yenilenmiş token reddedilmemeli.
+    now = int(time.time())
+    user = asyncio.run(auth.get_current_user(_token(key, iat=now + 20, nbf=now + 20)))
+    assert user.id == "u1"
+
+
+def test_invalid_token_message_is_turkish_and_hides_library_error(key):
+    other = ec.generate_private_key(ec.SECP256R1())
+    with pytest.raises(HTTPException) as info:
+        asyncio.run(auth.get_current_user(_token(other)))
+    assert info.value.detail == "Oturum doğrulanamadı. Lütfen tekrar giriş yapın."

@@ -24,6 +24,14 @@ Yalnızca aşağıdaki şemaya uyan TEK bir JSON nesnesi döndür, başka hiçbi
   "improvement_tips": [string]                   // 3-5 kısa, uygulanabilir Türkçe iyileştirme önerisi (içerik odaklı: ölçülebilir başarı, belirsiz ifadeler, eksik bölümler vb.)
 }
 
+improvement_tips için rehber (dayanak: docs/research/MULAKAT_VE_ATS_ARASTIRMASI.md):
+- Biçim sorunları (sütun, tablo, fotoğraf, dosya boyutu, üst/alt bilgi, gizli metin, kısaltma açılımı, tarih biçimi, iletişim bilgisi) kural tabanlı kontrollerle ayrıca raporlanıyor; bunları TEKRARLAMA. Yalnızca içeriğe odaklan.
+- Deneyim maddeleri "eylem + sonuç" yapısında olmalı: ne yapıldı, hangi teknolojiyle, ölçülebilir etkisi ne oldu. Sonucu olmayan maddeler için CV'deki somut maddeye atıfla öneri ver.
+- Belirsiz ifadeleri ("çeşitli projelerde yer aldım", "sorumluydum") somut katkıya çevirmeyi öner.
+- Beceriler listesindeki bir teknoloji deneyim/proje maddelerinde hiç geçmiyorsa, onu kullandığı bir yeri yazmasını öner (ATS'ler ve işe alımcılar beceriyi bağlamıyla arar).
+- Her öneri bu CV'de GERÇEKTEN var olan bir eksikliğe dayanmalı ve mümkünse CV'deki maddeye atıf yapmalı. Bir ilke bu CV'de zaten karşılanıyorsa o öneriyi YAZMA; genel tavsiye listesi (LinkedIn, sertifika, blog vb.) üretme. Öneriler yalnızca Türkçe olsun.
+- ASLA önerme: fotoğraf, grafik, beceri çubuğu/yüzdesi, iki sütunlu şablon, tablo, gizli/beyaz anahtar kelime, CV'de olmayan bir beceriyi ekleme.
+
 Kurallar:
 - CV'de olmayan bilgiyi UYDURMA; bilinmeyen alanları null veya boş liste yap.
 - Tarihleri CV'deki gibi kısa yaz (örn. "2023", "Haz 2022", "Devam ediyor").

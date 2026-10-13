@@ -12,7 +12,7 @@ gösterilir (bkz. org_insights_service). Öğrenci kendi skorunu her zaman gör�
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from app.core.database import supabase
+from app.core.database import run, aw, supabase
 from app.services import organization_service, progress_service
 
 STATUS_ORDER = {"completed": 2, "in_progress": 1, "not_started": 0}
@@ -59,7 +59,7 @@ def _status_by_user(interviews: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any
     return result
 
 
-def assignment_interviews(assignment_ids: List[str], user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+async def assignment_interviews(assignment_ids: List[str], user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     if not assignment_ids:
         return []
     query = (
@@ -69,7 +69,7 @@ def assignment_interviews(assignment_ids: List[str], user_id: Optional[str] = No
     )
     if user_id:
         query = query.eq("user_id", user_id)
-    return query.execute().data or []
+    return (await run(query)).data or []
 
 
 # --- eğitmen tarafı ---
@@ -78,7 +78,7 @@ async def create_assignment(actor_id: str, org_id: str, payload: Dict[str, Any])
     record = {**payload, "org_id": org_id, "created_by": actor_id}
     if record.get("due_at") is not None:
         record["due_at"] = record["due_at"].isoformat()
-    result = _db().table("assignments").insert(record).execute()
+    result = (await run(_db().table("assignments").insert(record)))
     if not result.data:
         raise RuntimeError("Ödev oluşturulamadı")
     created = result.data[0]
@@ -88,9 +88,9 @@ async def create_assignment(actor_id: str, org_id: str, payload: Dict[str, Any])
 
 async def list_org_assignments(org_id: str, memberships: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     assignments = (
-        _db().table("assignments").select("*").eq("org_id", org_id).order("created_at", desc=True).execute().data or []
+        (await run(_db().table("assignments").select("*").eq("org_id", org_id).order("created_at", desc=True))).data or []
     )
-    interviews = assignment_interviews([a["id"] for a in assignments])
+    interviews = (await aw(assignment_interviews([a["id"] for a in assignments])))
     out = []
     for a in assignments:
         candidates = {str(m["user_id"]) for m in targets(a, memberships)}
@@ -105,7 +105,7 @@ async def list_org_assignments(org_id: str, memberships: List[Dict[str, Any]]) -
 
 
 async def get_org_assignment(org_id: str, assignment_id: str) -> Optional[Dict[str, Any]]:
-    result = _db().table("assignments").select("*").eq("id", assignment_id).eq("org_id", org_id).execute()
+    result = (await run(_db().table("assignments").select("*").eq("id", assignment_id).eq("org_id", org_id)))
     return result.data[0] if result.data else None
 
 
@@ -135,7 +135,7 @@ def build_assignment_rows(memberships: List[Dict[str, Any]], interviews: List[Di
 async def delete_assignment(actor_id: str, org_id: str, assignment_id: str) -> bool:
     if not await get_org_assignment(org_id, assignment_id):
         return False
-    _db().table("assignments").delete().eq("id", assignment_id).eq("org_id", org_id).execute()
+    (await run(_db().table("assignments").delete().eq("id", assignment_id).eq("org_id", org_id)))
     await organization_service.log_audit(actor_id, org_id, "assignment.delete", "assignment", assignment_id)
     return True
 
@@ -145,19 +145,19 @@ async def delete_assignment(actor_id: str, org_id: str, assignment_id: str) -> b
 async def my_assignments(user_id: str, now: Optional[datetime] = None) -> List[Dict[str, Any]]:
     now = now or datetime.now(timezone.utc)
     memberships = (
-        _db().table("memberships").select("org_id, group_id").eq("user_id", user_id).eq("role", "candidate").execute().data or []
+        (await run(_db().table("memberships").select("org_id, group_id").eq("user_id", user_id).eq("role", "candidate"))).data or []
     )
     my_group = {m["org_id"]: m.get("group_id") for m in memberships}
     org_ids = list(my_group)
     if not org_ids:
         return []
     assignments = [
-        a for a in (_db().table("assignments").select("*").in_("org_id", org_ids).execute().data or [])
+        a for a in ((await run(_db().table("assignments").select("*").in_("org_id", org_ids))).data or [])
         # Gruba atanmış ödevi yalnızca o grubun öğrencisi görür.
         if not a.get("group_id") or str(a["group_id"]) == str(my_group.get(a["org_id"]) or "")
     ]
-    orgs = {o["id"]: o for o in (_db().table("organizations").select("id, name, rubric").in_("id", org_ids).execute().data or [])}
-    interviews = assignment_interviews([a["id"] for a in assignments], user_id=user_id)
+    orgs = {o["id"]: o for o in ((await run(_db().table("organizations").select("id, name, rubric").in_("id", org_ids))).data or [])}
+    interviews = (await aw(assignment_interviews([a["id"] for a in assignments], user_id=user_id)))
 
     out = []
     for a in assignments:
@@ -179,7 +179,7 @@ async def my_assignments(user_id: str, now: Optional[datetime] = None) -> List[D
 
 async def get_assignment_for_member(user_id: str, assignment_id: str) -> Optional[Dict[str, Any]]:
     """Ödev + kullanıcının o kurumun üyesi olduğu doğrulaması (mülakat başlatma için)."""
-    result = _db().table("assignments").select("*").eq("id", assignment_id).execute()
+    result = (await run(_db().table("assignments").select("*").eq("id", assignment_id)))
     if not result.data:
         return None
     assignment = result.data[0]

@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.core.database import supabase
+from app.core.database import run, supabase
 from app.services import ats_service, cv_service
 from app.services.llm_service import llm_service
 from app.services.prompts.cv_v1 import build_cv_profile_prompt, build_cv_user_message
@@ -171,14 +171,14 @@ async def analyze_cv(user_id: str, cv_id: str) -> Dict[str, Any]:
             suggestions.append(tip)
 
     if profile:
-        supabase.table("cvs").update({"profile": profile}).eq("id", cv_id).eq("user_id", user_id).execute()
-    saved = supabase.table("cv_analyses").insert({
+        (await run(supabase.table("cvs").update({"profile": profile}).eq("id", cv_id).eq("user_id", user_id)))
+    saved = (await run(supabase.table("cv_analyses").insert({
         "cv_id": cv_id,
         "user_id": user_id,
         "ats_score": ats["ats_score"],
         "ats_breakdown": ats["breakdown"],
         "suggestions": suggestions,
-    }).execute()
+    })))
 
     return {
         "cv_id": cv_id,
@@ -197,8 +197,8 @@ async def latest_analysis(user_id: str, cv_id: str) -> Optional[Dict[str, Any]]:
     if not cv:
         raise ValueError("CV bulunamadı")
     rows = (
-        supabase.table("cv_analyses").select("*").eq("cv_id", cv_id).eq("user_id", user_id)
-        .order("created_at", desc=True).limit(1).execute().data or []
+        (await run(supabase.table("cv_analyses").select("*").eq("cv_id", cv_id).eq("user_id", user_id)
+        .order("created_at", desc=True).limit(1))).data or []
     )
     if not rows:
         return None

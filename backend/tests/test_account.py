@@ -75,7 +75,7 @@ def db(monkeypatch):
 
 
 def test_export_includes_interviews_with_messages_and_orgs(db):
-    data = account_service.export_user_data("u1", "u1@x.com", {"profile": {}})
+    data = asyncio.run(account_service.export_user_data("u1", "u1@x.com", {"profile": {}}))
     assert data["interviews"][0]["messages"] == [{"role": "user", "content": "merhaba", "created_at": "t1"}]
     assert data["organizations"][0]["org_name"] == "Ege Kariyer"
     # Kullanıcıya ait tablolar her zaman kullanıcı kimliğiyle süzülür.
@@ -128,6 +128,8 @@ def test_delete_with_matching_email_case_insensitive(client, monkeypatch):
 
 
 def test_export_endpoint_returns_json_attachment(client, monkeypatch, db):
+    import app.api.routes.account as account_route
+    monkeypatch.setattr(account_route, "fetch_user_profile", AsyncMock(return_value=ME))
     resp = client.get("/api/v1/account/export")
     assert resp.status_code == 200 and "attachment" in resp.headers["content-disposition"]
     body = json.loads(resp.content.decode("utf-8"))

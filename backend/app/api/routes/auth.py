@@ -1,3 +1,4 @@
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -7,7 +8,7 @@ from app.api.dependencies.auth import _TRANSIENT, get_current_user
 from datetime import datetime, timezone
 
 from app.api.schemas.user import PRIVACY_NOTICE_VERSION, UserCreate, UserLogin, TokenResponse, UserProfile
-from app.core.database import supabase
+from app.core.database import aw, supabase
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -167,17 +168,17 @@ def forgot_password(body: ForgotPasswordRequest):
 
 
 @router.post("/reset-password")
-def reset_password(body: ResetPasswordRequest):
+async def reset_password(body: ResetPasswordRequest):
     """E-postadaki bağlantının verdiği kurtarma token'ıyla yeni şifre belirler."""
     if not supabase:
         raise HTTPException(status_code=500, detail="Database connection is not configured.")
     try:
-        user = supabase.auth.get_user(body.access_token).user
+        user = (await aw(supabase.auth.get_user(body.access_token))).user
     except Exception:
         user = None
     if not user:
         raise HTTPException(status_code=401, detail="Bağlantının süresi dolmuş ya da geçersiz. Yeniden sıfırlama isteyin.")
-    supabase.auth.admin.update_user_by_id(user.id, {"password": body.new_password})
+    await aw(supabase.auth.admin.update_user_by_id(user.id, {"password": body.new_password}))
     return {"message": "Şifreniz güncellendi. Yeni şifrenizle giriş yapabilirsiniz."}
 
 
@@ -186,13 +187,17 @@ async def change_password(body: ChangePasswordRequest, current_user: UserProfile
     """Oturum açıkken şifre değiştirme; mevcut şifre doğrulanır."""
     from supabase import create_client
     from app.core.config import settings
-    try:
+    def _check_current_password():
+        # Ayrı (oturumsuz) senkron istemci: global istemcinin oturumunu kirletmez.
         create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY).auth.sign_in_with_password(
             {"email": current_user.email, "password": body.current_password}
         )
+
+    try:
+        await asyncio.to_thread(_check_current_password)
     except Exception:
         raise HTTPException(status_code=400, detail="Mevcut şifreniz hatalı.")
-    supabase.auth.admin.update_user_by_id(current_user.id, {"password": body.new_password})
+    await aw(supabase.auth.admin.update_user_by_id(current_user.id, {"password": body.new_password}))
     return {"message": "Şifreniz güncellendi."}
 
 

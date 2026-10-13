@@ -685,7 +685,7 @@ def save_analytics_to_db(data: Dict[str, Any]) -> None:
     """
     Analiz sonuçlarını Supabase interview_analytics tablosuna kaydeder.
     """
-    from app.core.database import supabase
+    from app.core.database import sync_supabase as supabase  # arka plan iş parçacığı
 
     if not supabase:
         logger.error("Supabase bağlantısı yok, analiz kaydedilemedi!")
@@ -724,7 +724,7 @@ def _update_analysis_status(
     error_message: str = None,
 ) -> None:
     """Analiz durumunu günceller veya yeni kayıt oluşturur."""
-    from app.core.database import supabase
+    from app.core.database import sync_supabase as supabase  # arka plan iş parçacığı
 
     if not supabase:
         return

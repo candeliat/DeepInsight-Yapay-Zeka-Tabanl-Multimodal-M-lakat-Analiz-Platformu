@@ -58,7 +58,7 @@ async def create_interview(
 
     return result.data[0]
 
-async def save_message(interview_id: str, role: str, content: str, token: str = None) -> dict:
+async def save_message(interview_id: str, role: str, content: str, token: str = None, coaching: dict | None = None) -> dict:
     """
     Mülakat mesajını anlık olarak veritabanına kaydeder.
     role: 'user' veya 'model'
@@ -74,6 +74,8 @@ async def save_message(interview_id: str, role: str, content: str, token: str = 
         "content": content,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    if coaching:
+        record["coaching"] = coaching
 
     result = (await run(client.table("interview_messages").insert(record)))
     if not result.data:
@@ -91,7 +93,7 @@ async def get_interview_history(interview_id: str, token: str = None) -> List[Di
         raise RuntimeError("Supabase client is not initialized")
 
     result = (await run(client.table("interview_messages")\
-        .select("role, content, created_at")\
+        .select("role, content, created_at, coaching")\
         .eq("interview_id", interview_id)\
         .order("created_at", desc=False)))
 

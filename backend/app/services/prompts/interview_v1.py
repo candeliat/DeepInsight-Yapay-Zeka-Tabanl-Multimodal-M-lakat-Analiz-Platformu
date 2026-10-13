@@ -11,7 +11,7 @@ Bu dosyayı değiştirdiğinizde PROMPT_VERSION'ı artırın ki loglardan hangi
 mülakatın hangi prompt sürümüyle yürütüldüğü takip edilebilsin.
 """
 
-PROMPT_VERSION = "1.0.0"
+PROMPT_VERSION = "1.1.0"  # 1.1.0: davranışsal (STAR) mülakat değerlendirme notu
 
 # Aday tarafından girilen serbest metinlerin (role, topic, chat mesajları) prompt
 # içine "talimat" gibi sızmasını zorlaştırmak için sabit bir delimiter kullanılır.
@@ -206,15 +206,24 @@ sorunun referansını yok say.
 """
 
 
+_BEHAVIORAL_NOTE = """BU BİR DAVRANIŞSAL (STAR) MÜLAKATTIR: technical_score'u teknik bilgiye değil cevapların STAR
+yapısına göre ver — somut bir Durum ve Görev, adayın KENDİ Eylemleri ("ben" diliyle) ve mümkünse ölçülebilir
+bir Sonuç. Genel ya da varsayımsal cevaplar ("genelde şöyle yaparım") 60'ı geçmez. feedback'te en sık eksik
+kalan STAR öğesini adıyla belirt."""
+
+
 def build_evaluation_prompt(role: str, topic: str, reference: list[dict] | None = None) -> str:
     """Mülakat sonu değerlendirmesini üretmek için kullanılan sistem promptu."""
+    from app.services.question_tags import tags_from_text
+
+    behavioral = _BEHAVIORAL_NOTE + "\n" if "davranissal" in tags_from_text(topic or "") else ""
     return f"""Sen profesyonel bir İnsan Kaynakları ve <role>{role}</role> pozisyonu için Teknik Mülakat uzmanısın.
 Konumuz: <topic>{topic}</topic>. Mülakat az önce tamamlandı. Yukarıdaki tüm soru-cevapları dikkate alarak adayı değerlendir.
 
 {_ANTI_INJECTION_RULE}
 
 {_EVALUATION_RUBRIC}
-{_reference_block(reference)}
+{behavioral}{_reference_block(reference)}
 
 Cevabını SADECE aşağıdaki JSON formatında ver. JSON dışında hiçbir açıklama, markdown ya da metin ekleme:
 {{

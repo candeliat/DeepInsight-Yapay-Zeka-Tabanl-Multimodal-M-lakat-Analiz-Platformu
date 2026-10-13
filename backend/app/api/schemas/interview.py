@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 class InterviewSummary(BaseModel):
     id: str
@@ -24,6 +24,7 @@ class InterviewMessage(BaseModel):
     role: str
     content: str
     created_at: str
+    coaching: Optional[Dict[str, Any]] = None  # davranışsal mülakatta STAR analizi (bkz. star_service)
 
 class InterviewDetail(InterviewSummary):
     feedback: Optional[str] = None

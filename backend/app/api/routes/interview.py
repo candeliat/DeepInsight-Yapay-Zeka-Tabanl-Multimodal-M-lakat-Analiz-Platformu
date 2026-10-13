@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
 from app.core.config import settings
 from app.services.llm_service import llm_service
-from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching, assignment_service
+from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching, assignment_service, star_service
 from app.services.interview_service import (
     create_interview,
     save_message,
@@ -373,6 +373,7 @@ async def chat_with_ai_stream(
     token-token SSE (`text/event-stream`) olarak akıtır; son soru cevaplanınca değerlendirir.
 
     Event'ler:
+      - `star`:  (yalnızca davranışsal mülakatta, ilk olay) adayın cevabının STAR analizi
       - `chunk`: üretilen metin parçası (JSON string)
       - `done`:  `{"interview_complete": bool, "evaluation": {...} | null}`
       - `error`: `{"detail": str, "partial_saved": bool}` — akış yarıda
@@ -392,7 +393,10 @@ async def chat_with_ai_stream(
     if interview.get("status") == "completed":
         raise HTTPException(status_code=400, detail="Bu mülakat zaten tamamlanmış.")
 
-    await save_message(request.interview_id, role="user", content=request.message, token=token)
+    # Davranışsal mülakatta cevap anında STAR açısından değerlendirilir (kural tabanlı, LLM'siz)
+    # ve mesajla birlikte saklanır; istemciye yeni sorudan önce `star` olayıyla gider.
+    star = star_service.analyze_answer(request.message) if star_service.is_behavioral(topic) else None
+    await save_message(request.interview_id, role="user", content=request.message, token=token, coaching=star)
     history_records = await get_interview_history(request.interview_id, token=token)
 
     max_questions = settings.MAX_INTERVIEW_QUESTIONS
@@ -400,6 +404,8 @@ async def chat_with_ai_stream(
     candidate_context = await _candidate_context_for(interview, current_user.id)
 
     async def event_generator():
+        if star:
+            yield _sse("star", star)
         try:
             if questions_asked >= max_questions:
                 claimed = await try_claim_interview_finalization(request.interview_id, token=token)

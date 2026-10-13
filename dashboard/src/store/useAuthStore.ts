@@ -87,6 +87,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   }
 }));
 
-// Yenileme reddedilince (refresh token geçersiz) store da temizlenir; middleware sonraki
+// Yenileme reddedilince (refresh token geçersiz) store da temizlenir; proxy sonraki
 // gezinmede girişe yönlendirir.
 setSessionExpiredHandler(() => useAuthStore.setState({ token: null, refreshToken: null, user: null }));

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // This function can be marked `async` if using `await` inside
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const token = request.cookies.get('token')?.value;
   const { pathname } = request.nextUrl;
 
@@ -43,7 +43,7 @@ export function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// Ensure the middleware only runs for paths underneath
+// Ensure the proxy only runs for paths underneath
 export const config = {
   matcher: [
     /*

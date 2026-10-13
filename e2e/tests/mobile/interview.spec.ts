@@ -66,6 +66,16 @@ test.describe('yarıda kalan mülakat', () => {
     await expect(page.getByText('Yanıt gönderilemedi.', { exact: false })).toHaveCount(0);
   });
 
+  test('sesle yanıt: kayıt başlar, durdurulunca metne çevrilip kutuya yazılır', async ({ authedPage: page, api }) => {
+    api.on('POST', '/api/v1/interview/transcribe', { json: { text: ANSWER } });
+    await page.getByRole('button', { name: 'Sesle yanıtla' }).click();
+    await expect(page.getByPlaceholder('Dinleniyor...')).toBeVisible();
+    await page.waitForTimeout(500);
+    await page.getByRole('button', { name: 'Kaydı durdur' }).click();
+    await expect(page.getByPlaceholder('Cevabınızı buraya yazın...')).toHaveValue(ANSWER);
+    expect(api.callsTo('POST', '/api/v1/interview/transcribe')).toHaveLength(1);
+  });
+
   test('Mülakatı Bitir → "Şimdilik çık" ana sayfaya döner, mülakat bitirilmez', async ({ authedPage: page, api }) => {
     await page.getByText('Mülakatı Bitir', { exact: true }).click();
     await page.getByText('Şimdilik çık', { exact: false }).click();

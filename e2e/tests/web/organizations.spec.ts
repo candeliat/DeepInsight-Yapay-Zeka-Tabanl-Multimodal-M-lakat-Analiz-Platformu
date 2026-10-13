@@ -148,6 +148,46 @@ test.describe('kurum paneli (yönetici)', () => {
     await expect(result).toContainText('Geçersiz e-posta (1): bozuk-adres');
     expect(api.callsTo('POST', `/api/v1/organizations/${ORG_ADMIN}/invites`)[0].body.role).toBe('candidate');
   });
+
+  test('kurum soru bankası: soru eklenir, pasifleştirilir ve onayla silinir', async ({ authedPage: page, api }) => {
+    const base = `/api/v1/organizations/${ORG_ADMIN}/questions`;
+    let questions: Record<string, unknown>[] = [];
+    api.on('GET', base, () => ({ json: questions }));
+    api.on('POST', base, ({ body }) => {
+      const q = { id: 'q-1', tags: [], family_id: null, times_served: 0, is_active: true, created_at: null, difficulty: null, ...body };
+      questions = [q];
+      return { json: q };
+    });
+    api.on('PATCH', `${base}/q-1`, ({ body }) => ({ json: { ...questions[0], ...body } }));
+    api.on('DELETE', `${base}/q-1`, { json: { status: 'deleted' } });
+
+    await page.reload();
+    const panel = page.locator('div').filter({ has: page.getByRole('heading', { name: /Kurum soru bankası/ }) }).last();
+    await expect(panel.getByText('Henüz kuruma özel soru yok')).toBeVisible();
+
+    const add = panel.getByRole('button', { name: 'Soru ekle' });
+    await expect(add).toBeDisabled();
+    await panel.getByLabel('Sorunun rolü').fill('Backend Geliştirici');
+    await panel.getByLabel('Sorunun konusu').fill('Python');
+    await panel.getByLabel('Sorunun zorluğu').selectOption('ORTA');
+    await panel.getByLabel('Soru metni').fill('Python’da GIL nedir ve çoklu iş parçacığını nasıl etkiler?');
+    await add.click();
+    await expect(panel.getByText('Python’da GIL nedir')).toBeVisible();
+    await expect(panel.getByRole('heading', { name: 'Kurum soru bankası (1)' })).toBeVisible();
+    expect(api.callsTo('POST', base)[0].body).toEqual({
+      role: 'Backend Geliştirici', topic: 'Python', difficulty: 'ORTA',
+      question_text: 'Python’da GIL nedir ve çoklu iş parçacığını nasıl etkiler?',
+    });
+
+    await panel.getByRole('button', { name: 'Pasifleştir' }).click();
+    await expect(panel.getByText('· Pasif')).toBeVisible();
+    expect(api.callsTo('PATCH', `${base}/q-1`)[0].body).toEqual({ is_active: false });
+
+    await panel.getByRole('button', { name: 'Soruyu sil' }).click();
+    await panel.getByRole('button', { name: 'Sil', exact: true }).click();
+    await expect(panel.getByText('Python’da GIL nedir')).toHaveCount(0);
+    expect(api.callsTo('DELETE', `${base}/q-1`)).toHaveLength(1);
+  });
 });
 
 test('yetkisiz kurum paneli erişim hatası gösterir', async ({ authedPage: page, api }) => {

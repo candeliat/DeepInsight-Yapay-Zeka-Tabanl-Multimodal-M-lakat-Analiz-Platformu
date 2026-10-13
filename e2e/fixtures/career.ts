@@ -115,6 +115,7 @@ export function installCareer(api: MockApi, c: CareerState) {
   api.on('GET', org('/members'), { json: ORG_MEMBERS });
   api.on('GET', org('/groups'), { json: [] });
   api.on('GET', org('/invites'), { json: [] });
+  api.on('GET', org('/questions'), { json: [] });
   api.on('GET', org('/assignments'), () => ({ json: c.orgAssignments }));
   api.on('POST', org('/assignments'), ({ url, body }) => {
     const created = {

@@ -18,7 +18,7 @@ import { useRouter } from 'expo-router';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
-import { Audio } from 'expo-av';
+import { RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import { Colors } from '../src/constants/Colors';
 import { FontFamilies } from '../src/constants/Fonts';
 import { useInterviewStore } from '../src/store/interviewStore';
@@ -145,7 +145,7 @@ export default function InterviewRoomScreen() {
 
   const [userAnswer, setUserAnswer] = useState('');
   const [timer, setTimer] = useState(0);
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const cameraRef = useRef<any>(null);
@@ -172,9 +172,8 @@ export default function InterviewRoomScreen() {
     const sub = AppState.addEventListener('change', async (nextState) => {
       if (appStateRef.current === 'active' && nextState !== 'active') {
         Speech.stop();
-        if (recording) {
-          try { await recording.stopAndUnloadAsync(); } catch { /* ignore */ }
-          setRecording(null);
+        if (isRecording) {
+          try { await recorder.stop(); } catch { /* ignore */ }
           setIsRecording(false);
           setIsTranscribing(false);
         }
@@ -182,7 +181,7 @@ export default function InterviewRoomScreen() {
       appStateRef.current = nextState;
     });
     return () => sub.remove();
-  }, [recording]);
+  }, [isRecording, recorder]);
 
   // Görüntülü modda kamera izni kalıcı olarak reddedildiyse mülakat analizsiz sürer; satır içinde bildirilir
   // (Alert.alert web'de görünmez). Yazılı modda kamera kullanılmadığı için uyarı gösterilmez.
@@ -348,25 +347,24 @@ export default function InterviewRoomScreen() {
         return;
       }
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording: rec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      setRecording(rec);
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      recorder.record();
       setIsRecording(true);
       Speech.stop();
     } catch (err) {
       setSendError('Ses kaydı başlatılamadı. Tekrar deneyin ya da cevabınızı yazın.');
     }
-  }, [micPermission, requestMicPermission]);
+  }, [micPermission, requestMicPermission, recorder]);
 
   // Ses kaydı durdur
   const stopRecording = useCallback(async () => {
-    if (!recording) return;
+    if (!isRecording) return;
     setIsRecording(false);
     setIsTranscribing(true);
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
+      await recorder.stop();
+      const uri = recorder.uri;
       if (uri) {
         const text = await transcribeAudio(uri);
         if (!text || text.trim().length === 0) {
@@ -380,7 +378,7 @@ export default function InterviewRoomScreen() {
     } finally {
       setIsTranscribing(false);
     }
-  }, [recording, transcribeAudio]);
+  }, [isRecording, recorder, transcribeAudio]);
 
   const toggleRecording = useCallback(async () => {
     if (isRecording) {

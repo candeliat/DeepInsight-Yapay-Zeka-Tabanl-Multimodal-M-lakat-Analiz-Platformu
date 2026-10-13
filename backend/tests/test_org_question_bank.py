@@ -91,7 +91,7 @@ def test_update_question_in_other_scope_is_not_found(monkeypatch):
     fake.table.return_value.update.return_value = q
     monkeypatch.setattr(admin_service, "supabase", fake)
     monkeypatch.setattr(llm_service, "embed_text", AsyncMock(return_value=[0.1]))
-    monkeypatch.setattr(admin_service, "embed_text_local", MagicMock(return_value=[0.1]))
+    monkeypatch.setattr(admin_service, "embed_text_local_if_ready", MagicMock(return_value=[0.1]))
 
     with pytest.raises(ValueError):
         run(admin_service.update_question("q-of-org-b", {"is_active": False}, org_id="org-a"))
@@ -101,7 +101,7 @@ def test_create_question_rejects_family_from_another_scope(monkeypatch):
     fake = _recording_supabase(rows_for_family=[{"org_id": "org-b"}])
     monkeypatch.setattr(admin_service, "supabase", fake)
     monkeypatch.setattr(llm_service, "embed_text", AsyncMock(return_value=[0.1]))
-    monkeypatch.setattr(admin_service, "embed_text_local", MagicMock(return_value=[0.1]))
+    monkeypatch.setattr(admin_service, "embed_text_local_if_ready", MagicMock(return_value=[0.1]))
 
     with pytest.raises(ValueError):
         run(admin_service.create_question(

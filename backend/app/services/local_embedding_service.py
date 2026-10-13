@@ -23,6 +23,7 @@ sonraki her çağrı aynı process-wide instance'ı paylaşır.
 
 import logging
 import threading
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ _MODEL_NAME = "intfloat/multilingual-e5-base"
 
 _model = None
 _lock = threading.Lock()
+_warming = False
 
 
 def get_local_embedding_model():
@@ -62,3 +64,31 @@ def embed_text_local(text: str, input_type: str = "query") -> list[float]:
     model = get_local_embedding_model()
     prefixed = f"{input_type}: {text}"
     return model.encode(prefixed, normalize_embeddings=True).tolist()
+
+
+def _warm() -> None:
+    global _warming
+    try:
+        get_local_embedding_model()
+    except Exception:
+        logger.warning("Yerel embedding modeli arka planda yüklenemedi.", exc_info=True)
+    finally:
+        _warming = False
+
+
+def embed_text_local_if_ready(text: str, input_type: str = "query") -> Optional[list[float]]:
+    """
+    Model bellekteyse `embed_text_local` ile aynı; değilse modeli arka planda yüklemeye
+    başlatıp hemen None döner. Soğuk yükleme (torch + model) bu makinede ~75 sn sürdüğü
+    için istek yolunda (soru ekleme, mülakat başlatma) beklenmez; boş kalan
+    `embedding_local` alanları scripts/backfill_local_embeddings.py ile doldurulur.
+    """
+    global _warming
+    if _model is None:
+        with _lock:
+            if _model is None and not _warming:
+                _warming = True
+                threading.Thread(target=_warm, name="local-embedding-warmup", daemon=True).start()
+        if _model is None:
+            return None
+    return embed_text_local(text, input_type)

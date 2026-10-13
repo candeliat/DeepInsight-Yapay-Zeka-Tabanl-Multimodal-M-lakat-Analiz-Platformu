@@ -68,6 +68,10 @@ silme. Yazılamazsa asıl işlemi engellemez (best-effort).
   içerik yazılmaz). RLS açık ve politika yok: yalnızca backend erişir. Kullanıcı silinince
   `user_id` boşaltılır.
 
+- `profiles` (sql/020): auth.users'ın e-posta, ad ve hedef pozisyonunun aynası; yalnızca
+  tetikleyiciyle yazılır, kullanıcı silinince silinir. RLS açık, politika yok: yalnızca backend
+  okur (kurum panelinde üye kimlikleri, e-postayla kurum yöneticisi atama).
+
 ## Şifre güvenliği
 
 - Kayıt, şifre sıfırlama ve şifre değiştirmede yeni şifre HaveIBeenPwned "Pwned Passwords"

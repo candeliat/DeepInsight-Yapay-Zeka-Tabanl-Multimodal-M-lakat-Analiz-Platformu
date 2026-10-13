@@ -30,19 +30,11 @@ def _new_invite_code() -> str:
 
 
 async def _find_user_id_by_email(email: str) -> Optional[str]:
+    """profiles üzerinden tek sorgu (önceden tüm kullanıcılar Auth'tan sayfa sayfa listeleniyordu)."""
     target = email.strip().lower()
-    page = 1
-    while True:
-        response = (await aw(_db().auth.admin.list_users(page=page, per_page=200)))
-        users = response if isinstance(response, list) else getattr(response, "users", [])
-        if not users:
-            return None
-        for user in users:
-            if (user.email or "").strip().lower() == target:
-                return user.id
-        if len(users) < 200:
-            return None
-        page += 1
+    rows = (await run(_db().table("profiles").select("id, email").ilike("email", target))).data or []
+    # ilike'ta _ ve % joker karakterdir: tam eşleşme yine de burada doğrulanır.
+    return next((str(r["id"]) for r in rows if (r.get("email") or "").strip().lower() == target), None)
 
 
 async def create_organization(name: str, created_by: str, admin_email: Optional[str] = None) -> Dict[str, Any]:

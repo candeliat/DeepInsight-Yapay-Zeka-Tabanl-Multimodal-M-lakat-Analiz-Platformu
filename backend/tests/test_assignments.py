@@ -169,7 +169,7 @@ def as_user(monkeypatch):
     monkeypatch.setattr(organization_service, "list_members", AsyncMock(return_value=MEMBERS))
     monkeypatch.setattr(organization_service, "get_organization", AsyncMock(return_value={"id": "org-a", "rubric": None}))
     monkeypatch.setattr(organization_service, "log_audit", AsyncMock(return_value=None))
-    monkeypatch.setattr(insights, "get_identity", lambda uid: {"email": f"{uid}@x.com", "name": None})
+    monkeypatch.setattr(insights, "get_identities", AsyncMock(side_effect=lambda ids: {uid: {"email": f"{uid}@x.com", "name": None} for uid in ids}))
 
     def _login(user_id):
         user = UserProfile(id=user_id, email=f"{user_id}@x.com", created_at="2026-01-01T00:00:00Z", user_metadata={}, app_metadata={})

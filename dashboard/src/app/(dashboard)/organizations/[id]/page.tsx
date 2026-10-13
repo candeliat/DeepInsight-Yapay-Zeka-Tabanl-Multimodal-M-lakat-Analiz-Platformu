@@ -26,6 +26,7 @@ import { StatTile } from "@/components/progress/ProgressView";
 import { AssignmentsPanel } from "@/components/org/AssignmentsPanel";
 import { GroupsPanel } from "@/components/org/GroupsPanel";
 import { InvitePanel } from "@/components/org/InvitePanel";
+import { QuestionsPanel } from "@/components/org/QuestionsPanel";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
@@ -461,6 +462,8 @@ export default function OrganizationPanelPage() {
         <GroupsPanel orgId={orgId} groups={groups} onChanged={load} onError={setError} />
         <InvitePanel orgId={orgId} groups={groups} canInviteInstructors={isAdmin} onInvited={reloadGroups} onError={setError} />
       </div>
+
+      <QuestionsPanel orgId={orgId} onError={setError} />
 
       {isAdmin && detail && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

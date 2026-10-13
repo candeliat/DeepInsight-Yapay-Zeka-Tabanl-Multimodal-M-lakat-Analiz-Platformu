@@ -126,7 +126,7 @@ export class MockApi {
   }
 }
 
-/** Web: middleware yalnızca `token` çerezine bakar; profil taklit backend'den gelir. */
+/** Web: proxy (src/proxy.ts) yalnızca `token` çerezine bakar; profil taklit backend'den gelir. */
 export async function signInWeb(context: BrowserContext, baseURL: string) {
   await context.addCookies([{ name: 'token', value: 'e2e-token', url: baseURL }]);
 }

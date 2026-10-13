@@ -1,6 +1,7 @@
 import { api } from "../lib/api";
 import { call } from "../lib/apiError";
 import { Progress, TopicStat } from "./progressService";
+import type { CreateQuestionPayload, QuestionBankItem, UpdateQuestionPayload } from "./questionBankService";
 
 export type OrgRole = "org_admin" | "instructor" | "candidate";
 
@@ -128,6 +129,14 @@ export const orgService = {
   bulkInvite: (orgId: string, rows: { email: string; group?: string }[], role: "candidate" | "instructor", groupId?: string) =>
     call<BulkInviteResult>(api.post(`/api/v1/organizations/${orgId}/invites`, { rows, role, group_id: groupId || undefined })),
   deleteInvite: (orgId: string, inviteId: string) => call<{ status: string }>(api.delete(`/api/v1/organizations/${orgId}/invites/${inviteId}`)),
+  // Kuruma özel soru bankası: yalnızca bu kurumun mülakatlarında, global sorularla birlikte kullanılır.
+  questions: (orgId: string) => call<QuestionBankItem[]>(api.get(`/api/v1/organizations/${orgId}/questions`)),
+  createQuestion: (orgId: string, payload: CreateQuestionPayload) =>
+    call<QuestionBankItem>(api.post(`/api/v1/organizations/${orgId}/questions`, payload)),
+  updateQuestion: (orgId: string, questionId: string, payload: UpdateQuestionPayload) =>
+    call<QuestionBankItem>(api.patch(`/api/v1/organizations/${orgId}/questions/${questionId}`, payload)),
+  deleteQuestion: (orgId: string, questionId: string) =>
+    call<{ status: string }>(api.delete(`/api/v1/organizations/${orgId}/questions/${questionId}`)),
   myInvites: () => call<MyInvite[]>(api.get("/api/v1/organizations/invites/me")),
   respondInvite: (inviteId: string, accept: boolean) =>
     call<{ org_id: string; accepted: boolean }>(api.post(`/api/v1/organizations/invites/${inviteId}/${accept ? "accept" : "decline"}`)),

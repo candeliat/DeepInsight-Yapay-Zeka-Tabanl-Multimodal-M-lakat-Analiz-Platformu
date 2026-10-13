@@ -57,6 +57,13 @@ class Settings:
     # Varsayılan olarak KAPALI: yanlışlıkla ücretli model çağrısı yapıp maliyet oluşmasını engeller.
     # Açmak için .env dosyasına ENABLE_PAID_MODEL_FALLBACK=true ekleyin.
     ENABLE_PAID_MODEL_FALLBACK: bool = os.getenv("ENABLE_PAID_MODEL_FALLBACK", "false").lower() == "true"
+    # Devre kesici: üst üste bu kadar sağlık hatası (zaman aşımı/429/5xx/404) veren model
+    # LLM_BREAKER_COOLDOWN saniye zincirin sonuna alınır; tekrarında süre ikiye katlanır.
+    LLM_BREAKER_THRESHOLD: int = int(os.getenv("LLM_BREAKER_THRESHOLD", "2"))
+    LLM_BREAKER_COOLDOWN: float = float(os.getenv("LLM_BREAKER_COOLDOWN", "120"))
+    LLM_BREAKER_MAX_COOLDOWN: float = float(os.getenv("LLM_BREAKER_MAX_COOLDOWN", "900"))
+    # Her LLM denemesi llm_usage tablosuna yazılır (sql/019); kapatmak için false.
+    LLM_USAGE_PERSIST: bool = os.getenv("LLM_USAGE_PERSIST", "true").lower() == "true"
 
     # --- Soru Bankası / RAG ---
     # `nvidia/nemotron-3-embed-1b` — build.nvidia.com kataloğunda canlı istekle

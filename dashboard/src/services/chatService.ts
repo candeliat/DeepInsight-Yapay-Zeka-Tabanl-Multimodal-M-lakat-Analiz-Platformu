@@ -1,4 +1,7 @@
+export type InterviewLanguage = "tr" | "en";
+
 export interface StartInterviewRequest {
+  language?: InterviewLanguage;
   role: string;
   topic: string;
   difficulty?: string;
@@ -16,6 +19,8 @@ export interface StartInterviewContext {
   orgId?: string;
   /** Ödevden başlatılırsa rol/konu/zorluk ve kurum backend'de ödevden alınır. */
   assignmentId?: string;
+  /** Konuşma dili; verilmezse Türkçe. */
+  language?: InterviewLanguage;
 }
 
 export interface StartInterviewResponse {
@@ -78,7 +83,7 @@ export const chatService = {
    */
   async startInterview(role: string, topic: string, difficulty?: string, context: StartInterviewContext = {}): Promise<StartInterviewResponse> {
     try {
-      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, cv_id: context.cvId, job_id: context.jobId, org_id: context.orgId, assignment_id: context.assignmentId } satisfies StartInterviewRequest);
+      const response = await api.post("/api/v1/interview/start", { role, topic, difficulty, cv_id: context.cvId, job_id: context.jobId, org_id: context.orgId, assignment_id: context.assignmentId, language: context.language } satisfies StartInterviewRequest);
       return response.data;
     } catch (error: unknown) {
       const e = error as { response?: { data?: { detail?: string } }, message?: string };

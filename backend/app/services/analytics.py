@@ -347,6 +347,11 @@ class AudioAnalyzer:
         r'\b(e{2,}|ı{2,}|ş[eə]y|yani|hani|işte|aslında)\b',
         re.IGNORECASE | re.UNICODE,
     )
+    # İngilizce mülakat için ("like"/"actually" gibi anlamlı kullanımları da sayar: kaba bir göstergedir)
+    FILLER_PATTERN_EN = re.compile(
+        r'\b(u+m+|u+h+|e+r+m*|like|you know|i mean|basically|actually|sort of|kind of)\b',
+        re.IGNORECASE,
+    )
 
     # Duraksama eşiği (saniye)
     PAUSE_THRESHOLD_SEC = 1.5
@@ -395,7 +400,7 @@ class AudioAnalyzer:
             raise RuntimeError(f"ffmpeg ses çıkarma hatası: {e.stderr.decode(errors='replace')}")
 
     @staticmethod
-    def transcribe(audio_path: str) -> Dict[str, Any]:
+    def transcribe(audio_path: str, language: str = "tr") -> Dict[str, Any]:
         """
         Whisper ile ses dosyasını metne dönüştürür.
 
@@ -411,8 +416,12 @@ class AudioAnalyzer:
 
         result = model.transcribe(
             audio_path,
-            language="tr",
-            initial_prompt="Ee, ııı, şey, yani, hani, işte, dediki, aslında...",
+            language="en" if language == "en" else "tr",
+            # Whisper dolgu sözcüklerini atlama eğiliminde; örnekli başlangıç metni onları da yazdırır.
+            initial_prompt=(
+                "Umm, uh, like, you know, I mean, basically..." if language == "en"
+                else "Ee, ııı, şey, yani, hani, işte, dediki, aslında..."
+            ),
             verbose=False,
         )
 
@@ -432,7 +441,7 @@ class AudioAnalyzer:
         }
 
     @classmethod
-    def count_filler_words(cls, text: str) -> Dict[str, Any]:
+    def count_filler_words(cls, text: str, language: str = "tr") -> Dict[str, Any]:
         """
         Transkriptte dolgu kelimelerini sayar.
 
@@ -442,12 +451,15 @@ class AudioAnalyzer:
                 "detail": {"ee": 3, "şey": 2, "yani": 3}
             }
         """
-        matches = cls.FILLER_PATTERN.findall(text.lower())
+        pattern = cls.FILLER_PATTERN_EN if language == "en" else cls.FILLER_PATTERN
+        matches = pattern.findall(text.lower())
         detail: Dict[str, int] = {}
         for match in matches:
             # normalize et
             normalized = match.lower().strip()
-            if re.match(r'^e{2,}$', normalized):
+            if language == "en":
+                key = "um" if re.match(r'^u+m+$', normalized) else "uh" if re.match(r'^u+h+$|^e+r+m*$', normalized) else normalized
+            elif re.match(r'^e{2,}$', normalized):
                 key = "ee"
             elif re.match(r'^ı{2,}$', normalized):
                 key = "ııı"
@@ -627,10 +639,11 @@ def run_full_analysis(
 
         # --- Whisper Transkript ---
         logger.info("Whisper transkript başlıyor...")
-        transcript_result = AudioAnalyzer.transcribe(audio_path)
+        language = _interview_language(interview_id)
+        transcript_result = AudioAnalyzer.transcribe(audio_path, language)
 
         # --- Dolgu Kelimeleri ---
-        filler_result = AudioAnalyzer.count_filler_words(transcript_result["text"])
+        filler_result = AudioAnalyzer.count_filler_words(transcript_result["text"], language)
 
         # --- Duraksama Tespiti ---
         logger.info("Librosa duraksama tespiti başlıyor...")
@@ -732,6 +745,18 @@ def save_analytics_to_db(data: Dict[str, Any]) -> None:
     except Exception as e:
         logger.error("Supabase kayıt hatası: %s", e, exc_info=True)
         raise
+
+
+def _interview_language(interview_id: str) -> str:
+    """Mülakatın konuşma dili ("tr"/"en"); okunamazsa Türkçe varsayılır."""
+    from app.core.database import sync_supabase as supabase  # arka plan iş parçacığı
+
+    try:
+        rows = supabase.table("interviews").select("language").eq("id", interview_id).limit(1).execute().data
+        return "en" if rows and rows[0].get("language") == "en" else "tr"
+    except Exception:
+        logger.warning("Mülakat dili okunamadı (interview_id=%s), Türkçe varsayılıyor.", interview_id, exc_info=True)
+        return "tr"
 
 
 def _update_analysis_status(

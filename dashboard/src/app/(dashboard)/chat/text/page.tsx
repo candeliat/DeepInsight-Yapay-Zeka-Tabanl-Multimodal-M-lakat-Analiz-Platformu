@@ -27,6 +27,8 @@ import { useAuthStore } from "@/store/useAuthStore";
 import { orgService, MyOrganization } from "@/services/orgService";
 import { Button } from "@/components/ui/Button";
 import { ScoreCard } from "@/components/interview/ScoreCard";
+import { LanguageToggle } from "@/components/interview/LanguageToggle";
+import type { InterviewLanguage } from "@/services/chatService";
 import { BEHAVIORAL_TOPIC, isBehavioralTopic, StarCoachingCard, StarSummary } from "@/components/interview/StarCoaching";
 import { useInterviewTurns } from "@/hooks/useInterviewTurns";
 import { Input } from "@/components/ui/Input";
@@ -70,6 +72,7 @@ function TextInterviewContent() {
   const [role, setRole] = useState("Yazılım Mühendisi");
   const [topic, setTopic] = useState("React ve Modern Web Geliştirme");
   const [difficulty, setDifficulty] = useState("ORTA");
+  const [language, setLanguage] = useState<InterviewLanguage>("tr");
 
   // CV'ye özel mülakat (opsiyonel, ?cv=<id>)
   const [cv, setCv] = useState<CVDetail | null>(null);
@@ -235,7 +238,7 @@ function TextInterviewContent() {
     setStartError(null);
 
     try {
-      const data = await chatService.startInterview(role, topic, difficulty, { cvId: cv?.id, jobId: job?.id, orgId: orgId || undefined, assignmentId: assignment?.id });
+      const data = await chatService.startInterview(role, topic, difficulty, { cvId: cv?.id, jobId: job?.id, orgId: orgId || undefined, assignmentId: assignment?.id, language });
       setInterviewId(data.interview_id);
       setMessages([{ role: "ai", content: data.first_message }]);
       setCurrentState("INTERVIEWING");
@@ -393,6 +396,8 @@ function TextInterviewContent() {
                 </p>
               )}
             </div>
+
+            <LanguageToggle value={language} onChange={setLanguage} />
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Zorluk Seviyesi</label>
@@ -585,7 +590,7 @@ function TextInterviewContent() {
                 ref={textareaRef}
                 value={userAnswer}
                 onChange={(e) => setUserAnswer(e.target.value)}
-                placeholder="Cevabınızı buraya yazın..."
+                placeholder={language === "en" ? "Cevabınızı buraya İngilizce yazın..." : "Cevabınızı buraya yazın..."}
                 className="min-h-[56px] max-h-40 text-[15px]"
                 rows={1}
                 disabled={isThinking}

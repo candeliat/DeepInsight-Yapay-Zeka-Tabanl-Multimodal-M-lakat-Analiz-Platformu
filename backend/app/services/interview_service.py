@@ -17,6 +17,7 @@ async def create_interview(
     cv_id: Optional[str] = None,
     job_id: Optional[str] = None,
     assignment_id: Optional[str] = None,
+    language: str = "tr",
 ) -> dict:
     """
     Supabase'de yeni bir mülakat kaydı oluşturur.
@@ -51,6 +52,9 @@ async def create_interview(
         record["job_id"] = job_id
     if assignment_id:
         record["assignment_id"] = assignment_id
+    # "tr" kolonun varsayılanı; yalnızca İngilizce açıkça yazılır (sql/022).
+    if language != "tr":
+        record["language"] = language
 
     result = (await run(client.table("interviews").insert(record)))
     if not result.data:

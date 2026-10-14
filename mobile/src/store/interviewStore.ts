@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { api, API_URL, refreshAccessToken } from '../config/api';
 import { getStorageItemAsync } from '../utils/storage';
+import type { StarAnalysis } from '../components/StarCoaching';
 
 export interface EvaluationData {
   technical_score: number;
@@ -27,6 +28,8 @@ interface InterviewState {
   context: InterviewContext;
   currentQuestion: string;
   evaluation: EvaluationData | null;
+  /** Davranışsal mülakatta her cevabın STAR koçluk notu (sıralı). */
+  starNotes: StarAnalysis[];
   
   // Kontroller
   micOn: boolean;
@@ -58,6 +61,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   context: {},
   currentQuestion: '',
   evaluation: null,
+  starNotes: [],
 
   micOn: true,
   cameraOn: true,
@@ -66,7 +70,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   setRoleTopic: (role, topic, difficulty = null, context = {}) => set({ role, topic, difficulty, context }),
 
   startInterview: async () => {
-    set({ isThinking: true, evaluation: null });
+    set({ isThinking: true, evaluation: null, starNotes: [] });
     try {
       const { role, topic, difficulty, context } = get();
       const response = await api.post('/api/v1/interview/start', {
@@ -147,6 +151,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
     interviewId: null,
     currentQuestion: '',
     evaluation: null,
+    starNotes: [],
     micOn: true,
     cameraOn: true,
     isThinking: false
@@ -174,7 +179,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
   }
 }));
 
-type SetState = (partial: Partial<InterviewState>) => void;
+type SetState = (partial: Partial<InterviewState> | ((s: InterviewState) => Partial<InterviewState>)) => void;
 
 /** /chat/stream SSE akışını XHR ile tüketir (React Native'in fetch+ReadableStream desteği tutarsız). */
 function streamOnce(interviewId: string, message: string, token: string | null, set: SetState): Promise<boolean> {
@@ -205,7 +210,9 @@ function streamOnce(interviewId: string, message: string, token: string | null, 
           return;
         }
 
-        if (eventType === 'chunk') {
+        if (eventType === 'star') {
+          set((s) => ({ starNotes: [...s.starNotes, parsed as StarAnalysis] }));
+        } else if (eventType === 'chunk') {
           accumulated += parsed;
           set({ currentQuestion: accumulated, isThinking: false });
         } else if (eventType === 'done') {

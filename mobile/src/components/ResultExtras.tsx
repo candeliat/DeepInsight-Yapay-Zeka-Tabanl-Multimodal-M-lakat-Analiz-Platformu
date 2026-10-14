@@ -9,10 +9,13 @@ import { Colors } from '../constants/Colors';
 import { FontFamilies } from '../constants/Fonts';
 import { PilotStatus, PostItemKey, pilotService } from '../services/orgService';
 import { Banner, LikertRow, PrimaryButton, typo } from './ui';
+import { StarAnalysis, StarCoachingCard } from './StarCoaching';
 
 interface Message {
   role: 'user' | 'model';
   content: string;
+  /** Davranışsal mülakatta bu cevabın STAR koçluk notu. */
+  coaching?: StarAnalysis | null;
 }
 
 /** Soru-cevap dökümü (başlangıç komutu hariç); varsayılan kapalı, uzun olabilir. */
@@ -33,6 +36,7 @@ export function ConversationCard({ messages }: { messages: Message[] | undefined
           <View key={i} style={[styles.msg, m.role === 'user' ? styles.msgUser : styles.msgAi]}>
             <Text style={styles.msgRole}>{m.role === 'user' ? 'Siz' : 'Mülakatçı'}</Text>
             <Text style={m.role === 'user' ? styles.userText : styles.aiText}>{m.content}</Text>
+            {m.coaching && <StarCoachingCard star={m.coaching} />}
           </View>
         ))}
     </View>

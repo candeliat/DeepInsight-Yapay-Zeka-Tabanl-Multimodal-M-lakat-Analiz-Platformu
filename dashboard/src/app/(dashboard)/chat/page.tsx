@@ -19,11 +19,12 @@ import {
   ArrowRight,
   ShieldCheck
 } from "lucide-react";
-import { chatService, EvaluationData, ChatStreamDoneData } from "@/services/chatService";
+import { chatService, EvaluationData, ChatStreamDoneData, StarAnalysis } from "@/services/chatService";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ScoreCard } from "@/components/interview/ScoreCard";
+import { BEHAVIORAL_TOPIC, isBehavioralTopic, StarCoachingCard, StarSummary } from "@/components/interview/StarCoaching";
 import { useInterviewTurns } from "@/hooks/useInterviewTurns";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
@@ -73,6 +74,8 @@ export default function InterviewRoomPage() {
   const [interviewId, setInterviewId] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
   const [userAnswer, setUserAnswer] = useState("");
+  // Davranışsal mülakatta her cevabın STAR notu; sonuncusu yeni sorunun altında gösterilir.
+  const [starNotes, setStarNotes] = useState<StarAnalysis[]>([]);
   // Gönderim/bitirme ve satır içi hata/onay durumu iki mülakat sayfasında ortak (bkz. useInterviewTurns).
   const { isThinking, setIsThinking, chatError, confirmEnd, setConfirmEnd, sendAnswer, finishEarly } = useInterviewTurns(interviewId);
   const [isListening, setIsListening] = useState(false);
@@ -373,6 +376,7 @@ export default function InterviewRoomPage() {
     setCurrentQuestion("");
 
     await sendAnswer(currentAnswer, {
+      onStar: (star) => setStarNotes((prev) => [...prev, star]),
       onText: setCurrentQuestion,
       onDone: (data: ChatStreamDoneData, streamed) => {
         if (data.interview_complete && data.evaluation) {
@@ -499,6 +503,21 @@ export default function InterviewRoomPage() {
                 placeholder="Örn: React ve Modern Web"
                 required
               />
+              <button
+                type="button"
+                onClick={() => setTopic(BEHAVIORAL_TOPIC)}
+                aria-pressed={isBehavioralTopic(topic)}
+                className={`ml-1 text-xs font-semibold rounded-full px-3 py-1 border transition-colors ${
+                  isBehavioralTopic(topic) ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Davranışsal (STAR) mülakat
+              </button>
+              {isBehavioralTopic(topic) && (
+                <p className="text-xs text-muted-foreground ml-1 leading-relaxed">
+                  &quot;Bana ... bir zamanı anlat&quot; türü sorular. Her cevabınızdan sonra Durum, Görev, Eylem ve Sonuç öğelerine göre koçluk notu alırsınız.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -650,6 +669,12 @@ export default function InterviewRoomPage() {
             ) : (
               <div className="break-words pb-10">
                 {renderHighlightedText(currentQuestion, spokenWordIndex)}
+                {starNotes.length > 0 && (
+                  <div className="font-sans not-italic font-normal text-base tracking-normal leading-normal max-w-2xl mx-auto mt-6">
+                    <p className="text-xs font-semibold text-muted-foreground text-left">Önceki cevabınız için koçluk notu</p>
+                    <StarCoachingCard star={starNotes[starNotes.length - 1]} />
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -796,7 +821,7 @@ export default function InterviewRoomPage() {
           {/* Skor Kartları */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
             <ScoreCard
-              title="Teknik Bilgi"
+              title={isBehavioralTopic(topic) ? "STAR Yapısı" : "Teknik Bilgi"}
               score={evaluation.technical_score}
               icon={<Brain className="w-4 h-4 text-primary" />}
               tone="primary"
@@ -834,6 +859,12 @@ export default function InterviewRoomPage() {
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Duygu</span>
                 <p className="text-base font-black text-foreground capitalize">{analytics.dominant_emotion === "neutral" ? "Nötr" : analytics.dominant_emotion}</p>
               </div>
+            </div>
+          )}
+
+          {starNotes.length > 0 && (
+            <div className="mb-8">
+              <StarSummary analyses={starNotes} />
             </div>
           )}
 

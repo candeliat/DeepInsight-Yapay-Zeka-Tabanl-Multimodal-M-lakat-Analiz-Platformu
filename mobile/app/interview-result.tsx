@@ -20,6 +20,7 @@ import { api } from '../src/config/api';
 import { useInterviewStore } from '../src/store/interviewStore';
 import { analyticsService } from '../src/services/analyticsService';
 import { ConversationCard, PilotSurveyCard } from '../src/components/ResultExtras';
+import { isBehavioralTopic, StarAnalysis, StarSummary } from '../src/components/StarCoaching';
 import { scoreBand } from '../src/utils/scoreBand';
 
 function SkeletonLoader() {
@@ -414,7 +415,7 @@ export default function InterviewResultScreen() {
               <Ionicons name="trending-up" size={20} color="#3B82F6" />
               <Text style={styles.cardTitle}>Bütünsel Performans</Text>
             </View>
-            <ProgressBar label="Teknik Bilgi" value={data.technical_score || 0} color="#3B82F6" />
+            <ProgressBar label={isBehavioralTopic(data.topic ?? '') ? 'STAR Yapısı' : 'Teknik Bilgi'} value={data.technical_score || 0} color="#3B82F6" />
             <ProgressBar label="İletişim & Kelime" value={data.vocabulary_score || 0} color="#8B5CF6" />
             <ProgressBar label="Özgüven (Genel)" value={data.confidence_score || 0} color="#F59E0B" />
             {analyticsData && (
@@ -482,6 +483,9 @@ export default function InterviewResultScreen() {
             </View>
           )}
 
+          <StarSummary
+            analyses={(data.messages ?? []).flatMap((m: { coaching?: StarAnalysis | null }) => (m.coaching ? [m.coaching] : []))}
+          />
           <ConversationCard messages={data.messages} />
           {isCompleted && <PilotSurveyCard interviewId={String(id)} />}
 

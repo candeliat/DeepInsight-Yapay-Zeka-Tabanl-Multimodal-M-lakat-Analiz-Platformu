@@ -15,6 +15,7 @@ import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo
 import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
 import { useInterviewStore } from '../../src/store/interviewStore';
+import { BEHAVIORAL_TOPIC, isBehavioralTopic } from '../../src/components/StarCoaching';
 import { useUserStore } from '../../src/store/userStore';
 import { CustomInput } from '../../src/components/CustomInput';
 import { errorMessage } from '../../src/config/api';
@@ -483,6 +484,25 @@ export default function PrepareScreen() {
             iconName="book-outline"
             editable={!locked}
           />
+          {!locked && (
+            <View style={[styles.topicList, { marginTop: 8 }]}>
+              <TouchableOpacity
+                style={[styles.topicChip, isBehavioralTopic(selectedTopic) && styles.topicChipActive]}
+                onPress={() => setSelectedTopic(BEHAVIORAL_TOPIC)}
+                accessibilityRole="button"
+                aria-pressed={isBehavioralTopic(selectedTopic)}
+              >
+                <Text style={[styles.topicChipText, isBehavioralTopic(selectedTopic) && styles.topicChipTextActive]}>
+                  Davranışsal (STAR) mülakat
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {isBehavioralTopic(selectedTopic) && (
+            <Text style={styles.starHint}>
+              &quot;Bana ... bir zamanı anlat&quot; türü sorular. Her cevabınızdan sonra Durum, Görev, Eylem ve Sonuç öğelerine göre koçluk notu alırsınız.
+            </Text>
+          )}
 
           {/* Zorluk Seviyesi */}
           <Text style={[styles.fieldLabel, { marginTop: 20 }]}>ZORLUK SEVİYESİ</Text>
@@ -774,6 +794,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   topicList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  starHint: { fontSize: 12, lineHeight: 17, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, marginTop: 8 },
   topicChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,

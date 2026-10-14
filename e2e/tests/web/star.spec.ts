@@ -71,3 +71,45 @@ test('teknik mülakatta STAR seçeneği seçili değildir ve koçluk gösterilme
   await expect(page.getByRole('button', { name: 'Davranışsal (STAR) mülakat' })).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByText('koçluk notu alırsınız', { exact: false })).toHaveCount(0);
 });
+
+test('görüntülü mülakatta da STAR seçeneği var; son cevabın notu yeni sorunun altında, özet sonuçta', async ({ authedPage: page, api }) => {
+  // Kamera reddedilir: kayıt/analiz olmadan sonuç ekranına doğrudan geçilir.
+  await page.addInitScript(() => {
+    navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('denied', 'NotAllowedError'));
+  });
+  api.state.consentGranted = true;
+  api.on('POST', '/api/v1/interview/start', { json: { interview_id: 'int-star-v', first_message: QUESTION } });
+  await page.goto('/chat');
+
+  await page.getByRole('button', { name: 'Davranışsal (STAR) mülakat' }).click();
+  await page.getByRole('button', { name: 'Görüntülü mülakata başla' }).click();
+  await expect(page.getByText(QUESTION)).toBeVisible();
+  expect(api.callsTo('POST', '/api/v1/interview/start')[0].body.topic).toBe('Davranışsal mülakat (STAR)');
+
+  const box = page.getByPlaceholder('Cevabınızı buraya yazın veya sesli yanıtlayın...');
+  api.on('POST', STREAM, {
+    contentType: 'text/event-stream',
+    body: sse([['star', weakStar], ['chunk', NEXT], ['done', { interview_complete: false, evaluation: null }]]),
+  });
+  await box.fill('Bir projede ekip olarak anlaşamadık, toplantı yaptık ve sonunda uzlaştık.');
+  await box.press('Enter');
+  await expect(page.getByText('Önceki cevabınız için koçluk notu')).toBeVisible();
+  const coaching = page.getByLabel('STAR koçluğu');
+  await expect(coaching).toContainText('A · Eylem eksik');
+  await expect(coaching).toContainText('rakam ekle');
+
+  api.on('POST', STREAM, {
+    contentType: 'text/event-stream',
+    body: sse([
+      ['star', fullStar],
+      ['chunk', 'Mülakat tamamlandı.'],
+      ['done', { interview_complete: true, evaluation: { technical_score: 72, confidence_score: 70, vocabulary_score: 68, feedback: 'İyi iş.' } }],
+    ]),
+  });
+  await box.fill('Geçen yıl stajımda hatayı buldum, düzelttim ve hata oranı yüzde 90 azaldı.');
+  await box.press('Enter');
+
+  await expect(page.getByText('Değerlendirmeniz hazır')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('heading', { name: 'STAR Yapısı', exact: true })).toBeVisible();
+  await expect(page.getByLabel('STAR özeti')).toContainText('En sık eksik kalan: Eylem');
+});

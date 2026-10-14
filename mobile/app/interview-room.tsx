@@ -22,6 +22,7 @@ import { RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audi
 import { Colors } from '../src/constants/Colors';
 import { FontFamilies } from '../src/constants/Fonts';
 import { useInterviewStore } from '../src/store/interviewStore';
+import { StarCoachingCard } from '../src/components/StarCoaching';
 import * as FileSystem from 'expo-file-system';
 import { analyticsService } from '../src/services/analyticsService';
 
@@ -155,7 +156,7 @@ export default function InterviewRoomScreen() {
   const [uploadStatus, setUploadStatus] = useState('Hazırlanıyor...');
 
   const {
-    micOn, cameraOn, isThinking, currentQuestion,
+    micOn, cameraOn, isThinking, currentQuestion, starNotes,
     sendMessageStream, finishInterviewEarly, toggleMic, toggleCamera, resetInterview, transcribeAudio,
   } = useInterviewStore();
   // Mod, hazırlık ekranında kameranın açık/kapalı başlatılmasıyla belirlenir (yazılı = kapalı).
@@ -462,6 +463,13 @@ export default function InterviewRoomScreen() {
 
             <Text style={styles.listeningHint}>Yanıtınızı yazın veya mikrofonu kullanın...</Text>
           </View>
+          {/* Soru alanı kısıtlı (140px); koçluk notu kartın altında kendi kaydırma alanında. */}
+          {!isThinking && starNotes.length > 0 && (
+            <ScrollView style={styles.starScroll} showsVerticalScrollIndicator={false}>
+              <Text style={styles.starLabel}>Önceki cevabınız için koçluk notu</Text>
+              <StarCoachingCard star={starNotes[starNotes.length - 1]} dark />
+            </ScrollView>
+          )}
         </View>
 
         {!isThinking && <WaveformBars />}
@@ -620,6 +628,8 @@ const styles = StyleSheet.create({
   },
   aiLabelText: { fontSize: 10, fontFamily: FontFamilies.sansBold, color: Colors.secondary, letterSpacing: 0.8 },
   questionScroll: { maxHeight: 140 },
+  starLabel: { fontSize: 11, fontFamily: FontFamilies.sansSemibold, color: '#94a3b8' },
+  starScroll: { maxHeight: 220, marginTop: 12 },
   // Dashboard'daki (/chat) YZ soru metniyle aynı sesi taşır: Fraunces italic —
   // sistemin geri kalanı Manrope'ta kalıp bu tek anı "konuşma" olarak öne çıkarır.
   questionText: {

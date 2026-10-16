@@ -223,6 +223,11 @@ class LLMService:
     # şu an doğrulanmış ekstra bir model yok. Yeni bir model doğrulandığında
     # buraya eklenip ENABLE_PAID_MODEL_FALLBACK=true ile etkinleştirilebilir.
     PAID_FALLBACK_MODELS = []
+    # response_format={"type": "json_object"} verildiğinde boş content dönen modeller
+    # (NVIDIA'da gpt-oss-20b: ~35 token, finish_reason=stop, reasoning de yok — canlı
+    # llm_usage'da değerlendirme 0/4, CV profili 0/3). Bunlara JSON modu gönderilmez;
+    # prompt zaten yalnızca JSON istiyor ve _extract_json_object metinden ayıklıyor.
+    JSON_MODE_UNSUPPORTED = {"openai/gpt-oss-20b"}
 
     def __init__(self):
         self.client = AsyncOpenAI(
@@ -336,6 +341,7 @@ class LLMService:
         max_tokens: int,
         parse: Callable[[Any], Any],
         json_mode: bool = False,
+        attempt_timeout: float | None = None,
     ) -> Any:
         """Akışsız tüm çağrıların ortak motoru: modelleri sırayla dener, her denemeyi
         LLM_ATTEMPT_MAX_DURATION ile sınırlar, `parse` yanıtı doğrular (boş/bozuk yanıt =
@@ -349,10 +355,11 @@ class LLMService:
                     "model": model_name, "messages": messages,
                     "temperature": temperature, "max_tokens": max_tokens,
                 }
-                if json_mode:
+                if json_mode and model_name not in self.JSON_MODE_UNSUPPORTED:
                     kwargs["response_format"] = {"type": "json_object"}
                 response = await asyncio.wait_for(
-                    self.client.chat.completions.create(**kwargs), timeout=settings.LLM_ATTEMPT_MAX_DURATION,
+                    self.client.chat.completions.create(**kwargs),
+                    timeout=attempt_timeout or settings.LLM_ATTEMPT_MAX_DURATION,
                 )
                 value = parse(response)
                 usage = getattr(response, "usage", None)
@@ -716,6 +723,7 @@ class LLMService:
                 # NOT: reasoning modelleri uzun rubrikli promptlarda reasoning'e çok token
                 # harcayabiliyor; content için yeterli pay bırakmak adına yüksek tutuluyor.
                 max_tokens=2048, parse=parse, json_mode=True,
+                attempt_timeout=settings.LLM_JSON_ATTEMPT_MAX_DURATION,
             )
         except LLMUnavailable as e:
             logger.error(
@@ -745,6 +753,7 @@ class LLMService:
         return await self._complete(
             purpose=purpose, messages=messages, temperature=temperature,
             max_tokens=max_tokens, parse=_json_parser, json_mode=True,
+            attempt_timeout=settings.LLM_JSON_ATTEMPT_MAX_DURATION,
         )
 
     async def transcribe_audio(self, audio_bytes: bytes, mime_type: str = "audio/m4a", language: str = "tr") -> str:

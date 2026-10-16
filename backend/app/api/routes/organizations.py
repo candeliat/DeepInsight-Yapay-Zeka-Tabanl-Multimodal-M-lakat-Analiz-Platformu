@@ -27,10 +27,12 @@ from app.api.schemas.organization import (
     UpdateMemberRoleRequest,
 )
 from app.api.schemas.assignment import AssignmentCreate, AssignmentStudentRow, OrgAssignmentItem
+from app.api.schemas.notification import ReminderResult
 from app.api.schemas.question_bank_admin import QuestionBankCreate, QuestionBankItem, QuestionBankUpdate
 from app.api.schemas.user import UserProfile
 from app.services import organization_service as org_service
 from app.services import assignment_service
+from app.services import notification_service
 from app.services import org_export_service as export
 from app.services import org_group_service as groups
 from app.services import org_insights_service as insights
@@ -355,7 +357,34 @@ async def create_assignment(
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
     members = await org_service.list_members(org_id)
+    try:
+        org = await org_service.get_organization(org_id)
+        await notification_service.notify_assignment_created(created, members, (org or {}).get("name"))
+    except Exception:
+        # Bildirim yazılamasa da ödev oluşmuştur; öğrenci ödevi "Ödevlerim"de görür.
+        logger.exception("[assignments] Yeni ödev bildirimi yazılamadı (assignment_id=%s)", created.get("id"))
     return {**created, "total_candidates": len(assignment_service.targets(created, members))}
+
+
+@router.post("/{org_id}/assignments/{assignment_id}/remind", response_model=ReminderResult)
+async def remind_assignment(
+    org_id: str,
+    assignment_id: str,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    """Ödevi tamamlamamış öğrencilere uygulama içi hatırlatma (ödev başına 12 saatte bir)."""
+    assignment = await assignment_service.get_org_assignment(org_id, assignment_id)
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Ödev bulunamadı")
+    org = await org_service.get_organization(org_id)
+    try:
+        return await notification_service.remind_assignment(
+            current_user.id, org_id, assignment, await org_service.list_members(org_id), (org or {}).get("name"),
+        )
+    except notification_service.ReminderTooSoon as e:
+        next_at = notification_service.format_due(e.next_at.isoformat())
+        raise HTTPException(status_code=429, detail=f"Bu ödev için son 12 saatte hatırlatma gönderildi. Tekrar: {next_at}")
 
 
 @router.get("/{org_id}/assignments", response_model=List[OrgAssignmentItem])

@@ -205,6 +205,24 @@ export const MY_ASSIGNMENTS = [
   },
 ];
 
+export const NOTIFICATIONS = [
+  {
+    id: 'n-due', kind: 'assignment_due_soon', title: 'Son tarih yaklaşıyor: React haftalık pratik',
+    body: 'Son tarih: 01.12.2026 21:00. Ödevi henüz tamamlamadınız.', link: '/assignments', assignment_id: 'as-todo',
+    read_at: null, created_at: '2026-10-16T09:00:00+00:00',
+  },
+  {
+    id: 'n-new', kind: 'assignment_new', title: 'Yeni ödev: React haftalık pratik',
+    body: 'Örnek Üniversitesi Kariyer Merkezi · Frontend Developer / React', link: '/assignments', assignment_id: 'as-todo',
+    read_at: null, created_at: '2026-10-01T09:00:00+00:00',
+  },
+  {
+    id: 'n-old', kind: 'assignment_reminder', title: 'Eğitmen hatırlatması: Veri yapıları tekrarı',
+    body: 'Örnek Üniversitesi Kariyer Merkezi ödevi henüz tamamlanmadı', link: '/assignments', assignment_id: 'as-done',
+    read_at: '2026-09-20T09:00:00+00:00', created_at: '2026-09-18T09:00:00+00:00',
+  },
+];
+
 export const ORG_OVERVIEW = {
   org: { id: ORG_ADMIN, name: 'Örnek Bootcamp', monthly_interview_quota: 100, rubric: null },
   member_counts: { org_admin: 1, candidate: 2 },

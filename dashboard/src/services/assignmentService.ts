@@ -21,6 +21,8 @@ export interface Assignment {
   /** Doluysa ödev yalnızca bu grubun öğrencilerine atanmıştır. */
   group_id: string | null;
   created_at: string | null;
+  /** Eğitmenin son "Hatırlat" zamanı; 12 saat dolmadan tekrar gönderilemez. */
+  last_reminded_at?: string | null;
 }
 
 export interface OrgAssignment extends Assignment {

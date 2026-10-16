@@ -5,6 +5,7 @@ import Link from "next/link";
 import { UserCircle, LogOut } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
 import { useRouter } from "next/navigation";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 
 export default function Topbar() {
   const { user, initialize, logout } = useAuthStore();
@@ -28,6 +29,7 @@ export default function Topbar() {
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
       <div className="flex-1" />
       <div className="flex items-center gap-2">
+        {user && <NotificationBell />}
         <Link href="/profile" className="flex items-center gap-2 hover:bg-muted p-2 rounded-xl transition-colors" title="Profil">
           <UserCircle className="w-6 h-6 text-foreground" />
           {displayName ? (

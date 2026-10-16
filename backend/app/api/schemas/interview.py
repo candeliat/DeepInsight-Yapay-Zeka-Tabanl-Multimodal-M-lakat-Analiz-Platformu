@@ -7,6 +7,7 @@ class InterviewSummary(BaseModel):
     role: str
     topic: str
     difficulty: Optional[str] = None
+    language: Optional[str] = "tr"  # konuşma dili: "tr" | "en"
     status: str
     technical_score: Optional[int] = None
     confidence_score: Optional[int] = None

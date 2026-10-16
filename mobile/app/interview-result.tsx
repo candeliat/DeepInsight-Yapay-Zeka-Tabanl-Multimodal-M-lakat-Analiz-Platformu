@@ -250,7 +250,7 @@ export default function InterviewResultScreen() {
       role: data.role ?? 'Genel',
       topic: data.topic ?? 'Genel',
       difficulty: data.difficulty ?? null,
-      context: {},
+      context: { language: data.language === 'en' ? 'en' : 'tr' },
       currentQuestion: lastQuestion,
       evaluation: null,
       isThinking: false,
@@ -277,7 +277,7 @@ export default function InterviewResultScreen() {
     useInterviewStore.getState().resetInterview();
     router.replace({
       pathname: '/(tabs)/prepare',
-      params: { role: data.role ?? undefined, topic: data.topic ?? undefined, difficulty: data.difficulty ?? undefined },
+      params: { role: data.role ?? undefined, topic: data.topic ?? undefined, difficulty: data.difficulty ?? undefined, language: data.language ?? undefined },
     });
   };
 

@@ -35,6 +35,23 @@ _RESULT = (
     "hizland", "duzeldi", "cozuldu", "tamamlad", "kazand", "ogrendim", "ogrendik", "geri bildirim",
     "takdir", "yayina", "teslim ettik", "teslim ettim",
 )
+# İngilizce mülakat için karşılıkları (aynı ağırlıklar ve ipuçları; ipucu metni Türkçe kalır).
+_SITUATION_EN = (
+    "project", "internship", "at my", "in my previous", "when i was", "last year", "last semester", "our team",
+    "my team", "client", "customer", "during", "deadline", "there was a", "we had a", "at university", "in a course",
+)
+_TASK_EN = (
+    "my task", "my role", "responsib", "my goal", "our goal", "i needed to", "i had to", "was asked", "expected",
+    "my job was", "assigned", "we needed to", "we had to",
+)
+_RESULT_EN = (
+    "result", "in the end", "finally", "reduced", "increased", "improved", "decreased", "saved", "achieved",
+    "delivered", "learned", "feedback", "successfully", "launched", "fixed", "resolved", "completed",
+)
+# "I" + fiil (düşünce/durum bildirenler hariç): "I designed", "I talked".
+_I_EN = re.compile(r"\bi\s+(?!am\b|think\b|guess\b|believe\b|dont\b|don't\b|was\b|would\b)\w+")
+_WE_EN = re.compile(r"\bwe\s+(?!are\b|were\b|think\b)\w+")
+
 # Birinci tekil / çoğul geçmiş zaman fiilleri (sadeleştirilmiş: yaptım -> yaptim, ettik).
 _I_VERB = re.compile(r"\b\w{2,}[dt][iu]m\b")
 _WE_VERB = re.compile(r"\b\w{2,}[dt][iu]k\b")
@@ -50,20 +67,29 @@ def _has(text: str, cues) -> bool:
     return any(c in text for c in cues)
 
 
-def analyze_answer(answer: str) -> Dict[str, Any]:
+def analyze_answer(answer: str, language: str = "tr") -> Dict[str, Any]:
     folded = fold(answer or "")
     words = len(_WORD.findall(folded))
-    i_verbs = len(_I_VERB.findall(folded)) + folded.split().count("ben")
-    we_verbs = len(_WE_VERB.findall(folded)) + folded.split().count("biz")
+    english = language == "en"
+    if english:
+        situation_cues, task_cues, result_cues = _SITUATION_EN, _TASK_EN, _RESULT_EN
+        i_verbs = len(_I_EN.findall(folded))
+        we_verbs = len(_WE_EN.findall(folded))
+        action = i_verbs >= 2
+    else:
+        situation_cues, task_cues, result_cues = _SITUATION, _TASK, _RESULT
+        i_verbs = len(_I_VERB.findall(folded)) + folded.split().count("ben")
+        we_verbs = len(_WE_VERB.findall(folded)) + folded.split().count("biz")
+        action = len(_I_VERB.findall(folded)) >= 2 or (len(_WE_VERB.findall(folded)) >= 2 and _has(folded, ("ben ", "benim")))
 
     components = {
-        "situation": _has(folded, _SITUATION),
-        "task": _has(folded, _TASK),
-        "action": len(_I_VERB.findall(folded)) >= 2 or (len(_WE_VERB.findall(folded)) >= 2 and _has(folded, ("ben ", "benim"))),
-        "result": _has(folded, _RESULT),
+        "situation": _has(folded, situation_cues),
+        "task": _has(folded, task_cues),
+        "action": action,
+        "result": _has(folded, result_cues),
     }
     # Sonuçta sayı geçiyor mu: sonuç işaretinden sonraki kısımda rakam aranır.
-    result_start = min((folded.find(c) for c in _RESULT if c in folded), default=-1)
+    result_start = min((folded.find(c) for c in result_cues if c in folded), default=-1)
     quantified = result_start >= 0 and bool(_NUMBER.search(folded[result_start:]))
 
     voice = "ben" if i_verbs > we_verbs else ("biz" if we_verbs > i_verbs else "karisik")
@@ -71,9 +97,17 @@ def analyze_answer(answer: str) -> Dict[str, Any]:
     # Öncelik ağırlık sırasında: eylem ve sonuç cevabın asıl kısmıdır (UW), en fazla 3 ipucu.
     tips: List[str] = []
     if not components["action"]:
-        tips.append("Senin attığın adımları 'yaptım, önerdim, düzelttim' gibi ben-diliyle sırala; cevabın en uzun kısmı bu olmalı.")
+        tips.append(
+            "Senin attığın adımları 'I designed, I proposed, I fixed' gibi 'I' ile sırala; cevabın en uzun kısmı bu olmalı."
+            if english else
+            "Senin attığın adımları 'yaptım, önerdim, düzelttim' gibi ben-diliyle sırala; cevabın en uzun kısmı bu olmalı."
+        )
     elif voice == "biz":
-        tips.append("Çoğunlukla 'biz' dedin: ekibin değil, senin katkını 'ben' diliyle öne çıkar.")
+        tips.append(
+            "Çoğunlukla 'we' dedin: ekibin değil, senin katkını 'I' ile öne çıkar."
+            if english else
+            "Çoğunlukla 'biz' dedin: ekibin değil, senin katkını 'ben' diliyle öne çıkar."
+        )
     if not components["result"]:
         tips.append("Hikâyeyi bir sonuçla bitir: ne değişti, ne öğrendin?")
     elif not quantified:

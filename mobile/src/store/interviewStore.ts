@@ -12,7 +12,14 @@ export interface EvaluationData {
 
 /** Mülakatın opsiyonel bağlamı: kişiselleştirme (CV/ilan), kurum (kota, kurum soru bankası,
  * eğitmen görünürlüğü) ve ödev (rol/konu/zorluk ve kurum backend'de ödevden alınır). */
+export type InterviewLanguage = 'tr' | 'en';
+
+/** Seslendirme ve konuşma tanıma için BCP-47 dil kodu. */
+export const speechLanguage = (language?: InterviewLanguage) => (language === 'en' ? 'en-US' : 'tr-TR');
+
 export interface InterviewContext {
+  /** Konuşma dili; verilmezse Türkçe. */
+  language?: InterviewLanguage;
   cvId?: string;
   jobId?: string;
   orgId?: string;
@@ -81,6 +88,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         job_id: context.jobId,
         org_id: context.orgId,
         assignment_id: context.assignmentId,
+        language: context.language ?? 'tr',
       }, { timeout: 90000 });
       
       set({ 
@@ -165,6 +173,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         name: 'audio.m4a',
         type: 'audio/m4a',
       } as any);
+      formData.append('language', get().context.language ?? 'tr');
 
       const response = await api.post('/api/v1/interview/transcribe', formData, {
         headers: {

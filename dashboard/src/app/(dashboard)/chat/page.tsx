@@ -24,6 +24,8 @@ import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/Button";
 import { ScoreCard } from "@/components/interview/ScoreCard";
+import { LanguageToggle } from "@/components/interview/LanguageToggle";
+import type { InterviewLanguage } from "@/services/chatService";
 import { BEHAVIORAL_TOPIC, isBehavioralTopic, StarCoachingCard, StarSummary } from "@/components/interview/StarCoaching";
 import { useInterviewTurns } from "@/hooks/useInterviewTurns";
 import { Input } from "@/components/ui/Input";
@@ -52,6 +54,12 @@ export default function InterviewRoomPage() {
   const [role, setRole] = useState("Yazılım Mühendisi");
   const [topic, setTopic] = useState("React ve Modern Web Geliştirme");
   const [difficulty, setDifficulty] = useState("ORTA");
+  const [language, setLanguage] = useState<InterviewLanguage>("tr");
+  // Konuşma tanıma ve seslendirme bir kez kurulan geri çağrılarda kullanıldığı için dil ref'ten okunur.
+  const speechLangRef = useRef("tr-TR");
+  useEffect(() => {
+    speechLangRef.current = language === "en" ? "en-US" : "tr-TR";
+  }, [language]);
   // Video analizi onamı: kayıt sunucuya yüklenir ve yüz ifadesi analiz edilir — açık onam şart.
   const [videoConsent, setVideoConsent] = useState<ConsentStatus | null>(null);
   const [consentChecked, setConsentChecked] = useState(false);
@@ -207,6 +215,7 @@ export default function InterviewRoomPage() {
       recognitionRef.current?.stop();
       setIsListening(false);
     } else {
+      if (recognitionRef.current) recognitionRef.current.lang = speechLangRef.current;
       recognitionRef.current?.start();
       setIsListening(true);
     }
@@ -221,7 +230,7 @@ export default function InterviewRoomPage() {
       setSpokenWordIndex(-1);
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "tr-TR";
+      utterance.lang = speechLangRef.current;
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
 
@@ -297,7 +306,7 @@ export default function InterviewRoomPage() {
       setWaitingCamera(false);
 
       // 2. Backend'e başlatma isteği
-      const data = await chatService.startInterview(role, topic, difficulty);
+      const data = await chatService.startInterview(role, topic, difficulty, { language });
       setInterviewId(data.interview_id);
       setCurrentQuestion(data.first_message);
       
@@ -519,6 +528,8 @@ export default function InterviewRoomPage() {
                 </p>
               )}
             </div>
+
+            <LanguageToggle value={language} onChange={setLanguage} />
 
             <div className="space-y-2">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Zorluk Seviyesi</label>

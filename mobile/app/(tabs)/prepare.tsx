@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
-import { useInterviewStore } from '../../src/store/interviewStore';
+import { InterviewLanguage, useInterviewStore } from '../../src/store/interviewStore';
 import { BEHAVIORAL_TOPIC, isBehavioralTopic } from '../../src/components/StarCoaching';
 import { useUserStore } from '../../src/store/userStore';
 import { CustomInput } from '../../src/components/CustomInput';
@@ -29,7 +29,7 @@ import {
   orgService,
 } from '../../src/services/orgService';
 
-type Params = { cv?: string; job?: string; assignment?: string; role?: string; topic?: string; difficulty?: string };
+type Params = { cv?: string; job?: string; assignment?: string; role?: string; topic?: string; difficulty?: string; language?: string };
 
 const TOPICS = [
   { id: 'software', label: 'Yazılım Geliştirme' },
@@ -66,6 +66,7 @@ export default function PrepareScreen() {
   const [selectedRole, setSelectedRole] = useState('Yazılım Mühendisi');
   const [selectedTopic, setSelectedTopic] = useState('React ve Modern Web Geliştirme');
   const [selectedDifficulty, setSelectedDifficulty] = useState(DIFFICULTIES[1]);
+  const [language, setLanguage] = useState<InterviewLanguage>('tr');
 
   const { setRoleTopic, startInterview, isThinking } = useInterviewStore();
   const user = useUserStore((s) => s.user);
@@ -127,7 +128,8 @@ export default function PrepareScreen() {
     if (params.topic) setSelectedTopic(params.topic.slice(0, 120));
     const level = DIFFICULTIES.find((d) => d.label === params.difficulty);
     if (level) setSelectedDifficulty(level);
-  }, [params.role, params.topic, params.difficulty]);
+    if (params.language === 'en' || params.language === 'tr') setLanguage(params.language);
+  }, [params.role, params.topic, params.difficulty, params.language]);
 
   useEffect(() => {
     let cancelled = false;
@@ -224,6 +226,7 @@ export default function PrepareScreen() {
         jobId: jobLabel ? params.job : undefined,
         assignmentId: assignment?.id,
         orgId: orgId ?? undefined,
+        language,
       });
       await startInterview();
       // Yazılı modda kamera kapalı başlar: video kaydı/analizi yapılmaz, sonuç ekranına doğrudan geçilir.
@@ -505,6 +508,26 @@ export default function PrepareScreen() {
           )}
 
           {/* Zorluk Seviyesi */}
+          <Text style={[styles.fieldLabel, { marginTop: 20 }]}>MÜLAKAT DİLİ</Text>
+          <View style={styles.diffRow}>
+            {([['tr', 'Türkçe'], ['en', 'English']] as const).map(([value, label]) => (
+              <TouchableOpacity
+                key={value}
+                style={[styles.diffBtn, language === value && styles.diffBtnActive]}
+                onPress={() => setLanguage(value)}
+                accessibilityRole="button"
+                aria-pressed={language === value}
+              >
+                <Text style={[styles.diffBtnText, language === value && styles.diffBtnTextActive]}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {language === 'en' && (
+            <Text style={styles.starHint}>
+              Sorular İngilizce sorulur, cevaplarınızı İngilizce verin. Kelime puanı İngilizce iletişiminizi ölçer; geri bildirim Türkçe ve İngilizceniz için bir öneri içerir.
+            </Text>
+          )}
+
           <Text style={[styles.fieldLabel, { marginTop: 20 }]}>ZORLUK SEVİYESİ</Text>
           <View style={styles.diffRow}>
             {DIFFICULTIES.map((d) => (

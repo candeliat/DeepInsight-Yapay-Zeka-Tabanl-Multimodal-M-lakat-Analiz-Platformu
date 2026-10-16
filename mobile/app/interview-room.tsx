@@ -21,7 +21,7 @@ import * as Speech from 'expo-speech';
 import { RecordingPresets, setAudioModeAsync, useAudioRecorder } from 'expo-audio';
 import { Colors } from '../src/constants/Colors';
 import { FontFamilies } from '../src/constants/Fonts';
-import { useInterviewStore } from '../src/store/interviewStore';
+import { speechLanguage, useInterviewStore } from '../src/store/interviewStore';
 import { StarCoachingCard } from '../src/components/StarCoaching';
 import * as FileSystem from 'expo-file-system';
 import { analyticsService } from '../src/services/analyticsService';
@@ -156,7 +156,7 @@ export default function InterviewRoomScreen() {
   const [uploadStatus, setUploadStatus] = useState('Hazırlanıyor...');
 
   const {
-    micOn, cameraOn, isThinking, currentQuestion, starNotes,
+    micOn, cameraOn, isThinking, currentQuestion, starNotes, context,
     sendMessageStream, finishInterviewEarly, toggleMic, toggleCamera, resetInterview, transcribeAudio,
   } = useInterviewStore();
   // Mod, hazırlık ekranında kameranın açık/kapalı başlatılmasıyla belirlenir (yazılı = kapalı).
@@ -207,7 +207,7 @@ export default function InterviewRoomScreen() {
   // Soru seslendirme
   const speakText = useCallback((text: string) => {
     Speech.stop();
-    Speech.speak(text, { language: 'tr-TR', pitch: 1.0, rate: 0.95 });
+    Speech.speak(text, { language: speechLanguage(useInterviewStore.getState().context.language), pitch: 1.0, rate: 0.95 });
   }, []);
 
   // Sadece ekran ilk açıldığında (önceki ekrandan gelen ilk soru için) bir kez
@@ -497,7 +497,7 @@ export default function InterviewRoomScreen() {
             style={styles.textInput}
             value={userAnswer}
             onChangeText={setUserAnswer}
-            placeholder={isTranscribing ? 'Sese dönüştürülüyor...' : isRecording ? 'Dinleniyor...' : 'Cevabınızı buraya yazın...'}
+            placeholder={isTranscribing ? 'Sese dönüştürülüyor...' : isRecording ? 'Dinleniyor...' : context.language === 'en' ? 'Cevabınızı buraya İngilizce yazın...' : 'Cevabınızı buraya yazın...'}
             placeholderTextColor="rgba(255,255,255,0.35)"
             multiline
             maxLength={600}

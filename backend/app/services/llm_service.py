@@ -434,6 +434,7 @@ class LLMService:
         question_number: int,
         max_questions: int | None = None,
         candidate_context: str | None = None,
+        language: str = "tr",
     ) -> str:
         """
         `get_next_question`'ın HAFİF sürümü: soruyu sıfırdan üretmek yerine,
@@ -449,7 +450,7 @@ class LLMService:
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
 
         system_prompt = build_question_delivery_prompt(
-            role, topic, question_number, max_questions, bank_question_text, candidate_context,
+            role, topic, question_number, max_questions, bank_question_text, candidate_context, language,
         )
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
@@ -490,6 +491,7 @@ class LLMService:
         question_number: int,
         max_questions: int | None = None,
         candidate_context: str | None = None,
+        language: str = "tr",
     ) -> str:
         """
         Sohbetin bir sonraki mülakat sorusunu (düz metin) üretir.
@@ -498,7 +500,7 @@ class LLMService:
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
 
-        system_prompt = build_question_prompt(role, topic, question_number, max_questions, candidate_context)
+        system_prompt = build_question_prompt(role, topic, question_number, max_questions, candidate_context, language)
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
         if message:
@@ -521,6 +523,7 @@ class LLMService:
         question_number: int,
         max_questions: int | None = None,
         candidate_context: str | None = None,
+        language: str = "tr",
     ):
         """
         `get_next_question` ile aynı işi yapar ama metni token-token (async
@@ -531,7 +534,7 @@ class LLMService:
             str: Model tarafından üretilen art arda metin parçaları.
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
-        system_prompt = build_question_prompt(role, topic, question_number, max_questions, candidate_context)
+        system_prompt = build_question_prompt(role, topic, question_number, max_questions, candidate_context, language)
         async for delta in self._stream_chat(system_prompt, history, message, max_tokens=1024, purpose="question_stream"):
             yield delta
 
@@ -545,6 +548,7 @@ class LLMService:
         question_number: int,
         max_questions: int | None = None,
         candidate_context: str | None = None,
+        language: str = "tr",
     ):
         """
         `deliver_bank_question`'ın token-token akan sürümü — bkz. `_stream_chat`
@@ -555,7 +559,7 @@ class LLMService:
         """
         max_questions = max_questions or settings.MAX_INTERVIEW_QUESTIONS
         system_prompt = build_question_delivery_prompt(
-            role, topic, question_number, max_questions, bank_question_text, candidate_context,
+            role, topic, question_number, max_questions, bank_question_text, candidate_context, language,
         )
         async for delta in self._stream_chat(system_prompt, history, message, max_tokens=256, purpose="question_from_bank_stream"):
             yield delta
@@ -677,6 +681,7 @@ class LLMService:
         role: str,
         topic: str,
         reference: list[dict] | None = None,
+        language: str = "tr",
     ) -> dict:
         """
         Mülakat sonu değerlendirmesini üretir. `reference`: soru bankasından sorulan
@@ -686,7 +691,7 @@ class LLMService:
         değerlendirme sözlüğü döner — böylece mülakat asla "tamamlanamayan" bir
         durumda takılı kalmaz.
         """
-        system_prompt = build_evaluation_prompt(role, topic, reference)
+        system_prompt = build_evaluation_prompt(role, topic, reference, language)
         messages = [{"role": "system", "content": system_prompt}]
         messages.extend(self._history_to_messages(history))
         messages.append({
@@ -742,7 +747,7 @@ class LLMService:
             max_tokens=max_tokens, parse=_json_parser, json_mode=True,
         )
 
-    async def transcribe_audio(self, audio_bytes: bytes, mime_type: str = "audio/m4a") -> str:
+    async def transcribe_audio(self, audio_bytes: bytes, mime_type: str = "audio/m4a", language: str = "tr") -> str:
         """
         Transcribes an audio file into text using the shared local Whisper model
         (100% Free & Unlimited). `analytics.py` ile aynı singleton paylaşılır —
@@ -762,8 +767,12 @@ class LLMService:
                 result = await asyncio.to_thread(
                     model.transcribe,
                     temp_path,
-                    language="tr",
-                    initial_prompt="Lütfen bu ses kaydını eksiksiz ve hatasız bir şekilde Türkçe metne çevir.",
+                    language="en" if language == "en" else "tr",
+                    initial_prompt=(
+                        "Please transcribe this English job interview answer accurately."
+                        if language == "en" else
+                        "Lütfen bu ses kaydını eksiksiz ve hatasız bir şekilde Türkçe metne çevir."
+                    ),
                 )
                 return result.get("text", "").strip()
             finally:

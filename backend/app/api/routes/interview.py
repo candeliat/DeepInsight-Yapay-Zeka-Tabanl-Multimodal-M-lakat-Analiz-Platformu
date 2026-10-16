@@ -1,10 +1,10 @@
 import re
 import json
 import logging
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from app.core.config import settings
 from app.services.llm_service import llm_service
 from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching, assignment_service, star_service
@@ -89,6 +89,9 @@ class StartInterviewRequest(BaseModel):
     # Opsiyonel: kurum ödevi. Verilirse rol/konu/zorluk ve kurum bağlamı ödevden
     # alınır (istemcinin gönderdiği değerler yok sayılır).
     assignment_id: Optional[str] = Field(default=None, max_length=64)
+    # Konuşma dili: "en" ile sorular İngilizce sorulur (bankadaki Türkçe soru çevrilir),
+    # ses İngilizce çözümlenir; değerlendirme metni yine Türkçedir.
+    language: Literal["tr", "en"] = "tr"
 
     @field_validator("role", "topic")
     @classmethod
@@ -140,6 +143,7 @@ async def _ask_question(
     history_dicts: List[Dict[str, Any]],
     question_pool: List[Dict[str, Any]],
     candidate_context: Optional[str] = None,
+    language: str = "tr",
 ) -> str:
     """
     Sıradaki mülakat sorusunu üretir. Önce `/start`'ta bir kez çekilmiş soru
@@ -164,6 +168,7 @@ async def _ask_question(
                 question_number=question_number,
                 max_questions=max_questions,
                 candidate_context=candidate_context,
+                language=language,
             )
         except Exception:
             logger.warning(
@@ -179,6 +184,7 @@ async def _ask_question(
         question_number=question_number,
         max_questions=max_questions,
         candidate_context=candidate_context,
+        language=language,
     )
 
 
@@ -315,6 +321,7 @@ async def start_interview(
             cv_id=request.cv_id,
             job_id=request.job_id,
             assignment_id=request.assignment_id,
+            language=request.language,
         )
         interview_id = str(interview_data["id"])
 
@@ -329,6 +336,7 @@ async def start_interview(
             history_dicts=[],
             question_pool=question_pool,
             candidate_context=candidate_context,
+            language=request.language,
         )
 
         # Kullanıcının ilk mülakatı başlatma isteğini anlık olarak kaydet 
@@ -389,13 +397,14 @@ async def chat_with_ai_stream(
 
     role = interview.get("role", "Yazılım Mühendisi")
     topic = interview.get("topic", "Genel")
+    language = interview.get("language") or "tr"
 
     if interview.get("status") == "completed":
         raise HTTPException(status_code=400, detail="Bu mülakat zaten tamamlanmış.")
 
     # Davranışsal mülakatta cevap anında STAR açısından değerlendirilir (kural tabanlı, LLM'siz)
     # ve mesajla birlikte saklanır; istemciye yeni sorudan önce `star` olayıyla gider.
-    star = star_service.analyze_answer(request.message) if star_service.is_behavioral(topic) else None
+    star = star_service.analyze_answer(request.message, language) if star_service.is_behavioral(topic) else None
     await save_message(request.interview_id, role="user", content=request.message, token=token, coaching=star)
     history_records = await get_interview_history(request.interview_id, token=token)
 
@@ -422,6 +431,7 @@ async def chat_with_ai_stream(
                         role=role,
                         topic=topic,
                         reference=_evaluation_reference(interview, questions_asked),
+                        language=language,
                     )
                     feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
                     tech_score = evaluation_data.get("technical_score", 0)
@@ -472,6 +482,7 @@ async def chat_with_ai_stream(
                             question_number=questions_asked + 1,
                             max_questions=max_questions,
                             candidate_context=candidate_context,
+                            language=language,
                         ):
                             full_parts.append(delta)
                             yield _sse("chunk", delta)
@@ -490,6 +501,7 @@ async def chat_with_ai_stream(
                             question_number=questions_asked + 1,
                             max_questions=max_questions,
                             candidate_context=candidate_context,
+                            language=language,
                         ):
                             full_parts.append(delta)
                             yield _sse("chunk", delta)
@@ -502,6 +514,7 @@ async def chat_with_ai_stream(
                         question_number=questions_asked + 1,
                         max_questions=max_questions,
                         candidate_context=candidate_context,
+                        language=language,
                     ):
                         full_parts.append(delta)
                         yield _sse("chunk", delta)
@@ -556,6 +569,7 @@ async def finish_interview_early(
 
     role = interview.get("role", "Yazılım Mühendisi")
     topic = interview.get("topic", "Genel")
+    language = interview.get("language") or "tr"
 
     try:
         try:
@@ -568,6 +582,7 @@ async def finish_interview_early(
                 reference=_evaluation_reference(
                     interview, sum(1 for m in history_records if m.get("role") == "model"),
                 ),
+                language=language,
             )
 
             feedback = evaluation_data.get("feedback", "Mülakat tamamlandı.")
@@ -621,6 +636,8 @@ async def abandon_interview(
 @router.post("/transcribe", dependencies=[Depends(ai_rate_limit)])
 async def transcribe_audio_endpoint(
     file: UploadFile = File(...),
+    # Mülakatın dili (istemci bilir); yalnızca "en" İngilizce çözümler.
+    language: str = Form("tr"),
     token: str = Depends(oauth2_scheme),
     current_user: UserProfile = Depends(get_current_user)
 ):
@@ -640,7 +657,7 @@ async def transcribe_audio_endpoint(
 
         mime_type = file.content_type or "audio/m4a"
 
-        text = await llm_service.transcribe_audio(audio_bytes, mime_type)
+        text = await llm_service.transcribe_audio(audio_bytes, mime_type, "en" if language == "en" else "tr")
         return {"text": text}
     except HTTPException:
         raise

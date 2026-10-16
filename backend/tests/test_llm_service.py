@@ -514,3 +514,48 @@ def test_stream_next_question_falls_back_on_attempt_timeout(monkeypatch):
 
     assert text == "ikinci model cevabı"
     assert svc.client.chat.completions.create.call_count == 2
+
+
+# --- JSON modu ve süre sınırı (canlıda gpt-oss-20b json_object ile boş dönüyordu) ---
+
+def _models_and_formats(svc):
+    return [(c.kwargs["model"], c.kwargs.get("response_format")) for c in svc.client.chat.completions.create.call_args_list]
+
+
+def test_json_mode_is_not_sent_to_models_that_return_empty_content():
+    svc = _service_with_mock_client()
+    svc.client.chat.completions.create.side_effect = [
+        _fake_response('{"technical_score": 80, "confidence_score": 70, "vocabulary_score": 75, "feedback": "iyi"}', _fake_usage()),
+    ]
+    result = run(svc.get_final_evaluation([], "Rol", "Konu"))
+    assert result["technical_score"] == 80
+    model, fmt = _models_and_formats(svc)[0]
+    assert model in LLMService.JSON_MODE_UNSUPPORTED and fmt is None
+
+
+def test_json_mode_still_sent_to_other_models():
+    svc = _service_with_mock_client()
+    svc.client.chat.completions.create.side_effect = [
+        _fake_response(""),
+        _fake_response('{"technical_score": 60, "feedback": "ok"}', _fake_usage()),
+    ]
+    run(svc.get_final_evaluation([], "Rol", "Konu"))
+    second_model, fmt = _models_and_formats(svc)[1]
+    assert second_model not in LLMService.JSON_MODE_UNSUPPORTED
+    assert fmt == {"type": "json_object"}
+
+
+def test_structured_calls_use_longer_attempt_timeout(monkeypatch):
+    # Değerlendirme genel sınırdan (30 sn) uzun sürebilir; JSON çağrıları kendi sınırını kullanır.
+    monkeypatch.setattr(llm_service_module.settings, "LLM_ATTEMPT_MAX_DURATION", 0.05)
+    monkeypatch.setattr(llm_service_module.settings, "LLM_JSON_ATTEMPT_MAX_DURATION", 1.0)
+    svc = _service_with_mock_client()
+
+    async def _slow(*args, **kwargs):
+        await asyncio.sleep(0.2)
+        return _fake_response('{"technical_score": 90, "feedback": "çok iyi"}', _fake_usage())
+
+    svc.client.chat.completions.create.side_effect = _slow
+    result = run(svc.get_final_evaluation([], "Rol", "Konu"))
+    assert result["technical_score"] == 90
+    assert svc.client.chat.completions.create.call_count == 1

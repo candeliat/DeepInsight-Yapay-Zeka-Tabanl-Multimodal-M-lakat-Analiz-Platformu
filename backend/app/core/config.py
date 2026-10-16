@@ -47,6 +47,10 @@ class Settings:
     # streaming hem non-streaming çağrılarda kullanılır (bkz. llm_service.py).
     # Aşılırsa o deneme başarısız sayılıp sıradaki fallback modele geçilir.
     LLM_ATTEMPT_MAX_DURATION: float = float(os.getenv("LLM_ATTEMPT_MAX_DURATION", "30"))
+    # Yapılandırılmış (JSON) çağrılar — mülakat değerlendirmesi, CV profili, ilan
+    # gereksinimleri — uzun rubrik/metinle daha çok reasoning yapıyor: canlı ölçümde
+    # gpt-oss-20b değerlendirmesi 18-27 sn sürdü, 30 sn sınırı ikinci modeli de kesiyordu.
+    LLM_JSON_ATTEMPT_MAX_DURATION: float = float(os.getenv("LLM_JSON_ATTEMPT_MAX_DURATION", "60"))
     # Bir "sonraki soru" yanıtı bu karakter sayısını aşarsa reddedilir — normal
     # bir mülakat sorusu (+ kısa değerlendirme cümlesi) birkaç yüz karakteri
     # geçmez; canlı testte gözlemlendiği üzere bazı reasoning modelleri

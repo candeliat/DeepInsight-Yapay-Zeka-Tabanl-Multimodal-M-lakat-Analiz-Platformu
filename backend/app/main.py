@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager  # noqa: E402
 
 from fastapi import FastAPI  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
-from app.api.routes import interview, auth, users, analytics, question_bank_admin, organizations, cv, jobs, progress, assignments, pilot, account  # noqa: E402
+from app.api.routes import interview, auth, users, analytics, question_bank_admin, organizations, cv, jobs, progress, assignments, notifications, pilot, account  # noqa: E402
 
 @asynccontextmanager
 async def lifespan(_app):
@@ -59,6 +59,7 @@ app.include_router(cv.router, prefix="/api/v1/cv", tags=["CV"])
 app.include_router(jobs.router, prefix="/api/v1/jobs", tags=["Jobs"])
 app.include_router(progress.router, prefix="/api/v1/progress", tags=["Progress"])
 app.include_router(assignments.router, prefix="/api/v1/assignments", tags=["Assignments"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
 app.include_router(pilot.router, prefix="/api/v1/pilot", tags=["Pilot"])
 app.include_router(account.router, prefix="/api/v1/account", tags=["Account (KVKK)"])
 

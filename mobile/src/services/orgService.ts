@@ -72,6 +72,27 @@ export const assignmentService = {
   mine: () => call<MyAssignment[]>(api.get('/api/v1/assignments/me')),
 };
 
+// --- Bildirimler (ödev hatırlatma) ---
+
+export type NotificationKind = 'assignment_new' | 'assignment_due_soon' | 'assignment_overdue' | 'assignment_reminder';
+
+export interface AppNotification {
+  id: string;
+  kind: NotificationKind;
+  title: string;
+  body: string | null;
+  link: string | null;
+  assignment_id: string | null;
+  read_at: string | null;
+  created_at: string | null;
+}
+
+export const notificationService = {
+  mine: () => call<{ items: AppNotification[]; unread_count: number }>(api.get('/api/v1/notifications/me')),
+  /** ids verilmezse tüm okunmamışlar okundu sayılır. */
+  markRead: (ids?: string[]) => call<{ updated: number }>(api.post('/api/v1/notifications/read', { ids })),
+};
+
 // --- Pilot ---
 
 export type PostItemKey = 'useful' | 'realistic' | 'feedback_clear';

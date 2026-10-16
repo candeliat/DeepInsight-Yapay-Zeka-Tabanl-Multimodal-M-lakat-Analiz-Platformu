@@ -1,14 +1,16 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import { ClipboardList, Plus, Loader2, ChevronDown, ChevronUp, Trash2, CheckCircle2, Clock, Circle, Lock, CalendarClock, Layers, Download } from "lucide-react";
+import { ClipboardList, Plus, Loader2, ChevronDown, ChevronUp, Trash2, CheckCircle2, Clock, Circle, Lock, CalendarClock, Layers, Download, Megaphone } from "lucide-react";
 import { assignmentService, AssignmentStatus, AssignmentStudentRow, OrgAssignment, STATUS_LABEL } from "@/services/assignmentService";
 import { orgService, OrgGroup } from "@/services/orgService";
+import { notificationService } from "@/services/notificationService";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 
 const LEVELS = ["JUNIOR", "ORTA", "UZMAN"] as const;
+const REMIND_COOLDOWN_MS = 12 * 60 * 60 * 1000;
 
 export function StatusBadge({ status }: { status: AssignmentStatus }) {
   const Icon = status === "completed" ? CheckCircle2 : status === "in_progress" ? Clock : Circle;
@@ -34,6 +36,8 @@ export function AssignmentsPanel({ orgId, groups, onError }: { orgId: string; gr
   const [openId, setOpenId] = useState<string | null>(null);
   const [students, setStudents] = useState<Record<string, AssignmentStudentRow[]>>({});
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [reminding, setReminding] = useState<string | null>(null);
+  const [remindNote, setRemindNote] = useState<Record<string, string>>({});
 
   const [title, setTitle] = useState("");
   const [role, setRole] = useState("");
@@ -107,6 +111,22 @@ export function AssignmentsPanel({ orgId, groups, onError }: { orgId: string; gr
       await orgService.downloadCsv(`${orgId}/assignments/${a.id}/export.csv`, `odev-${a.title}.csv`);
     } catch (e) {
       onError(e instanceof Error ? e.message : "Dışa aktarılamadı.");
+    }
+  };
+
+  const handleRemind = async (a: OrgAssignment) => {
+    setReminding(a.id);
+    try {
+      const result = await notificationService.remind(orgId, a.id);
+      setItems((prev) => prev.map((x) => (x.id === a.id ? { ...x, last_reminded_at: result.last_reminded_at } : x)));
+      setRemindNote((prev) => ({
+        ...prev,
+        [a.id]: result.sent ? `${result.sent} öğrenciye hatırlatma gönderildi.` : "Tamamlamamış öğrenci yok; hatırlatma gönderilmedi.",
+      }));
+    } catch (e) {
+      setRemindNote((prev) => ({ ...prev, [a.id]: e instanceof Error ? e.message : "Hatırlatma gönderilemedi." }));
+    } finally {
+      setReminding(null);
     }
   };
 
@@ -188,6 +208,9 @@ export function AssignmentsPanel({ orgId, groups, onError }: { orgId: string; gr
           {items.map((a) => {
             const pct = a.total_candidates ? (a.completed_count / a.total_candidates) * 100 : 0;
             const due = formatDue(a.due_at);
+            const allDone = a.total_candidates > 0 && a.completed_count >= a.total_candidates;
+            const remindedAt = a.last_reminded_at ? new Date(a.last_reminded_at).getTime() : 0;
+            const coolingDown = remindedAt > 0 && Date.now() - remindedAt < REMIND_COOLDOWN_MS;
             return (
               <li key={a.id} className="rounded-2xl border border-border p-4">
                 <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -243,7 +266,21 @@ export function AssignmentsPanel({ orgId, groups, onError }: { orgId: string; gr
                   <button onClick={() => handleExport(a)} className="text-xs font-semibold text-muted-foreground inline-flex items-center gap-1 hover:text-foreground hover:underline">
                     <Download className="w-3.5 h-3.5" /> CSV
                   </button>
+                  {a.total_candidates > 0 && !allDone && (
+                    <button
+                      onClick={() => handleRemind(a)}
+                      disabled={reminding === a.id || coolingDown}
+                      className="text-xs font-semibold text-muted-foreground inline-flex items-center gap-1 hover:text-foreground hover:underline disabled:opacity-60 disabled:no-underline disabled:cursor-not-allowed"
+                      title={coolingDown ? "Aynı ödev için 12 saatte bir hatırlatma gönderilebilir." : "Tamamlamamış öğrencilere uygulama içi hatırlatma gönder"}
+                    >
+                      {reminding === a.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Megaphone className="w-3.5 h-3.5" />}
+                      {coolingDown ? `Hatırlatıldı · ${formatDue(a.last_reminded_at ?? null)}` : "Hatırlat"}
+                    </button>
+                  )}
                 </div>
+                {remindNote[a.id] && (
+                  <p className="mt-2 text-xs text-muted-foreground" role="status">{remindNote[a.id]}</p>
+                )}
 
                 {openId === a.id && (
                   <div className="mt-3 overflow-x-auto">

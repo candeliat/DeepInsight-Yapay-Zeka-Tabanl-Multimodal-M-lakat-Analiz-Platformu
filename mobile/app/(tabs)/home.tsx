@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
 import { useUserStore } from '../../src/store/userStore';
 import { api } from '../../src/config/api';
-import { assignmentService } from '../../src/services/orgService';
+import { assignmentService, notificationService } from '../../src/services/orgService';
 import { scoreBand } from '../../src/utils/scoreBand';
 
 interface Interview {
@@ -100,6 +100,17 @@ export default function HomeScreen() {
       ? `${user.user_metadata.first_name}`
       : user?.email?.split('@')[0] || 'Aday';
 
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  // Bildirimler ekranından dönünce rozet güncellensin diye odakta yenilenir.
+  useFocusEffect(
+    useCallback(() => {
+      notificationService
+        .mine()
+        .then((data) => setUnreadNotifications(data.unread_count))
+        .catch(() => undefined);
+    }, []),
+  );
+
   useEffect(() => {
     fetchHistory();
     assignmentService
@@ -180,11 +191,26 @@ export default function HomeScreen() {
           </View>
           <Text style={styles.logoText}>DeepInsight</Text>
         </View>
-        <TouchableOpacity style={styles.avatarBtn} onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Profil">
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={18} color={Colors.onSurfaceVariant} />
-          </View>
-        </TouchableOpacity>
+        <View style={styles.topActions}>
+          <TouchableOpacity
+            style={styles.avatar}
+            onPress={() => router.push('/notifications')}
+            accessibilityRole="button"
+            accessibilityLabel={unreadNotifications > 0 ? `Bildirimler, ${unreadNotifications} okunmamış` : 'Bildirimler'}
+          >
+            <Ionicons name="notifications-outline" size={18} color={Colors.onSurfaceVariant} />
+            {unreadNotifications > 0 && (
+              <View style={styles.notifBadge}>
+                <Text style={styles.notifBadgeText}>{unreadNotifications > 9 ? '9+' : unreadNotifications}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.avatarBtn} onPress={() => router.push('/(tabs)/profile')} accessibilityLabel="Profil">
+            <View style={styles.avatar}>
+              <Ionicons name="person" size={18} color={Colors.onSurfaceVariant} />
+            </View>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -422,6 +448,12 @@ const styles = StyleSheet.create({
   },
   logoText: { fontSize: 18, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface, letterSpacing: -0.3 },
   avatarBtn: {},
+  topActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  notifBadge: {
+    position: 'absolute', top: -3, right: -3, minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+    backgroundColor: Colors.error, alignItems: 'center', justifyContent: 'center',
+  },
+  notifBadgeText: { color: '#fff', fontSize: 10, fontFamily: FontFamilies.sansBold },
   avatar: {
     width: 36,
     height: 36,

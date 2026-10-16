@@ -45,6 +45,7 @@ class AssignmentItem(BaseModel):
     due_at: Optional[str] = None
     group_id: Optional[str] = None
     created_at: Optional[str] = None
+    last_reminded_at: Optional[str] = None
 
 
 class OrgAssignmentItem(AssignmentItem):

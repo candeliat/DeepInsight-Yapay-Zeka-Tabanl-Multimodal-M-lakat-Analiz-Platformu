@@ -1,5 +1,5 @@
 import {
-  CV_CONSENT_TEXT, CV_ID, cvAnalysis, cvItem, JOB_ID, jobItem, jobMatch, MY_ASSIGNMENTS, MY_INVITES, MY_ORGS,
+  CV_CONSENT_TEXT, CV_ID, cvAnalysis, cvItem, JOB_ID, jobItem, jobMatch, MY_ASSIGNMENTS, MY_INVITES, MY_ORGS, NOTIFICATIONS,
   ORG_DETAIL, ORG_MEMBERS, ORG_OVERVIEW,
 } from './data';
 import type { MockApi, Reply } from './api';
@@ -16,6 +16,7 @@ export function careerState() {
     invites: [] as typeof MY_INVITES,
     assignments: [] as typeof MY_ASSIGNMENTS,
     orgAssignments: [] as Record<string, unknown>[],
+    notifications: [] as typeof NOTIFICATIONS,
     inviteCode: ORG_DETAIL.invite_code,
   };
 }
@@ -30,6 +31,7 @@ export function seedCareer(c: CareerState) {
   c.orgs = structuredClone(MY_ORGS);
   c.invites = structuredClone(MY_INVITES);
   c.assignments = structuredClone(MY_ASSIGNMENTS);
+  c.notifications = structuredClone(NOTIFICATIONS);
 }
 
 const notFound = (detail: string): Reply => ({ status: 404, json: { detail } });
@@ -125,6 +127,13 @@ export function installCareer(api: MockApi, c: CareerState) {
     c.orgAssignments = [created, ...c.orgAssignments];
     return { json: created };
   });
+  api.on('POST', org(`/assignments/${ID}/remind`), ({ url }) => {
+    const a = c.orgAssignments.find((x) => x.id === seg(url, 5));
+    if (a?.last_reminded_at) return { status: 429, json: { detail: 'Bu ödev için son 12 saatte hatırlatma gönderildi. Tekrar: 17.10.2026 09:00' } };
+    const now = new Date().toISOString();
+    if (a) a.last_reminded_at = now;
+    return { json: { sent: 2, last_reminded_at: now, next_available_at: now } };
+  });
   api.on('POST', org('/invite-code/rotate'), () => {
     c.inviteCode = 'BOOT-YENI';
     return { json: { invite_code: c.inviteCode } };
@@ -156,4 +165,20 @@ export function installCareer(api: MockApi, c: CareerState) {
     return { json: { id: 'org-katil', name: 'Katılım Akademisi' } };
   });
   api.on('GET', path('assignments/me'), () => ({ json: c.assignments }));
+
+  // --- Bildirimler ---
+  api.on('GET', path('notifications/me'), () => ({
+    json: { items: c.notifications, unread_count: c.notifications.filter((n) => !n.read_at).length },
+  }));
+  api.on('POST', path('notifications/read'), ({ body }) => {
+    const ids: string[] | undefined = body?.ids ?? undefined;
+    let updated = 0;
+    for (const n of c.notifications) {
+      if (!n.read_at && (!ids || ids.includes(n.id))) {
+        n.read_at = new Date().toISOString();
+        updated++;
+      }
+    }
+    return { json: { updated } };
+  });
 }

@@ -385,6 +385,9 @@ async def remind_assignment(
     except notification_service.ReminderTooSoon as e:
         next_at = notification_service.format_due(e.next_at.isoformat())
         raise HTTPException(status_code=429, detail=f"Bu ödev için son 12 saatte hatırlatma gönderildi. Tekrar: {next_at}")
+    except Exception:
+        logger.exception("[assignments] Hatırlatma gönderilemedi (assignment_id=%s)", assignment_id)
+        raise HTTPException(status_code=503, detail="Hatırlatma şu an gönderilemiyor. Biraz sonra tekrar deneyin.")
 
 
 @router.get("/{org_id}/assignments", response_model=List[OrgAssignmentItem])

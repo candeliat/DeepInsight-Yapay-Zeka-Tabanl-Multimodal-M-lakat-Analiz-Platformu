@@ -9,6 +9,7 @@ from app.services import notification_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+UNAVAILABLE = "Bildirimler şu an yüklenemiyor. Biraz sonra tekrar deneyin."
 
 
 @router.get("/me", response_model=NotificationList)
@@ -24,8 +25,10 @@ async def my_notifications(
         logger.exception("[notifications] Son tarih hatırlatmaları üretilemedi (user_id=%s)", current_user.id)
     try:
         return await notification_service.list_for_user(current_user.id)
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    except Exception:
+        # Yakalanmayan 500 CORS başlığı taşımadığından tarayıcıda "sunucuya ulaşılamadı" görünür.
+        logger.exception("[notifications] Bildirimler okunamadı (user_id=%s)", current_user.id)
+        raise HTTPException(status_code=503, detail=UNAVAILABLE)
 
 
 @router.post("/read")
@@ -34,4 +37,8 @@ async def mark_read(
     token: str = Depends(oauth2_scheme),
     current_user: UserProfile = Depends(get_current_user),
 ):
-    return {"updated": await notification_service.mark_read(current_user.id, payload.ids)}
+    try:
+        return {"updated": await notification_service.mark_read(current_user.id, payload.ids)}
+    except Exception:
+        logger.exception("[notifications] Okundu işaretlenemedi (user_id=%s)", current_user.id)
+        raise HTTPException(status_code=503, detail=UNAVAILABLE)

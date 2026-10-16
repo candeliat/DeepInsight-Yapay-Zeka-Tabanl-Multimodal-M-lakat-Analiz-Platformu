@@ -200,3 +200,20 @@ def test_mark_read_filters_by_user(monkeypatch):
     monkeypatch.setattr(notification_service, "supabase", db)
     assert asyncio.run(notification_service.mark_read("s1")) == 1
     assert ("notifications", "eq", ("user_id", "s1")) in db.filters
+
+
+def test_missing_table_returns_503_not_500(as_user, monkeypatch):
+    # Canlıda: tablo yokken PostgREST APIError fırlatıyordu -> 500 -> tarayıcıda "sunucuya ulaşılamadı".
+    monkeypatch.setattr(notification_service, "sync_due_reminders", AsyncMock(return_value=0))
+    monkeypatch.setattr(notification_service, "list_for_user", AsyncMock(side_effect=Exception("PGRST205")))
+    resp = as_user("s1").get("/api/v1/notifications/me")
+    assert resp.status_code == 503 and "yüklenemiyor" in resp.json()["detail"]
+    monkeypatch.setattr(notification_service, "mark_read", AsyncMock(side_effect=Exception("PGRST205")))
+    assert as_user("s1").post("/api/v1/notifications/read", json={}).status_code == 503
+
+
+def test_remind_db_error_returns_503(as_user, monkeypatch):
+    monkeypatch.setattr(assignment_service, "get_org_assignment", AsyncMock(return_value=ASSIGNMENT))
+    monkeypatch.setattr(notification_service, "remind_assignment", AsyncMock(side_effect=Exception("42703 kolon yok")))
+    resp = as_user("teacher").post("/api/v1/organizations/org-a/assignments/a1/remind")
+    assert resp.status_code == 503 and "gönderilemiyor" in resp.json()["detail"]

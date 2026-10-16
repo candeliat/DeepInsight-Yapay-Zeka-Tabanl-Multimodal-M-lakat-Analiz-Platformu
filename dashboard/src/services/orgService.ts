@@ -94,7 +94,40 @@ export interface OrgOverview {
   topics: TopicStat[];
 }
 
+export interface OrgUsage {
+  month: string;
+  quota: number | null;
+  interviews_started: number;
+  interviews_completed: number;
+  students: number;
+  calls: number;
+  failed_calls: number;
+  success_rate: number | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  /** Kullanım kaydı olan mülakat sayısı (kayıt sql/024 ile başladı; öncekiler sayılmaz). */
+  metered_interviews: number;
+  tokens_per_interview: number | null;
+  /** Yalnızca fiyatı tanımlı modellerin toplamı; hiçbiri tanımlı değilse null. */
+  estimated_cost_usd: number | null;
+  unpriced_models: string[];
+  by_model: {
+    model: string;
+    calls: number;
+    failed: number;
+    prompt_tokens: number;
+    completion_tokens: number;
+    avg_latency_ms: number | null;
+    estimated_cost_usd: number | null;
+  }[];
+  by_purpose: { purpose: string; calls: number; total_tokens: number }[];
+  daily: { date: string; calls: number; total_tokens: number }[];
+}
+
 export const orgService = {
+  usage: (orgId: string, month?: string) =>
+    call<OrgUsage>(api.get(`/api/v1/organizations/${orgId}/usage`, { params: { month } })),
   myOrganizations: () => call<MyOrganization[]>(api.get("/api/v1/organizations/me")),
   join: (inviteCode: string) => call<{ id: string; name: string }>(api.post("/api/v1/organizations/join", { invite_code: inviteCode })),
   /** Yalnızca platform yöneticisi. adminEmail verilirse o kişi kurum yöneticisi olur. */
@@ -142,7 +175,8 @@ export const orgService = {
     call<{ org_id: string; accepted: boolean }>(api.post(`/api/v1/organizations/invites/${inviteId}/${accept ? "accept" : "decline"}`)),
 
   /** CSV'yi yetkili istekle indirir ve tarayıcıya dosya olarak kaydettirir. */
-  async downloadCsv(path: string, filename: string, params?: Record<string, string | undefined>): Promise<void> {
+  /** Kurum altındaki bir dosyayı (CSV, PDF) oturum başlığıyla indirir. */
+  async downloadFile(path: string, filename: string, params?: Record<string, string | undefined>): Promise<void> {
     const blob = await call<Blob>(api.get(`/api/v1/organizations/${path}`, { params, responseType: "blob" }));
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -150,6 +184,9 @@ export const orgService = {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
+  },
+  downloadCsv(path: string, filename: string, params?: Record<string, string | undefined>): Promise<void> {
+    return orgService.downloadFile(path, filename, params);
   },
 };
 

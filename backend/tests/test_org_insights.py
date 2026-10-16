@@ -39,6 +39,15 @@ MEMBERS = _members(("teacher", "instructor", False), ("s1", "candidate", True), 
 
 # --- toplu istatistik eşiği ---
 
+def test_staff_interviews_do_not_count_toward_cohort():
+    # 2 öğrenci + eğitmen: eğitmen kendi skorunu bildiği için eşiği dolduramaz (canlı raporda bulundu).
+    data = {"interviews": [_inv(1, "s1", 80), _inv(2, "s2", 40), _inv(3, "teacher", 60)], "analytics": {}}
+    o = insights.build_overview(ORG, MEMBERS, data, now=NOW)
+    assert o["contributors"] == 2 and o["completed_count"] == 2 and o["aggregates_available"] is False
+    assert o["active_students_30d"] == 2
+
+
+
 def test_aggregates_hidden_below_min_cohort():
     data = {"interviews": [_inv(1, "s1", 80), _inv(2, "s2", 40)], "analytics": {}}
     o = insights.build_overview(ORG, MEMBERS, data, now=NOW)

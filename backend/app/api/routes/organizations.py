@@ -33,6 +33,8 @@ from app.api.schemas.user import UserProfile
 from app.services import organization_service as org_service
 from app.services import assignment_service
 from app.services import notification_service
+from app.services import org_report
+from app.services import org_usage_service
 from app.services import org_export_service as export
 from app.services import org_group_service as groups
 from app.services import org_insights_service as insights
@@ -171,6 +173,70 @@ async def org_overview(
         await org_service.list_members(org_id), await asyncio.to_thread(progress_service.fetch_org_data, org_id), group_id,
     )
     return insights.build_overview(org, memberships, data)
+
+
+@router.get("/{org_id}/usage")
+async def org_usage(
+    org_id: str,
+    month: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin")),
+):
+    """Ay bazında kurumun yapay zekâ kullanımı ve tahmini maliyeti (yalnızca kurum yöneticisi)."""
+    org = await org_service.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Kurum bulunamadı")
+    try:
+        return await org_usage_service.org_usage(org, month)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception:
+        logger.exception("[usage] Kullanım raporu okunamadı (org_id=%s)", org_id)
+        raise HTTPException(status_code=503, detail="Kullanım raporu şu an hazırlanamıyor. Biraz sonra tekrar deneyin.")
+
+
+@router.get("/{org_id}/report.pdf")
+async def org_report_pdf(
+    org_id: str,
+    group_id: Optional[str] = Query(default=None),
+    month: Optional[str] = Query(default=None, pattern=r"^\d{4}-\d{2}$"),
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(require_org_role("org_admin", "instructor")),
+):
+    """Kurum (ya da grup) raporu: katılım, toplu skorlar (≥3 öğrenci kuralıyla), ödevler ve —
+    yalnızca kurum yöneticisine — o ayın kullanım/maliyet özeti. Öğrenci bazında veri içermez."""
+    org = await org_service.get_organization(org_id)
+    if not org:
+        raise HTTPException(status_code=404, detail="Kurum bulunamadı")
+    group = await groups.get_group(org_id, group_id) if group_id else None
+    if group_id and not group:
+        raise HTTPException(status_code=404, detail="Grup bulunamadı")
+
+    all_members = await org_service.list_members(org_id)
+    memberships, data = insights.scope_to_group(
+        all_members, await asyncio.to_thread(progress_service.fetch_org_data, org_id), group_id,
+    )
+    overview = insights.build_overview(org, memberships, data)
+    assignments = await assignment_service.list_org_assignments(org_id, all_members)
+    if group_id:
+        # Grup raporunda yalnızca o gruba atanmış ödevler (kurum geneli ödevlerin sayıları tüm öğrencileri kapsar).
+        assignments = [a for a in assignments if str(a.get("group_id") or "") == str(group_id)]
+
+    usage = None
+    membership = await org_service.get_membership(org_id, current_user.id)
+    is_admin = current_user.app_metadata.get("role") == "admin" or (membership or {}).get("role") == "org_admin"
+    if is_admin:
+        try:
+            usage = await org_usage_service.org_usage(org, month)
+        except Exception:
+            # Kullanım bölümü olmadan da rapor üretilir.
+            logger.exception("[report] Kullanım özeti eklenemedi (org_id=%s)", org_id)
+
+    pdf = await asyncio.to_thread(org_report.build_org_report_pdf, overview, assignments, usage, (group or {}).get("name"))
+    await org_service.log_audit(current_user.id, org_id, "export.report", "organization", org_id,
+                                {"group_id": group_id, "usage": usage is not None})
+    return Response(content=pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="kurum-raporu-{org_id[:8]}.pdf"'})
 
 
 @router.get("/{org_id}/members/{user_id}/progress")

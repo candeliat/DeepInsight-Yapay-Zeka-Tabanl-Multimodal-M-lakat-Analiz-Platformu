@@ -7,7 +7,7 @@ import logging
 import tempfile
 from collections import defaultdict
 from contextvars import ContextVar
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from openai import AsyncOpenAI, RateLimitError, NotFoundError, APIStatusError
 from pydantic import BaseModel, field_validator
@@ -130,6 +130,18 @@ class LLMUnavailable(RuntimeError):
 
 # İsteği yapan kullanıcı (auth dependency'si ayarlar); kullanım kaydına yazılır.
 current_user_id: ContextVar[Optional[str]] = ContextVar("llm_current_user_id", default=None)
+# Kurum bağlamındaki mülakatın kurumu ve mülakat (kurum kullanım/maliyet raporu, sql/024).
+current_org_id: ContextVar[Optional[str]] = ContextVar("llm_current_org_id", default=None)
+current_interview_id: ContextVar[Optional[str]] = ContextVar("llm_current_interview_id", default=None)
+
+
+def bind_usage_context(interview: Optional[Dict[str, Any]]) -> None:
+    """Bu istekteki LLM çağrılarını mülakata ve (varsa) kurumuna bağlar. Bireysel
+    mülakatta org_id boş kalır; CV/ilan gibi kişisel çağrılar hiç bağlanmaz."""
+    if not interview:
+        return
+    current_interview_id.set(str(interview["id"]) if interview.get("id") else None)
+    current_org_id.set(str(interview["org_id"]) if interview.get("org_id") else None)
 
 
 class CircuitBreaker:
@@ -395,6 +407,11 @@ class LLMService:
             "total_tokens": getattr(usage, "total_tokens", None) or 0,
             "prompt_version": PROMPT_VERSION,
         }
+        # Yalnızca doluysa yazılır: sql/024 uygulanmamış ortamda kayıt yine düşmez.
+        if current_org_id.get():
+            record["org_id"] = current_org_id.get()
+        if current_interview_id.get():
+            record["interview_id"] = current_interview_id.get()
 
         async def _write() -> None:
             try:

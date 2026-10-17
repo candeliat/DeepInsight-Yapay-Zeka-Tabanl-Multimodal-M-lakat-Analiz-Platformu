@@ -29,7 +29,9 @@ from typing import Any, Dict, List
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from app.core.database import supabase  # noqa: E402
+# Betikler senkron çalışır: varsayılan istemci asenkron olduğundan .execute() beklenmeyen bir
+# coroutine döndürüp işi sessizce yapmıyordu (B geçişinden kalma hata).
+from app.core.database import sync_supabase as supabase  # noqa: E402
 from app.services.llm_service import llm_service  # noqa: E402
 from app.services.local_embedding_service import embed_text_local  # noqa: E402
 

@@ -16,7 +16,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from app.core.database import supabase
+# Betikler senkron çalışır: varsayılan istemci asenkron olduğundan .execute() beklenmeyen bir
+# coroutine döndürüp işi sessizce yapmıyordu (B geçişinden kalma hata).
+from app.core.database import sync_supabase as supabase
 from app.services.local_embedding_service import embed_text_local
 
 

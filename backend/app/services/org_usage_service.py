@@ -25,13 +25,21 @@ logger = logging.getLogger(__name__)
 TR_TZ = timezone(timedelta(hours=3))
 PAGE = 1000
 
-PURPOSE_LABELS = {
-    "question": "Soru üretimi",
-    "question_stream": "Soru üretimi",
-    "question_from_bank": "Banka sorusunun sunulması",
-    "question_from_bank_stream": "Banka sorusunun sunulması",
-    "evaluation": "Mülakat değerlendirmesi",
+# llm_usage.purpose -> (özellik, nerede). Yeni bir purpose eklenince buraya da eklenmeli;
+# bilinmeyen purpose panelde ham adıyla görünür.
+PURPOSES: Dict[str, Dict[str, str]] = {
+    "question": {"feature": "Mülakat: soru üretimi", "where": "Banka sorusu yoksa yeni soru (akışsız, ilk soru)"},
+    "question_stream": {"feature": "Mülakat: soru üretimi", "where": "Banka sorusu yoksa yeni soru (akışlı)"},
+    "question_from_bank": {"feature": "Mülakat: banka sorusunun sunulması", "where": "Bankadaki soruyu sohbet diliyle sorma (ilk soru)"},
+    "question_from_bank_stream": {"feature": "Mülakat: banka sorusunun sunulması", "where": "Bankadaki soruyu sohbet diliyle sorma (akışlı)"},
+    "evaluation": {"feature": "Mülakat sonu değerlendirme", "where": "Teknik/özgüven/iletişim puanı ve geri bildirim"},
+    "cv_profile": {"feature": "CV analizi", "where": "CV metninden yapılandırılmış profil"},
+    "job_requirements": {"feature": "İlan analizi", "where": "İlan metninden gereksinimler"},
+    "job_roadmap": {"feature": "İlan eşleştirme", "where": "Eksik beceriler için öğrenme yol haritası"},
+    "cover_letter": {"feature": "Ön yazı", "where": "İlana ve CV'ye özel motivasyon mektubu"},
+    "question_candidate": {"feature": "Soru bankası (admin)", "where": "Yeni soru önerisi üretimi"},
 }
+PURPOSE_LABELS = {p: meta["feature"] for p, meta in PURPOSES.items()}
 
 
 def parse_month(month: Optional[str], now: Optional[datetime] = None) -> Tuple[datetime, datetime, str]:

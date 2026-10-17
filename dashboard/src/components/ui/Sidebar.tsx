@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Video, User, MessageCircle, Database, FileText, Briefcase, TrendingUp, Building2, ClipboardList,
+  LayoutDashboard, Video, User, MessageCircle, Database, ShieldCheck, FileText, Briefcase, TrendingUp, Building2, ClipboardList,
   FlaskConical, History, LucideIcon,
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -45,7 +45,13 @@ const GROUPS: { title: string; links: NavLink[] }[] = [
   },
 ];
 
-const ADMIN_GROUP = { title: "Yönetim", links: [{ href: "/question-bank", label: "Soru Bankası", icon: Database }] };
+const ADMIN_GROUP = {
+  title: "Yönetim",
+  links: [
+    { href: "/admin", label: "Admin Paneli", icon: ShieldCheck },
+    { href: "/question-bank", label: "Soru Bankası", icon: Database },
+  ],
+};
 
 export default function Sidebar() {
   const { user } = useAuthStore();

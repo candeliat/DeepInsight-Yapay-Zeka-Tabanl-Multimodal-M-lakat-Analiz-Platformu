@@ -66,7 +66,24 @@ export interface JobMatch {
   created_at: string | null;
 }
 
+export type CoverLetterLanguage = "tr" | "en";
+export type CoverLetterTone = "resmi" | "samimi";
+
+export interface CoverLetter {
+  subject: string;
+  body: string;
+  language: CoverLetterLanguage;
+  tone: CoverLetterTone;
+  highlighted_skills: string[];
+  /** CV'de dayanağı olmayan sayılar ya da CV'de görünmeyen ilan becerileri. */
+  warnings: string[];
+  word_count: number;
+}
+
 export const jobService = {
+  /** İlana ve CV'ye özel ön yazı taslağı (kaydedilmez). */
+  coverLetter: (jobId: string, payload: { cv_id: string; language: CoverLetterLanguage; tone: CoverLetterTone; note?: string }) =>
+    call<CoverLetter>(api.post(`/api/v1/jobs/${jobId}/cover-letter`, payload)),
   /** İlan metnini kaydeder; gereksinimler yapay zekâ ile çıkarılır. */
   createJob: (payload: { text: string; title?: string; company?: string }) =>
     call<JobDetail>(api.post("/api/v1/jobs", payload)),

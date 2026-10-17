@@ -369,6 +369,9 @@ class LLMService:
                 }
                 if json_mode and model_name not in self.JSON_MODE_UNSUPPORTED:
                     kwargs["response_format"] = {"type": "json_object"}
+                if attempt_timeout and attempt_timeout > settings.LLM_REQUEST_TIMEOUT:
+                    # Akışsız istekte httpx okuma sınırı tüm cevabı kapsar; deneme sınırından kısa kalmasın.
+                    kwargs["timeout"] = attempt_timeout
                 response = await asyncio.wait_for(
                     self.client.chat.completions.create(**kwargs),
                     timeout=attempt_timeout or settings.LLM_ATTEMPT_MAX_DURATION,
@@ -756,6 +759,7 @@ class LLMService:
         purpose: str,
         max_tokens: int = 3000,
         temperature: float = 0.2,
+        attempt_timeout: float | None = None,
     ) -> dict:
         """
         Genel amaçlı yapılandırılmış çıktı: aynı model zinciri / zaman aşımı /
@@ -770,7 +774,7 @@ class LLMService:
         return await self._complete(
             purpose=purpose, messages=messages, temperature=temperature,
             max_tokens=max_tokens, parse=_json_parser, json_mode=True,
-            attempt_timeout=settings.LLM_JSON_ATTEMPT_MAX_DURATION,
+            attempt_timeout=attempt_timeout or settings.LLM_JSON_ATTEMPT_MAX_DURATION,
         )
 
     async def transcribe_audio(self, audio_bytes: bytes, mime_type: str = "audio/m4a", language: str = "tr") -> str:

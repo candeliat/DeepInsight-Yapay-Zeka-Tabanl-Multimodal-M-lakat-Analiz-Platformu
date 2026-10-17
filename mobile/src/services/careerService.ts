@@ -165,6 +165,17 @@ export interface JobMatch {
   created_at: string | null;
 }
 
+export interface CoverLetter {
+  subject: string;
+  body: string;
+  language: 'tr' | 'en';
+  tone: 'resmi' | 'samimi';
+  highlighted_skills: string[];
+  /** CV'de dayanağı olmayan sayılar ya da CV'de görünmeyen ilan becerileri. */
+  warnings: string[];
+  word_count: number;
+}
+
 export const jobService = {
   createJob: (payload: { text: string; title?: string; company?: string }) =>
     call<JobDetail>(api.post('/api/v1/jobs', payload, { timeout: 90000 })),
@@ -173,6 +184,10 @@ export const jobService = {
   deleteJob: (id: string) => call<{ status: string }>(api.delete(`/api/v1/jobs/${id}`)),
   matchJob: (jobId: string, cvId: string) =>
     call<JobMatch>(api.post(`/api/v1/jobs/${jobId}/match`, { cv_id: cvId }, { timeout: 90000 })),
+  /** İlana ve CV'ye özel ön yazı taslağı (kaydedilmez). */
+  coverLetter: (jobId: string, payload: { cv_id: string; language: 'tr' | 'en'; tone: 'resmi' | 'samimi'; note?: string }) =>
+    // Model başına 110 sn deneme; ilk model düşüp yedeğe geçerse daha da uzayabilir.
+    call<CoverLetter>(api.post(`/api/v1/jobs/${jobId}/cover-letter`, payload, { timeout: 240000 })),
   getLatestMatch: (jobId: string, cvId: string) =>
     callOrNull<JobMatch>(api.get(`/api/v1/jobs/${jobId}/match`, { params: { cv_id: cvId } })),
 };

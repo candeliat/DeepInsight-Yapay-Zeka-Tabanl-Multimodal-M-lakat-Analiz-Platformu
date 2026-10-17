@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
 from app.core.rate_limit import ai_rate_limit
-from app.api.schemas.job import JobCreate, JobDetail, JobItem, JobMatch, MatchRequest
+from app.api.schemas.job import CoverLetter, CoverLetterRequest, JobCreate, JobDetail, JobItem, JobMatch, MatchRequest
 from app.api.schemas.user import UserProfile
-from app.services import job_service
+from app.services import cover_letter_service, job_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -73,6 +73,27 @@ async def match_job(
         raise HTTPException(status_code=404, detail=str(e))
     except PermissionError as e:
         raise HTTPException(status_code=422, detail=str(e))
+
+
+@router.post("/{job_id}/cover-letter", response_model=CoverLetter, dependencies=[Depends(ai_rate_limit)])
+async def cover_letter(
+    job_id: str,
+    payload: CoverLetterRequest,
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """İlana ve CV'ye özel ön yazı taslağı. Kaydedilmez; CV'de dayanağı olmayan iddialar uyarı olarak döner."""
+    try:
+        return await cover_letter_service.generate(
+            current_user.id, job_id, payload.cv_id, payload.language, payload.tone, payload.note,
+        )
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception:
+        logger.exception("[cover_letter] Ön yazı üretilemedi (job_id=%s)", job_id)
+        raise HTTPException(status_code=503, detail="Ön yazı şu an hazırlanamadı. Biraz sonra tekrar deneyin.")
 
 
 @router.get("/{job_id}/match", response_model=JobMatch)

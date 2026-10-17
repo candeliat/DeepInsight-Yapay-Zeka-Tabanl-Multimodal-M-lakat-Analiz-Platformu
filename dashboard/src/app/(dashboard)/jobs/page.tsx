@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { ScoreRing } from "@/components/ui/ScoreRing";
+import { CoverLetterPanel } from "@/components/jobs/CoverLetterPanel";
 
 const MIN_TEXT = 80;
 
@@ -456,6 +457,11 @@ export default function JobsPage() {
                       </div>
                     )}
                   </>
+                )}
+
+                {selectedCvId && busy !== "match" && (
+                  // İlan ya da CV değişince taslak sıfırlanır.
+                  <CoverLetterPanel key={`${job.id}:${selectedCvId}`} jobId={job.id} cvId={selectedCvId} jobTitle={job.title} />
                 )}
               </>
             )}

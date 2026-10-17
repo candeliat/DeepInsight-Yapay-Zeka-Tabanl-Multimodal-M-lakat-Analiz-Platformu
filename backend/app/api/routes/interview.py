@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any, Literal
 from app.core.config import settings
-from app.services.llm_service import llm_service
+from app.services.llm_service import bind_usage_context, llm_service
 from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching, assignment_service, star_service
 from app.services.interview_service import (
     create_interview,
@@ -239,6 +239,7 @@ async def _owned_interview(interview_id: str, user_id: str) -> Dict[str, Any]:
     """
     try:
         interview = await get_interview(interview_id)
+        bind_usage_context(interview)
     except ValueError:
         raise HTTPException(status_code=404, detail="Interview not found")
     if str(interview.get("user_id")) != str(user_id):
@@ -324,6 +325,7 @@ async def start_interview(
             language=request.language,
         )
         interview_id = str(interview_data["id"])
+        bind_usage_context({"id": interview_id, "org_id": request.org_id})
 
         # AI'dan ilk selamlama ve soruyu al (başlatma mesajı ile)
         # Mesaj geçmişi henüz yok.

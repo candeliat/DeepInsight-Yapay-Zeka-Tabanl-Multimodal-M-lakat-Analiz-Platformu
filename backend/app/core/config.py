@@ -51,6 +51,9 @@ class Settings:
     # gereksinimleri — uzun rubrik/metinle daha çok reasoning yapıyor: canlı ölçümde
     # gpt-oss-20b değerlendirmesi 18-27 sn sürdü, 30 sn sınırı ikinci modeli de kesiyordu.
     LLM_JSON_ATTEMPT_MAX_DURATION: float = float(os.getenv("LLM_JSON_ATTEMPT_MAX_DURATION", "60"))
+    # Kurum maliyet raporu: model başına fiyat (USD / 1M token), JSON: {"model": {"input": 0.1, "output": 0.4}}.
+    # Fiyatı tanımlı olmayan model için tahmini maliyet hesaplanmaz (raporda "fiyat tanımlı değil").
+    LLM_PRICES_JSON: str = os.getenv("LLM_PRICES_JSON", "")
     # Bir "sonraki soru" yanıtı bu karakter sayısını aşarsa reddedilir — normal
     # bir mülakat sorusu (+ kısa değerlendirme cümlesi) birkaç yüz karakteri
     # geçmez; canlı testte gözlemlendiği üzere bazı reasoning modelleri

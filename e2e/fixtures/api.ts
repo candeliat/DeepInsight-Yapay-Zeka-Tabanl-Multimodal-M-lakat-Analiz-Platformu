@@ -17,6 +17,8 @@ export type Handler = (ctx: { req: Request; url: URL; body: any }) => Reply | Pr
 export interface Call {
   method: string;
   path: string;
+  /** Sorgu dizesi (ör. ?month=2026-10). */
+  query: URLSearchParams;
   body: any;
 }
 
@@ -73,7 +75,7 @@ export class MockApi {
     } catch {
       body = req.postData();
     }
-    this.calls.push({ method: req.method(), path: url.pathname, body });
+    this.calls.push({ method: req.method(), path: url.pathname, query: url.searchParams, body });
 
     const match = this.routes.find((r) => r.method === req.method() && r.pattern.test(url.pathname));
     if (!match) {

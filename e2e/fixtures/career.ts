@@ -127,6 +127,17 @@ export function installCareer(api: MockApi, c: CareerState) {
     c.orgAssignments = [created, ...c.orgAssignments];
     return { json: created };
   });
+  api.on('GET', org('/usage'), ({ url }) => ({
+    json: {
+      month: url.searchParams.get('month') ?? '2026-10', quota: 100, interviews_started: 4, interviews_completed: 3, students: 2,
+      calls: 18, failed_calls: 2, success_rate: 88.9, prompt_tokens: 21000, completion_tokens: 4200, total_tokens: 25200,
+      metered_interviews: 4, tokens_per_interview: 6300, estimated_cost_usd: null, unpriced_models: ['openai/gpt-oss-20b'],
+      by_model: [{ model: 'openai/gpt-oss-20b', calls: 18, failed: 2, prompt_tokens: 21000, completion_tokens: 4200, avg_latency_ms: 8400, estimated_cost_usd: null }],
+      by_purpose: [{ purpose: 'Mülakat değerlendirmesi', calls: 4, total_tokens: 9000 }],
+      daily: [],
+    },
+  }));
+  api.on('GET', org('/report.pdf'), () => ({ status: 200, contentType: 'application/pdf', body: '%PDF-1.4 e2e' }));
   api.on('POST', org(`/assignments/${ID}/remind`), ({ url }) => {
     const a = c.orgAssignments.find((x) => x.id === seg(url, 5));
     if (a?.last_reminded_at) return { status: 429, json: { detail: 'Bu ödev için son 12 saatte hatırlatma gönderildi. Tekrar: 17.10.2026 09:00' } };

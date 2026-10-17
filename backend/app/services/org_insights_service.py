@@ -85,8 +85,12 @@ def scope_to_group(memberships: List[Dict[str, Any]], data: Dict[str, Any],
 def build_overview(org: Dict[str, Any], memberships: List[Dict[str, Any]], data: Dict[str, Any],
                    now: Optional[datetime] = None) -> Dict[str, Any]:
     now = now or datetime.now(timezone.utc)
-    timeline = progress_service.build_timeline(data["interviews"], data["analytics"], org.get("rubric"))
-    owner = {i["id"]: str(i.get("user_id")) for i in data["interviews"]}
+    # Yalnızca öğrencilerin mülakatları: eğitmen/yönetici kendi skorunu bildiği için onun
+    # mülakatları MIN_COHORT eşiğini doldurursa ortalamadan öğrenci skoru çıkarılabilir.
+    candidates = {str(m["user_id"]) for m in memberships if m["role"] == "candidate"}
+    interviews = [i for i in data["interviews"] if str(i.get("user_id")) in candidates]
+    timeline = progress_service.build_timeline(interviews, data["analytics"], org.get("rubric"))
+    owner = {i["id"]: str(i.get("user_id")) for i in interviews}
 
     role_counts: Dict[str, int] = defaultdict(int)
     for m in memberships:

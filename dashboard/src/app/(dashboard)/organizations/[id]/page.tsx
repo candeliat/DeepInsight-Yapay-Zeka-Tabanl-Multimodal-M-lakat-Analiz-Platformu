@@ -19,6 +19,7 @@ import {
   Settings,
   Trash2,
   Download,
+  FileText,
 } from "lucide-react";
 import { orgService, MemberDetail, MyOrganization, OrgGroup, OrgOverview, OrganizationDetail, OrgRole, ROLE_LABEL } from "@/services/orgService";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -27,6 +28,7 @@ import { AssignmentsPanel } from "@/components/org/AssignmentsPanel";
 import { GroupsPanel } from "@/components/org/GroupsPanel";
 import { InvitePanel } from "@/components/org/InvitePanel";
 import { QuestionsPanel } from "@/components/org/QuestionsPanel";
+import { UsagePanel } from "@/components/org/UsagePanel";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 
@@ -71,6 +73,7 @@ export default function OrganizationPanelPage() {
   // Panel görünümü: "" = tüm kurum, aksi halde bir grup (kohort).
   const [groupFilter, setGroupFilter] = useState("");
   const [exporting, setExporting] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   const isAdmin = myRole === "org_admin" || user?.app_metadata?.role === "admin";
 
@@ -163,6 +166,19 @@ export default function OrganizationPanelPage() {
       }
     }, "Dışa aktarılamadı.");
 
+  const handleReport = () =>
+    run(async () => {
+      setReporting(true);
+      try {
+        const group = groups.find((g) => g.id === groupFilter);
+        await orgService.downloadFile(`${orgId}/report.pdf`, `kurum-raporu${group ? `-${group.name}` : ""}.pdf`, {
+          group_id: groupFilter || undefined,
+        });
+      } finally {
+        setReporting(false);
+      }
+    }, "Rapor oluşturulamadı.");
+
   const handleRotate = () =>
     run(async () => {
       const { invite_code } = await orgService.rotateInviteCode(orgId);
@@ -230,6 +246,16 @@ export default function OrganizationPanelPage() {
         <div className="flex items-center gap-3 flex-wrap">
           <h1 className="font-serif italic text-3xl text-foreground tracking-tight">{overview.org.name}</h1>
           {myRole && <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-primary/10 text-primary">{ROLE_LABEL[myRole]}</span>}
+          <Button
+            size="sm"
+            variant="outline"
+            className="ml-auto"
+            onClick={handleReport}
+            disabled={reporting}
+            title="Katılım, toplu skorlar ve ödevler; öğrenci bazında veri içermez"
+          >
+            {reporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <FileText className="w-3.5 h-3.5" />} Kurum raporu (PDF)
+          </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-1">Yalnızca kurum adına yapılan mülakatlar sayılır; öğrencinin bireysel mülakatları burada görünmez.</p>
         {groups.length > 0 && (
@@ -464,6 +490,8 @@ export default function OrganizationPanelPage() {
       </div>
 
       <QuestionsPanel orgId={orgId} onError={setError} />
+
+      {isAdmin && <UsagePanel orgId={orgId} />}
 
       {isAdmin && detail && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

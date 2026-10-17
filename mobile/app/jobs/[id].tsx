@@ -6,6 +6,7 @@ import { Colors } from '../../src/constants/Colors';
 import { FontFamilies } from '../../src/constants/Fonts';
 import { CVItem, JobDetail, JobMatch, SkillMatch, cvService, jobService } from '../../src/services/careerService';
 import { Banner, Card, Chip, Loading, PrimaryButton, ScoreRing, Screen, SectionTitle, typo } from '../../src/components/ui';
+import { CoverLetterCard } from '../../src/components/CoverLetterCard';
 
 const SKILL = {
   matched: { icon: 'checkmark-circle', color: Colors.success, text: 'Var' },
@@ -215,6 +216,8 @@ export default function JobDetailScreen() {
               )}
             </>
           )}
+
+          {cvId && !matching && <CoverLetterCard key={cvId} jobId={id} cvId={cvId} />}
 
           <View style={{ marginTop: 8 }}>
             {confirmDelete ? (

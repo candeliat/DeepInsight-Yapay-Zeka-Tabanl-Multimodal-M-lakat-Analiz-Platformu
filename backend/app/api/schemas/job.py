@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -23,6 +23,25 @@ class JobDetail(JobItem):
 
 class MatchRequest(BaseModel):
     cv_id: str = Field(min_length=1, max_length=64)
+
+
+class CoverLetterRequest(BaseModel):
+    cv_id: str = Field(min_length=1, max_length=64)
+    language: Literal["tr", "en"] = "tr"
+    tone: Literal["resmi", "samimi"] = "resmi"
+    # Adayın öne çıkarmak istediği nokta (ör. "staj projemi vurgula"); modele veri olarak gider.
+    note: Optional[str] = Field(default=None, max_length=500)
+
+
+class CoverLetter(BaseModel):
+    subject: str
+    body: str
+    language: str
+    tone: str
+    highlighted_skills: List[str] = []
+    # CV'de dayanağı olmayan sayılar / CV'de görünmeyen ilan becerileri (deterministik denetim).
+    warnings: List[str] = []
+    word_count: int
 
 
 class RoadmapItem(BaseModel):

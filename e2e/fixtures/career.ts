@@ -98,6 +98,20 @@ export function installCareer(api: MockApi, c: CareerState) {
     const m = c.matches[`${seg(url, 3)}:${url.searchParams.get('cv_id')}`];
     return m ? { json: m } : notFound('Eşleştirme yok');
   });
+  api.on('POST', path(`jobs/${ID}/cover-letter`), ({ body }) => {
+    const en = body.language === 'en';
+    return {
+      json: {
+        subject: en ? 'Application for Frontend Developer' : 'Frontend Developer pozisyonu için başvuru',
+        body: en
+          ? ['Dear Hiring Team,', 'I am excited to apply.', 'Kind regards,\nEce Deneme'].join('\n\n')
+          : ['Sayın İşe Alım Ekibi,', 'Lumen Yazılım ekibine katılmak istiyorum.', 'Saygılarımla,\nEce Deneme'].join('\n\n'),
+        language: body.language, tone: body.tone, highlighted_skills: ['React', 'TypeScript'],
+        warnings: ["CV'nizde geçmeyen sayılar var: 40. Doğru değilse göndermeden önce düzeltin ya da çıkarın."],
+        word_count: 12,
+      },
+    };
+  });
   api.on('POST', path(`jobs/${ID}/match`), ({ url, body }) => {
     const m = jobMatch(seg(url, 3), body.cv_id);
     c.matches[`${m.job_id}:${m.cv_id}`] = m;

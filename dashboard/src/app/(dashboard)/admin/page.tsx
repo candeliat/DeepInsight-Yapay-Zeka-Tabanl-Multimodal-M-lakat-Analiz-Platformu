@@ -2,7 +2,8 @@
 
 import React, { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Cpu, Loader2, ShieldCheck, Boxes, CircleAlert, CircleCheck } from "lucide-react";
+import { Cpu, Loader2, ShieldCheck, Boxes, CircleAlert, CircleCheck, MessageSquareText } from "lucide-react";
+import { AdminFeedbackTab } from "@/components/feedback/AdminFeedbackTab";
 import { adminService, AdminOverview, AdminUsage, AiInventory } from "@/services/adminService";
 import { useAuthStore } from "@/store/useAuthStore";
 import { StatTile } from "@/components/progress/ProgressView";
@@ -11,8 +12,9 @@ const BAR = "#2a78d6";
 const AXIS = "#898781";
 const GRID = "#e1e0d9";
 const TABS = [
-  ["usage", "Yapay zekâ kullanımı"],
-  ["inventory", "Yapay zekâ envanteri"],
+  ["usage", "Yapay zekâ kullanımı", Cpu],
+  ["inventory", "Yapay zekâ envanteri", Boxes],
+  ["feedback", "Geri bildirimler", MessageSquareText],
 ] as const;
 type Tab = (typeof TABS)[number][0];
 
@@ -299,7 +301,7 @@ export default function AdminPage() {
       </div>
 
       <div className="flex gap-2 border-b border-border" role="tablist" aria-label="Admin bölümleri">
-        {TABS.map(([id, label]) => (
+        {TABS.map(([id, label, Icon]) => (
           <button
             key={id}
             role="tab"
@@ -309,12 +311,12 @@ export default function AdminPage() {
               tab === id ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            {id === "usage" ? <Cpu className="w-4 h-4" /> : <Boxes className="w-4 h-4" />} {label}
+            <Icon className="w-4 h-4" /> {label}
           </button>
         ))}
       </div>
 
-      {tab === "usage" ? <UsageTab /> : <InventoryTab />}
+      {tab === "usage" ? <UsageTab /> : tab === "inventory" ? <InventoryTab /> : <AdminFeedbackTab />}
     </div>
   );
 }

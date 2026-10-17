@@ -60,6 +60,13 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 |---|---|---|---|
 | GET | `/` | Herkese açık | Health check or root endpoint. |
 
+## Feedback
+
+| Yöntem | Yol | Yetki | Açıklama |
+|---|---|---|---|
+| POST | `/api/v1/feedback` | Giriş | Hata bildirimi (bug) ya da özellik önerisi (feature); isteğe bağlı ekran görüntüsü (PNG/JPG/WEBP, ≤5 MB). |
+| GET | `/api/v1/feedback/me` | Giriş | Kullanıcının kendi geri bildirimleri ve durumları. |
+
 ## Interview
 
 | Yöntem | Yol | Yetki | Açıklama |
@@ -147,6 +154,8 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 |---|---|---|---|
 | GET | `/api/v1/admin/ai-inventory` | Platform admini | Hangi özellik hangi yapay zekâ modelini/aracını kullanıyor, nerede çalışıyor; LLM zincirinin canlı durumu. |
 | GET | `/api/v1/admin/ai-usage` | Platform admini | Ay bazında platform geneli yapay zekâ kullanımı: özellik, model ve kurum kırılımı, tahmini maliyet. |
+| GET | `/api/v1/admin/feedback` | Platform admini | Tüm geri bildirimler: gönderen (ad/e-posta), sayfa, platform, ekran görüntüsü (imzalı URL), durum. |
+| PATCH | `/api/v1/admin/feedback/{feedback_id}` | Platform admini | Durum (yeni/inceleniyor/planlandı/çözüldü/reddedildi) ve admin notu; denetim kaydına yazılır. |
 | GET | `/api/v1/admin/overview` | Platform admini | Platform geneli sayılar (kullanıcı, kurum, mülakat, CV, ilan). |
 
 ## Progress

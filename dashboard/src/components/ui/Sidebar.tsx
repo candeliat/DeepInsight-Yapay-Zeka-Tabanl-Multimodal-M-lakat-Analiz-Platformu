@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  LayoutDashboard, Video, User, MessageCircle, Database, ShieldCheck, FileText, Briefcase, TrendingUp, Building2, ClipboardList,
+  LayoutDashboard, Video, User, MessageCircle, Database, ShieldCheck, MessageSquareText, FileText, Briefcase, TrendingUp, Building2, ClipboardList,
   FlaskConical, History, LucideIcon,
 } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -40,6 +40,7 @@ const GROUPS: { title: string; links: NavLink[] }[] = [
     title: "Hesap",
     links: [
       { href: "/pilot", label: "Pilot Çalışma", icon: FlaskConical },
+      { href: "/feedback", label: "Geri Bildirim", icon: MessageSquareText },
       { href: "/profile", label: "Profil", icon: User },
     ],
   },

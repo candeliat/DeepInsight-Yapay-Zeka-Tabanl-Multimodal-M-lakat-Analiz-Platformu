@@ -27,7 +27,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-from app.core.database import supabase  # noqa: E402
+# Betikler senkron çalışır: varsayılan istemci asenkron olduğundan .execute() beklenmeyen bir
+# coroutine döndürüp işi sessizce yapmıyordu (B geçişinden kalma hata).
+from app.core.database import sync_supabase as supabase  # noqa: E402
 from app.services.llm_service import llm_service  # noqa: E402
 from app.services.question_tags import normalize_tags, tags_from_text  # noqa: E402
 

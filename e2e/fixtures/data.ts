@@ -71,6 +71,23 @@ export const PROGRESS = {
   recommendations: [],
 };
 
+export const PRACTICE_SET = {
+  topics: [{ topic: 'Veri Yapıları', role: 'Backend Developer', difficulty: 'ORTA', average: 51, count: 2, weak: true }],
+  items: [
+    {
+      id: 'pq-1', question_text: 'BFS ile DFS arasındaki fark nedir?', difficulty: 'ORTA', question_type: 'teknik',
+      answer_points: ['BFS kuyruk, DFS yığın kullanır', 'Ağırlıksız grafta en kısa yol BFS ile bulunur'],
+      topic: 'Veri Yapıları', role: 'Backend Developer',
+    },
+    {
+      id: 'pq-2', question_text: 'Bağlı listeyi nasıl tersine çevirirsiniz?', difficulty: 'JUNIOR', question_type: 'teknik',
+      answer_points: [], topic: 'Veri Yapıları', role: 'Backend Developer',
+    },
+  ],
+  unmatched_topics: [],
+  reason: null,
+};
+
 export const EVALUATION_FAILED =
   'Değerlendirme şu an yapılamadı. Cevaplarınız kaydedildi; birkaç dakika sonra "Değerlendirmeyi tekrar dene" ile yeniden deneyebilirsiniz.';
 

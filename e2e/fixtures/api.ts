@@ -1,6 +1,6 @@
 import { test as base, expect, type BrowserContext, type Page, type Request, type Route } from '@playwright/test';
 import { careerState, installCareer, seedCareer } from './career';
-import { consent, INTERVIEWS, ongoingDetail, ONGOING_ID, PROGRESS, USER } from './data';
+import { consent, INTERVIEWS, ongoingDetail, ONGOING_ID, PRACTICE_SET, PROGRESS, USER } from './data';
 
 /**
  * Backend taklidi: :8123'e giden her istek burada karşılanır, gerçek sunucuya gitmez.
@@ -116,6 +116,7 @@ export class MockApi {
       return { json: { ok: true } };
     });
     this.on('GET', '/api/v1/progress/me', { json: PROGRESS });
+    this.on('GET', '/api/v1/progress/me/practice-set', { json: PRACTICE_SET });
     // Yarıda kalan mülakatın video analizi yok: gerçek backend de 404 döner.
     this.on('GET', /^\/api\/v1\/analytics\/(results|status)\/[^/]+$/, { status: 404, json: { detail: 'Analiz bulunamadı.' } });
     installCareer(this, this.career);

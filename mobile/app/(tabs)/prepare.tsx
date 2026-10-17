@@ -29,7 +29,7 @@ import {
   orgService,
 } from '../../src/services/orgService';
 
-type Params = { cv?: string; job?: string; assignment?: string; role?: string; topic?: string; difficulty?: string; language?: string };
+type Params = { cv?: string; job?: string; assignment?: string; role?: string; topic?: string; difficulty?: string; language?: string; practice?: string };
 
 const TOPICS = [
   { id: 'software', label: 'Yazılım Geliştirme' },
@@ -71,6 +71,8 @@ export default function PrepareScreen() {
   const { setRoleTopic, startInterview, isThinking } = useInterviewStore();
   const user = useUserStore((s) => s.user);
   const params = useLocalSearchParams<Params>();
+  // Raporlar > Pratik seti: mülakat bu soru kimlikleriyle, bu sırayla yapılır.
+  const practiceIds = (params.practice || '').split(',').filter(Boolean).slice(0, 10);
 
   // Bağlam: CV'ye / ilana göre mülakat, kurum ödevi ve kurum seçimi (varsayılan bireysel —
   // mülakatın kuruma görünmesi bilinçli bir seçim olmalı).
@@ -186,7 +188,7 @@ export default function PrepareScreen() {
   }, [params.assignment]);
 
   const clearContext = () => {
-    router.setParams({ cv: undefined, job: undefined, assignment: undefined });
+    router.setParams({ cv: undefined, job: undefined, assignment: undefined, practice: undefined });
     setCvLabel(null);
     setJobLabel(null);
     setAssignment(null);
@@ -227,6 +229,7 @@ export default function PrepareScreen() {
         assignmentId: assignment?.id,
         orgId: orgId ?? undefined,
         language,
+        questionIds: practiceIds.length && !assignment ? practiceIds : undefined,
       });
       await startInterview();
       // Yazılı modda kamera kapalı başlar: video kaydı/analizi yapılmaz, sonuç ekranına doğrudan geçilir.
@@ -273,6 +276,19 @@ export default function PrepareScreen() {
             Konuyu ve zorluk seviyesini seçin, ardından mülakatınızı başlatın.
           </Text>
         </View>
+
+        {practiceIds.length > 0 && !assignment && (
+          <View style={styles.contextCard}>
+            <Ionicons name="barbell-outline" size={20} color={Colors.secondary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.contextTitle}>Pratik seti</Text>
+              <Text style={styles.contextSub}>Mülakat Raporlar ekranındaki {practiceIds.length} soruyla yapılacak.</Text>
+            </View>
+            <TouchableOpacity onPress={clearContext} accessibilityLabel="Pratik setini kaldır" hitSlop={10}>
+              <Ionicons name="close" size={18} color={Colors.outline} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {(cvLabel || jobLabel || assignment) && (
           <View style={styles.contextCard}>

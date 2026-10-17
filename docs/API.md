@@ -141,11 +141,20 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 | POST | `/api/v1/pilot/surveys/post-interview` | Giriş |  |
 | POST | `/api/v1/pilot/surveys/sus` | Giriş |  |
 
+## Platform Admin
+
+| Yöntem | Yol | Yetki | Açıklama |
+|---|---|---|---|
+| GET | `/api/v1/admin/ai-inventory` | Platform admini | Hangi özellik hangi yapay zekâ modelini/aracını kullanıyor, nerede çalışıyor; LLM zincirinin canlı durumu. |
+| GET | `/api/v1/admin/ai-usage` | Platform admini | Ay bazında platform geneli yapay zekâ kullanımı: özellik, model ve kurum kırılımı, tahmini maliyet. |
+| GET | `/api/v1/admin/overview` | Platform admini | Platform geneli sayılar (kullanıcı, kurum, mülakat, CV, ilan). |
+
 ## Progress
 
 | Yöntem | Yol | Yetki | Açıklama |
 |---|---|---|---|
 | GET | `/api/v1/progress/me` | Giriş | Tamamlanmış mülakatlardan zaman serisi, eğilim, konu bazında performans ve öneriler. |
+| GET | `/api/v1/progress/me/practice-set` | Giriş | Zayıf konular için soru bankasından, daha önce görülmemiş somut sorular ve iyi cevap maddeleri. |
 | GET | `/api/v1/progress/me/report.pdf` | Giriş | Gelişim raporunun PDF'i (2 sayfa: özet + eğilim grafiği + öneriler, konu tablosu + geçmiş). |
 
 ## Question Bank Admin

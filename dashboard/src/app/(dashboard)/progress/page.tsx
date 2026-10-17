@@ -6,6 +6,7 @@ import { TrendingUp, Loader2, XCircle, Download, Play } from "lucide-react";
 import { progressService, Progress } from "@/services/progressService";
 import { Button } from "@/components/ui/Button";
 import { ProgressView } from "@/components/progress/ProgressView";
+import { PracticeSetPanel } from "@/components/progress/PracticeSetPanel";
 
 export default function ProgressPage() {
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -72,7 +73,10 @@ export default function ProgressPage() {
           </Button>
         </div>
       ) : (
-        <ProgressView progress={progress} />
+        <>
+          <ProgressView progress={progress} />
+          <PracticeSetPanel />
+        </>
       )}
     </div>
   );

@@ -62,6 +62,8 @@ function TextInterviewContent() {
   const topicParam = searchParams.get("topic");
   const difficultyParam = searchParams.get("difficulty");
   const assignmentParam = searchParams.get("assignment");
+  // Gelişimim > Pratik seti: mülakat bu soru kimlikleriyle, bu sırayla yapılır.
+  const practiceIds = (searchParams.get("practice") || "").split(",").filter(Boolean).slice(0, 10);
   // Yarıda kalmış bir mülakata kaldığı yerden devam (?resume=<id>).
   const resumeParam = searchParams.get("resume");
   const { user } = useAuthStore();
@@ -239,7 +241,7 @@ function TextInterviewContent() {
     setStartError(null);
 
     try {
-      const data = await chatService.startInterview(role, topic, difficulty, { cvId: cv?.id, jobId: job?.id, orgId: orgId || undefined, assignmentId: assignment?.id, language });
+      const data = await chatService.startInterview(role, topic, difficulty, { cvId: cv?.id, jobId: job?.id, orgId: orgId || undefined, assignmentId: assignment?.id, language, questionIds: practiceIds.length && !assignment ? practiceIds : undefined });
       setInterviewId(data.interview_id);
       setMessages([{ role: "ai", content: data.first_message }]);
       setCurrentState("INTERVIEWING");
@@ -317,6 +319,12 @@ function TextInterviewContent() {
             </p>
           </div>
 
+          {practiceIds.length > 0 && !assignment && (
+            <p className="text-sm bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 mb-4">
+              <span className="font-bold text-foreground">Pratik seti:</span>{" "}
+              <span className="text-muted-foreground">mülakat Gelişimim sayfasındaki {practiceIds.length} soruyla yapılacak.</span>
+            </p>
+          )}
           {assignment && (
             <div className="mb-6 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
               <ClipboardList className="w-5 h-5 text-primary shrink-0 mt-0.5" />

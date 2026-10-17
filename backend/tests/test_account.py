@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
 from app.api.schemas.user import UserProfile
 from app.main import app
-from app.services import account_service, cv_service, organization_service
+from app.services import account_service, cv_service, feedback_service, organization_service
 
 
 class _Query:
@@ -71,6 +71,7 @@ def db(monkeypatch):
     monkeypatch.setattr(organization_service, "get_organization", AsyncMock(return_value={"name": "Ege Kariyer"}))
     monkeypatch.setattr(cv_service, "list_cvs", AsyncMock(return_value=[{"id": "cv1"}]))
     monkeypatch.setattr(cv_service, "delete_cv", AsyncMock(return_value=True))
+    monkeypatch.setattr(feedback_service, "delete_for_user", AsyncMock(return_value=2))
     return fake
 
 
@@ -92,6 +93,8 @@ def test_delete_removes_messages_before_interviews_and_auth_user_last(db):
     cv_service.delete_cv.assert_awaited_once_with("u1", "cv1")  # depolamadaki dosya da silinir
     db.auth.admin.delete_user.assert_called_once_with("u1")
     assert counts["cvs"] == 1 and counts["interviews"] == 1
+    feedback_service.delete_for_user.assert_awaited_once_with("u1")  # bildirimler + ekran görüntüleri
+    assert counts["feedback"] == 2
 
 
 def test_last_org_admin_cannot_delete_account(db):

@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from app.core.database import run, aw, supabase
-from app.services import cv_service, organization_service
+from app.services import cv_service, feedback_service, organization_service
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +94,7 @@ async def export_user_data(user_id: str, email: str, profile: Dict[str, Any]) ->
         "job_matches": (await aw(_rows("job_matches", "user_id", user_id))),
         "survey_responses": (await aw(_rows("survey_responses", "user_id", user_id))),
         "notifications": (await aw(_rows("notifications", "user_id", user_id, "kind, title, body, read_at, created_at"))),
+        "feedback": (await aw(_rows("feedback", "user_id", user_id, "kind, title, description, page, status, admin_note, created_at"))),
         "activity_log": (
             (await run(_db().table("audit_log").select("action, target_type, created_at").eq("actor_id", user_id)
             .order("created_at", desc=True).limit(500))).data or []
@@ -164,6 +165,7 @@ async def delete_account(user_id: str, email: str) -> Dict[str, int]:
     # interview_analytics ve survey_responses(post_interview) zincirleme silinir.
     counts["interviews"] = len((await run(_db().table("interviews").delete().eq("user_id", user_id))).data or [])
 
+    counts["feedback"] = await feedback_service.delete_for_user(user_id)
     for table in ("survey_responses", "user_consents", "memberships", "notifications"):
         counts[table] = len((await run(_db().table(table).delete().eq("user_id", user_id))).data or [])
     if email:

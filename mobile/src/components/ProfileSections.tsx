@@ -21,6 +21,7 @@ const LINKS: { href: Href; label: string; sub: string; icon: IconName }[] = [
   { href: '/assignments', label: 'Ödevlerim', sub: 'Kurumunuzun atadığı mülakatlar', icon: 'clipboard-outline' },
   { href: '/organizations', label: 'Kurumlarım', sub: 'Davetler, katılım, paylaşım izni', icon: 'business-outline' },
   { href: '/pilot', label: 'Pilot Çalışma', sub: 'Araştırma onamı ve anketler', icon: 'flask-outline' },
+  { href: '/feedback', label: 'Geri Bildirim', sub: 'Hata bildirimi ya da özellik önerisi', icon: 'chatbox-ellipses-outline' },
 ];
 
 export function CareerMenu() {

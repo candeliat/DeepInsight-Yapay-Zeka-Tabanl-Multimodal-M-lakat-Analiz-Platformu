@@ -59,7 +59,7 @@ def test_summarize_totals_failures_and_cost():
     assert s["estimated_cost_usd"] == 0.0017 and s["unpriced_models"] == []
     m_a = next(m for m in s["by_model"] if m["model"] == "m-a")
     assert m_a["avg_latency_ms"] == 8000  # başarısız denemenin süresi ortalamaya girmez
-    assert {p["purpose"] for p in s["by_purpose"]} == {"Mülakat değerlendirmesi", "Soru üretimi"}
+    assert {p["purpose"] for p in s["by_purpose"]} == {"Mülakat sonu değerlendirme", "Mülakat: soru üretimi"}
 
 
 def test_tokens_per_interview_ignores_interviews_without_usage_records():

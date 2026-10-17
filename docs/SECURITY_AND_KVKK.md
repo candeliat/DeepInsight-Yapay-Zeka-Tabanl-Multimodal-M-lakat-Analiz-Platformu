@@ -5,7 +5,7 @@
 | Katman | Kural | Uygulandığı yer |
 |---|---|---|
 | Kimlik | Her istek Supabase Auth JWT'si ile doğrulanır; Supabase'e ulaşılamazsa 401 değil 503 döner (geçici ağ hatası kullanıcıyı oturumdan atmasın diye) | `dependencies/auth.py:get_current_user` |
-| Platform rolü | `app_metadata.role = admin`: global soru bankası, kurum oluşturma, pilot raporu | `require_admin` |
+| Platform rolü | `app_metadata.role = admin`: admin paneli (platform geneli kullanım ve yapay zekâ envanteri), global soru bankası, kurum oluşturma, pilot raporu | `require_admin` |
 | Kurum rolü | `org_admin` / `instructor` / `candidate` — `memberships` tablosundan; kullanıcı birden çok kurumda farklı rollerde olabilir | `require_org_role(...)` |
 | Kaynak sahipliği | Mülakat, video analizi, CV, ilan, eşleşme yalnızca sahibine; başkasınınki 404 döner (varlığı sızdırılmaz) | route ve servis katmanı |
 | Veritabanı | Tüm tablolarda RLS açık ve politika yok: yalnızca backend'in service_role anahtarı erişebilir | `sql/014_security_hardening.sql` |
@@ -22,11 +22,19 @@ her uç nokta için regresyon testi vardır (`test_ownership_security.py`,
   öğrenci bazında skor ve gelişim raporu yalnızca `share_progress` rızasıyla. CSV dışa
   aktarma da aynı kuralı uygular.
 - **Küçük grup koruması.** Toplu ortalamalar en az 3 farklı öğrenci katkı vermişse gösterilir
-  (`MIN_COHORT`); grup görünümünde ve haftalık kırılımda da ayrıca uygulanır.
+  (`MIN_COHORT`); grup görünümünde ve haftalık kırılımda da ayrıca uygulanır. Yalnızca öğrenci
+  rolündeki üyelerin mülakatları sayılır: eğitmen kendi skorunu bildiği için onun mülakatı eşiği
+  doldurursa öğrenci skoru ortalamadan çıkarılabilirdi (canlı raporda bulunup düzeltildi).
+- **Kurum PDF raporu öğrenci adı ya da öğrenci bazında skor içermez**; aynı eşik kuralını
+  uygular. Kullanım/maliyet bölümü yalnızca kurum yöneticisine eklenir. İndirme denetim kaydına yazılır.
 - **Rızasız üyelik yok.** Toplu davet bekleyen davet oluşturur; kişi ancak kendisi kabul edince
   kuruma eklenir. Kabul eden kişinin e-postası davetle eşleşmelidir.
 - **Veri minimizasyonu.** CV metni LLM'e gönderilmeden önce e-posta ve telefon maskelenir
-  (OCR'ın bozduğu biçimler dahil); profil çıkarımında ad/kimlik istenmez.
+  (OCR'ın bozduğu biçimler dahil); profil çıkarımında ad/kimlik istenmez. Ön yazıda modele ad
+  ve iletişim bilgisi gönderilmez (imza kodla eklenir), çıktıdaki iletişim bilgisi de maskelenir;
+  ön yazı veritabanına kaydedilmez.
+- **Admin paneli yalnızca sayı gösterir:** kullanım kurum ve özellik bazında toplanır, öğrenci
+  adı/e-postası dönmez.
 - **Pilot verisi kimliksizdir.** Rapor ve CSV'de katılımcılar P01, P02… takma adıyla yer alır.
 
 ## Onamlar (`user_consents`)
@@ -42,7 +50,7 @@ Onam metinlerinin sürümü (`version`) ve verilme/geri çekilme zamanları sakl
 
 - **Verilerimi indir** (`GET /api/v1/account/export`): mülakatlar ve mesajları, video/ses
   analizleri, CV'ler ve analizleri, ilanlar ve eşleşmeler, onamlar, kurum üyelikleri, bekleyen
-  davetler, anketler ve kişinin kendi işlem kaydı tek JSON dosyasında.
+  davetler, anketler, bildirimler ve kişinin kendi işlem kaydı tek JSON dosyasında.
 - **Hesabımı sil** (`DELETE /api/v1/account`): e-postayı yazarak onay; CV dosyaları
   depolamadan, tüm kişisel kayıtlar veritabanından ve Auth hesabı en son silinir. Bir kurumun
   tek yöneticisi önce yöneticiliği devretmelidir. Kuruma ait içerik (kurum soruları, ödevler)
@@ -66,7 +74,10 @@ silme. Yazılamazsa asıl işlemi engellemez (best-effort).
   `Retry-After`. Süreç içi sayaçtır; birden çok backend örneğinde paylaşılan sayaca (Redis) taşınmalı.
 - Her LLM denemesi `llm_usage` tablosuna yazılır (kullanıcı, amaç, model, sonuç, gecikme, token;
   içerik yazılmaz). RLS açık ve politika yok: yalnızca backend erişir. Kullanıcı silinince
-  `user_id` boşaltılır.
+  `user_id` boşaltılır. Kurum bağlamındaki mülakat çağrıları `org_id`/`interview_id` taşır
+  (sql/024); öğrencinin bireysel mülakatı ve CV/ilan/ön yazı çağrıları kuruma yazılmaz.
+- `notifications` (sql/023): yalnızca kullanıcının kendisi okur (her sorguda `user_id` filtresi);
+  hesap silinince silinir. Eğitmen hatırlatması ödev başına 12 saatte bir (koşullu güncelleme).
 
 - `profiles` (sql/020): auth.users'ın e-posta, ad ve hedef pozisyonunun aynası; yalnızca
   tetikleyiciyle yazılır, kullanıcı silinince silinir. RLS açık, politika yok: yalnızca backend
@@ -96,6 +107,5 @@ silme. Yazılamazsa asıl işlemi engellemez (best-effort).
 - Dashboard token'ı httpOnly olmayan cookie'de tutar (XSS durumunda okunabilir); üretimde
   httpOnly oturum çerezine geçilmesi önerilir.
 - Bazı 500 hataları iç hata metnini istemciye döndürür; üretimde genel mesaja çevrilmeli.
-- Mobil uygulamada API adresi sabit ve token yenileme yok (mobil fazında ele alınacak).
 - Sızdırılmış şifre kontrolü backend'de yapılır; Supabase Auth'a doğrudan (backend'i atlayarak)
   yapılan kayıtlarda çalışmaz. Pro plana geçilirse panelden de açılmalıdır.

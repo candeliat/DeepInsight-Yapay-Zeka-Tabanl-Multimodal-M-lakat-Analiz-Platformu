@@ -80,8 +80,16 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 | POST | `/api/v1/jobs` | Giriş | İlan metnini kaydeder ve gereksinimlerini (beceriler, deneyim) çıkarır. |
 | DELETE | `/api/v1/jobs/{job_id}` | Giriş |  |
 | GET | `/api/v1/jobs/{job_id}` | Giriş |  |
+| POST | `/api/v1/jobs/{job_id}/cover-letter` | Giriş | İlana ve CV'ye özel ön yazı taslağı. Kaydedilmez; CV'de dayanağı olmayan iddialar uyarı olarak döner. |
 | GET | `/api/v1/jobs/{job_id}/match` | Giriş |  |
 | POST | `/api/v1/jobs/{job_id}/match` | Giriş | İlanı kullanıcının bir CV'siyle eşleştirir: skor, eksik beceriler ve öğrenme yol haritası. |
+
+## Notifications
+
+| Yöntem | Yol | Yetki | Açıklama |
+|---|---|---|---|
+| GET | `/api/v1/notifications/me` | Giriş | Kullanıcının bildirimleri (en yeni önce) ve okunmamış sayısı. Son tarih |
+| POST | `/api/v1/notifications/read` | Giriş |  |
 
 ## Organizations
 
@@ -98,6 +106,7 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 | POST | `/api/v1/organizations/{org_id}/assignments` | Kurum: org_admin, instructor |  |
 | DELETE | `/api/v1/organizations/{org_id}/assignments/{assignment_id}` | Kurum: org_admin, instructor |  |
 | GET | `/api/v1/organizations/{org_id}/assignments/{assignment_id}/export.csv` | Kurum: org_admin, instructor |  |
+| POST | `/api/v1/organizations/{org_id}/assignments/{assignment_id}/remind` | Kurum: org_admin, instructor | Ödevi tamamlamamış öğrencilere uygulama içi hatırlatma (ödev başına 12 saatte bir). |
 | GET | `/api/v1/organizations/{org_id}/assignments/{assignment_id}/students` | Kurum: org_admin, instructor |  |
 | GET | `/api/v1/organizations/{org_id}/export/members.csv` | Kurum: org_admin, instructor | Üye listesi CSV'si — skor sütunu yalnızca paylaşım rızası veren öğrenciler için dolu. |
 | GET | `/api/v1/organizations/{org_id}/groups` | Kurum: org_admin, instructor |  |
@@ -118,6 +127,8 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 | POST | `/api/v1/organizations/{org_id}/questions` | Kurum: org_admin, instructor |  |
 | DELETE | `/api/v1/organizations/{org_id}/questions/{question_id}` | Kurum: org_admin, instructor |  |
 | PATCH | `/api/v1/organizations/{org_id}/questions/{question_id}` | Kurum: org_admin, instructor |  |
+| GET | `/api/v1/organizations/{org_id}/report.pdf` | Kurum: org_admin, instructor | Kurum (ya da grup) raporu: katılım, toplu skorlar (≥3 öğrenci kuralıyla), ödevler ve — |
+| GET | `/api/v1/organizations/{org_id}/usage` | Kurum: org_admin | Ay bazında kurumun yapay zekâ kullanımı ve tahmini maliyeti (yalnızca kurum yöneticisi). |
 
 ## Pilot
 

@@ -1,5 +1,5 @@
 import { api } from "../lib/api";
-import { extractErrorMessage } from "../lib/apiError";
+import { call, extractErrorMessage } from "../lib/apiError";
 
 export type MetricKey = "technical" | "confidence" | "vocabulary";
 
@@ -60,7 +60,26 @@ export interface Progress {
   recommendations: Recommendation[];
 }
 
+export interface PracticeItem {
+  id: string;
+  question_text: string;
+  difficulty: "JUNIOR" | "ORTA" | "UZMAN" | null;
+  question_type: string | null;
+  /** İyi bir cevapta olması gerekenler (pratikte gösterilir; mülakatta gösterilmez). */
+  answer_points: string[];
+  topic: string;
+  role: string | null;
+}
+
+export interface PracticeSet {
+  topics: { topic: string; role: string | null; difficulty: string | null; average: number | null; count: number; weak: boolean }[];
+  items: PracticeItem[];
+  unmatched_topics: string[];
+  reason: "no_history" | "no_questions" | null;
+}
+
 export const progressService = {
+  getPracticeSet: () => call<PracticeSet>(api.get("/api/v1/progress/me/practice-set")),
   async getMyProgress(): Promise<Progress> {
     try {
       return (await api.get<Progress>("/api/v1/progress/me")).data;

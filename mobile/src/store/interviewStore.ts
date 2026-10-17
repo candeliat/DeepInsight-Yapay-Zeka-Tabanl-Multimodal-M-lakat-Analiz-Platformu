@@ -24,6 +24,8 @@ export interface InterviewContext {
   jobId?: string;
   orgId?: string;
   assignmentId?: string;
+  /** Pratik setindeki sorular; mülakat bu sorularla, bu sırayla yapılır. */
+  questionIds?: string[];
 }
 
 interface InterviewState {
@@ -89,6 +91,7 @@ export const useInterviewStore = create<InterviewState>((set, get) => ({
         org_id: context.orgId,
         assignment_id: context.assignmentId,
         language: context.language ?? 'tr',
+        question_ids: context.questionIds,
       }, { timeout: 90000 });
       
       set({ 

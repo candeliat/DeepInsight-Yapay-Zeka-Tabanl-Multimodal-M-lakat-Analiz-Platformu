@@ -242,7 +242,24 @@ export const METRIC_LABEL: Record<MetricKey, string> = {
   vocabulary: 'İletişim',
 };
 
+export interface PracticeSet {
+  topics: { topic: string; role: string | null; difficulty: string | null; average: number | null; count: number; weak: boolean }[];
+  items: {
+    id: string;
+    question_text: string;
+    difficulty: string | null;
+    question_type: string | null;
+    /** İyi bir cevapta olması gerekenler (pratikte gösterilir; mülakatta gösterilmez). */
+    answer_points: string[];
+    topic: string;
+    role: string | null;
+  }[];
+  unmatched_topics: string[];
+  reason: 'no_history' | 'no_questions' | null;
+}
+
 export const progressService = {
   getMyProgress: () => call<Progress>(api.get('/api/v1/progress/me')),
+  getPracticeSet: () => call<PracticeSet>(api.get('/api/v1/progress/me/practice-set')),
   shareReport: () => downloadAndShare('/api/v1/progress/me/report.pdf', 'deepinsight-gelisim-raporu.pdf', 'application/pdf'),
 };

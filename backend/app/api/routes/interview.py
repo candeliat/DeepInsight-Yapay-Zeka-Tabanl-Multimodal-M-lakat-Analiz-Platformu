@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any, Literal
 from app.core.config import settings
 from app.services.llm_service import bind_usage_context, llm_service
-from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching, assignment_service, star_service
+from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching, assignment_service, star_service, practice_service
 from app.services.interview_service import (
     create_interview,
     save_message,
@@ -92,6 +92,9 @@ class StartInterviewRequest(BaseModel):
     # Konuşma dili: "en" ile sorular İngilizce sorulur (bankadaki Türkçe soru çevrilir),
     # ses İngilizce çözümlenir; değerlendirme metni yine Türkçedir.
     language: Literal["tr", "en"] = "tr"
+    # Opsiyonel: pratik setindeki sorular ("bu setle mülakat yap"); verilirse soru havuzu
+    # bunlardan, verilen sırayla kurulur (erişilemeyen kimlikler düşer, boşsa normal seçim).
+    question_ids: Optional[List[str]] = Field(default=None, max_length=10)
 
     @field_validator("role", "topic")
     @classmethod
@@ -304,11 +307,15 @@ async def start_interview(
         # döner, bkz. question_bank_service.fetch_question_pool). Bu havuz
         # interview kaydına yazılır ve her tur `_ask_question` tarafından
         # sırayla tüketilir.
-        question_pool = await question_bank_service.fetch_question_pool(
-            role=request.role, topic=request.topic, difficulty=request.difficulty, size=max_questions,
-            org_id=request.org_id,
-            skills_hint=skills_hint,
-        )
+        question_pool = []
+        if request.question_ids and not request.assignment_id:
+            question_pool = await practice_service.fetch_pool_by_ids(request.question_ids[:max_questions], request.org_id)
+        if not question_pool:
+            question_pool = await question_bank_service.fetch_question_pool(
+                role=request.role, topic=request.topic, difficulty=request.difficulty, size=max_questions,
+                org_id=request.org_id,
+                skills_hint=skills_hint,
+            )
 
         # DB'de mülakat oluştur
         interview_data = await create_interview(

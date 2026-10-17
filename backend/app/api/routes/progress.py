@@ -6,7 +6,7 @@ from fastapi.responses import Response
 
 from app.api.dependencies.auth import get_current_user, oauth2_scheme
 from app.api.schemas.user import UserProfile
-from app.services import progress_report, progress_service
+from app.services import practice_service, progress_report, progress_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -29,6 +29,19 @@ async def my_progress(
         return await asyncio.to_thread(progress_service.get_user_progress, current_user.id)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
+
+
+@router.get("/me/practice-set")
+async def my_practice_set(
+    token: str = Depends(oauth2_scheme),
+    current_user: UserProfile = Depends(get_current_user),
+):
+    """Zayıf konular için soru bankasından, daha önce görülmemiş somut sorular ve iyi cevap maddeleri."""
+    try:
+        return await practice_service.build_practice_set(current_user.id)
+    except Exception:
+        logger.exception("[practice] Pratik seti hazırlanamadı (user_id=%s)", current_user.id)
+        raise HTTPException(status_code=503, detail="Pratik seti şu an hazırlanamadı. Biraz sonra tekrar deneyin.")
 
 
 @router.get("/me/report.pdf")

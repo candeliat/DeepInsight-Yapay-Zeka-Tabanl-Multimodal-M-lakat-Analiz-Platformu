@@ -13,6 +13,7 @@ import { scoreBand } from '../utils/scoreBand';
 import { FontFamilies } from '../constants/Fonts';
 import { METRIC_LABEL, MetricKey, Progress, progressService } from '../services/careerService';
 import { Banner, Card, Chip, PrimaryButton, SectionTitle, typo } from './ui';
+import { PracticeSetCard } from './PracticeSetCard';
 
 const SERIES: { key: MetricKey; color: string }[] = [
   { key: 'technical', color: '#2a78d6' },
@@ -223,6 +224,8 @@ export function ProgressSection() {
           ))}
         </>
       )}
+
+      <PracticeSetCard />
 
       <PrimaryButton title="PDF raporu paylaş" icon="share-outline" variant="outline" onPress={shareReport} loading={sharing} style={{ marginBottom: 16 }} />
     </View>

@@ -85,7 +85,8 @@ export default function InterviewRoomPage() {
   // Davranışsal mülakatta her cevabın STAR notu; sonuncusu yeni sorunun altında gösterilir.
   const [starNotes, setStarNotes] = useState<StarAnalysis[]>([]);
   // Gönderim/bitirme ve satır içi hata/onay durumu iki mülakat sayfasında ortak (bkz. useInterviewTurns).
-  const { isThinking, setIsThinking, chatError, confirmEnd, setConfirmEnd, sendAnswer, finishEarly } = useInterviewTurns(interviewId);
+  const { isThinking, setIsThinking, chatError, confirmEnd, setConfirmEnd, sendAnswer, finishEarly, evaluationFailed } =
+    useInterviewTurns(interviewId);
   const [isListening, setIsListening] = useState(false);
   const [evaluation, setEvaluation] = useState<EvaluationData | null>(null);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -694,9 +695,19 @@ export default function InterviewRoomPage() {
         {/* Alt Kısım: Cevap Girişi */}
         <div className="p-6 bg-background/50 backdrop-blur-xl border-t border-border mt-auto relative z-20">
           {chatError && (
-            <p role="alert" className="max-w-4xl mx-auto mb-3 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-2.5">
+            <div role="alert" className="max-w-4xl mx-auto mb-3 text-xs font-semibold text-destructive bg-destructive/10 rounded-xl px-4 py-2.5">
               {chatError}
-            </p>
+              {evaluationFailed && (
+                <button
+                  type="button"
+                  onClick={handleEndInterviewManual}
+                  disabled={isThinking}
+                  className="block mt-2 font-bold underline disabled:opacity-60"
+                >
+                  {isThinking ? "Değerlendiriliyor..." : "Değerlendirmeyi tekrar dene"}
+                </button>
+              )}
+            </div>
           )}
           <div className="max-w-4xl mx-auto flex items-end gap-3">
             

@@ -328,24 +328,22 @@ def test_get_final_evaluation_parses_json_with_surrounding_prose():
     assert result["technical_score"] == 70
 
 
-def test_get_final_evaluation_never_raises_even_if_all_models_return_garbage():
+def test_get_final_evaluation_raises_when_all_models_return_garbage():
+    # 0 puanlık sahte değerlendirme yerine hata: route claim'i geri alır, kullanıcı tekrar dener.
     svc = _service_with_mock_client()
     svc.client.chat.completions.create.return_value = _fake_response("bu bir JSON değil, düz metin.")
 
-    # RuntimeError FIRLATMAMALI — mülakat her zaman tamamlanabilmeli.
-    result = run(svc.get_final_evaluation([], "Backend Developer", "Python"))
-
-    assert result == InterviewEvaluation().model_dump()
+    with pytest.raises(llm_service_module.LLMUnavailable):
+        run(svc.get_final_evaluation([], "Backend Developer", "Python"))
     assert svc.client.chat.completions.create.call_count == len(LLMService.FREE_MODELS)
 
 
-def test_get_final_evaluation_never_raises_even_if_all_models_error_out():
+def test_get_final_evaluation_raises_when_all_models_error_out():
     svc = _service_with_mock_client()
     svc.client.chat.completions.create.side_effect = _api_error(APIStatusError, 500)
 
-    result = run(svc.get_final_evaluation([], "Backend Developer", "Python"))
-
-    assert result["feedback"] == InterviewEvaluation().feedback
+    with pytest.raises(llm_service_module.LLMUnavailable):
+        run(svc.get_final_evaluation([], "Backend Developer", "Python"))
 
 
 # --------------------------------------------------------------------------

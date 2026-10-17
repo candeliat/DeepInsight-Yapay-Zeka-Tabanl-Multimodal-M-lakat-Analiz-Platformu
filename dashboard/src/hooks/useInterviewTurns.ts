@@ -26,9 +26,12 @@ export function useInterviewTurns(interviewId: string) {
   const [isThinking, setIsThinking] = useState(false);
   const [chatError, setChatError] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  // Son cevaptan sonra değerlendirme yapılamadı: cevaplar kayıtlı, mülakat açık; "tekrar dene" gösterilir.
+  const [evaluationFailed, setEvaluationFailed] = useState(false);
 
   const sendAnswer = async (answer: string, handlers: AnswerHandlers) => {
     setChatError(null);
+    setEvaluationFailed(false);
     setIsThinking(true);
     let streamed = "";
     try {
@@ -39,8 +42,14 @@ export function useInterviewTurns(interviewId: string) {
           handlers.onText(streamed);
         },
         onDone: (data) => handlers.onDone(data, streamed),
-        onError: (detail, partialSaved) => {
+        onError: (detail, partialSaved, failedEvaluation) => {
           console.error("Stream hatası:", detail, "kısmi metin kaydedildi mi:", partialSaved);
+          if (failedEvaluation) {
+            // Cevap kaydedildi; kutuya geri konmaz, değerlendirme tekrar denenir.
+            setEvaluationFailed(true);
+            setChatError(detail);
+            return;
+          }
           if (!partialSaved) handlers.restore(streamed);
           setChatError(partialSaved ? PARTIAL_SAVED : CONNECTION_LOST);
         },
@@ -61,14 +70,19 @@ export function useInterviewTurns(interviewId: string) {
     setIsThinking(true);
     try {
       const response = await chatService.finishInterviewEarly(interviewId);
+      setEvaluationFailed(false);
       onFinished(response.evaluation ?? null);
     } catch (e) {
       console.error("Mülakatı bitirme hatası:", e);
-      setChatError(FINISH_FAILED);
+      const failed = (e as { status?: number }).status === 503;
+      setEvaluationFailed(failed);
+      setChatError(failed && e instanceof Error ? e.message : FINISH_FAILED);
     } finally {
       setIsThinking(false);
     }
   };
 
-  return { isThinking, setIsThinking, chatError, setChatError, confirmEnd, setConfirmEnd, sendAnswer, finishEarly };
+  return {
+    isThinking, setIsThinking, chatError, setChatError, confirmEnd, setConfirmEnd, sendAnswer, finishEarly, evaluationFailed,
+  };
 }

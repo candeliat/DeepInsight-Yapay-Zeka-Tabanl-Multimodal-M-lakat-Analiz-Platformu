@@ -116,3 +116,24 @@ def test_finish_early_returns_400_when_already_completed(client, monkeypatch):
     )
     resp = client.post("/api/v1/interview/interview-1/finish")
     assert resp.status_code == 400
+
+
+def test_finish_retry_after_failed_evaluation_returns_clear_503(client, monkeypatch):
+    """Tüm modeller başarısızsa 0 puan yazılmaz; 503 + tekrar deneme mesajı, claim geri alınır."""
+    from app.services.llm_service import LLMUnavailable
+    monkeypatch.setattr(
+        interview_route, "get_interview",
+        AsyncMock(return_value={"user_id": "user-1", "role": "Backend Developer", "topic": "Python", "status": "ongoing"}),
+    )
+    monkeypatch.setattr(interview_route, "get_interview_history", AsyncMock(return_value=[]))
+    monkeypatch.setattr(interview_route, "try_claim_interview_finalization", AsyncMock(return_value=True))
+    release_mock = AsyncMock(return_value=None)
+    monkeypatch.setattr(interview_route, "release_interview_finalization_claim", release_mock)
+    monkeypatch.setattr(interview_route, "finish_interview_and_evaluate", AsyncMock(return_value={}))
+    monkeypatch.setattr(llm_service, "get_final_evaluation", AsyncMock(side_effect=LLMUnavailable(TimeoutError())))
+
+    resp = client.post("/api/v1/interview/interview-1/finish")
+
+    assert resp.status_code == 503 and resp.json()["detail"] == interview_route.EVALUATION_FAILED
+    release_mock.assert_awaited_once()
+    interview_route.finish_interview_and_evaluate.assert_not_awaited()

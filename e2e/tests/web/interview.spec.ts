@@ -1,5 +1,5 @@
 import { expect, test } from '../../fixtures/api';
-import { FIRST_QUESTION, NEXT_QUESTION, ONGOING_ID, sseBody } from '../../fixtures/data';
+import { EVALUATION_FAILED, FINISH_OK, FIRST_QUESTION, NEXT_QUESTION, ONGOING_ID, SSE_EVALUATION_FAILED, sseBody } from '../../fixtures/data';
 
 const STREAM = '/api/v1/interview/chat/stream';
 const ANSWER = 'Küçük uygulamada Context yeterli; sık güncellenen durumda Zustand seçerim.';
@@ -26,6 +26,27 @@ test.describe('yazılı mülakat (devam)', () => {
     await expect(box).toHaveValue('');
     await expect(page.getByRole('main').getByRole('alert')).toHaveCount(0);
     expect(api.callsTo('POST', STREAM).at(-1)!.body).toEqual({ interview_id: ONGOING_ID, message: ANSWER });
+  });
+
+  test('değerlendirme yapılamazsa 0 puan gösterilmez; tekrar dene ile sonuç alınır', async ({ authedPage: page, api }) => {
+    const finish = `/api/v1/interview/${ONGOING_ID}/finish`;
+    api.on('POST', STREAM, { body: SSE_EVALUATION_FAILED, contentType: 'text/event-stream' });
+    api.on('POST', finish, { status: 503, json: { detail: EVALUATION_FAILED } });
+    const box = page.getByPlaceholder('Cevabınızı buraya yazın...');
+    await box.fill(ANSWER);
+    await page.getByRole('button', { name: 'Cevabı gönder' }).click();
+
+    const alert = page.getByRole('main').getByRole('alert');
+    await expect(alert).toContainText('Değerlendirme şu an yapılamadı');
+    await expect(box).toHaveValue(''); // cevap kaydedildi, kutuya geri konmaz
+
+    await alert.getByRole('button', { name: 'Değerlendirmeyi tekrar dene' }).click();
+    await expect(alert).toContainText('Değerlendirme şu an yapılamadı'); // ikinci deneme de başarısız
+    api.on('POST', finish, { json: FINISH_OK });
+    await alert.getByRole('button', { name: 'Değerlendirmeyi tekrar dene' }).click();
+    await expect(page.getByText('Değerlendirmeniz hazır')).toBeVisible();
+    await expect(page.getByText('72/100')).toBeVisible();
+    expect(api.callsTo('POST', finish)).toHaveLength(2);
   });
 
   test('Mülakatı Bitir onay ister; Vazgeç ile mülakat sürer', async ({ authedPage: page, api }) => {

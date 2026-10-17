@@ -108,20 +108,22 @@ def test_next_question_is_requested_with_server_side_question_number(client, mon
     final_eval_mock.assert_not_awaited()
 
 
-def test_interview_completes_even_when_llm_evaluation_totally_fails(client, monkeypatch):
+def test_failed_evaluation_is_not_saved_as_zero_and_can_be_retried(client, monkeypatch):
     """
-    get_final_evaluation kendi içinde asla exception fırlatmaz (bkz. test_llm_service.py):
-    LLM tamamen çöktüğünde güvenli varsayılan değerlendirmeyi döner. Route da bu durumda
-    mülakatı tamamlamalı; kullanıcı "takılı" bir mülakatla kalmamalı.
+    Tüm modeller başarısız olursa mülakat 0 puanla tamamlanMAZ (canlıda gelişim
+    istatistiklerini bozuyordu): claim geri alınır, istemciye evaluation_failed döner.
     """
+    from app.services.llm_service import LLMUnavailable
     _mock_interview_service(monkeypatch, _history_with_n_questions_asked(3))
-    monkeypatch.setattr(llm_service, "get_final_evaluation", AsyncMock(return_value=InterviewEvaluation().model_dump()))
+    monkeypatch.setattr(llm_service, "get_final_evaluation", AsyncMock(side_effect=LLMUnavailable(TimeoutError())))
 
     events = _stream_events(client, "Son cevap.")
 
-    assert events[-1][0] == "done"
-    assert events[-1][1]["interview_complete"] is True
-    interview_route.finish_interview_and_evaluate.assert_awaited_once()
+    assert events[-1][0] == "error"
+    assert events[-1][1]["evaluation_failed"] is True and "tekrar dene" in events[-1][1]["detail"]
+    interview_route.finish_interview_and_evaluate.assert_not_awaited()
+    interview_route.release_interview_finalization_claim.assert_awaited_once()
+    interview_route.save_message.assert_awaited_once()  # yalnızca adayın cevabı; 0 puanlık rapor yazılmadı
 
 
 def test_claim_is_released_when_final_evaluation_raises(client, monkeypatch):

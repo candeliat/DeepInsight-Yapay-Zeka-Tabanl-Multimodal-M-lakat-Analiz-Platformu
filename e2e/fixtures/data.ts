@@ -88,6 +88,19 @@ export const PRACTICE_SET = {
   reason: null,
 };
 
+export const EVALUATION_FAILED =
+  'Değerlendirme şu an yapılamadı. Cevaplarınız kaydedildi; birkaç dakika sonra "Değerlendirmeyi tekrar dene" ile yeniden deneyebilirsiniz.';
+
+/** Son cevaptan sonra tüm modeller başarısız: mülakat açık kalır, istemci tekrar dener. */
+export const SSE_EVALUATION_FAILED =
+  `event: error\ndata: ${JSON.stringify({ detail: EVALUATION_FAILED, partial_saved: false, evaluation_failed: true })}\n\n`;
+
+export const FINISH_OK = {
+  response: 'Mülakat tamamlandı.',
+  interview_complete: true,
+  evaluation: { technical_score: 72, confidence_score: 68, vocabulary_score: 75, feedback: 'Net ve yapılandırılmış cevaplar.' },
+};
+
 /** SSE gövdesi: soru parça parça akar, sonra "done". */
 export function sseBody(text: string, complete = false): string {
   const words = text.split(' ');

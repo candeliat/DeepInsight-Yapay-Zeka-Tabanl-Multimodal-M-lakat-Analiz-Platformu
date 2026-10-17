@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any, Literal
 from app.core.config import settings
-from app.services.llm_service import bind_usage_context, llm_service
+from app.services.llm_service import LLMUnavailable, bind_usage_context, llm_service
 from app.services import question_bank_service, organization_service, cv_service, cv_analysis_service, job_service, skill_matching, assignment_service, star_service, practice_service
 from app.services.interview_service import (
     create_interview,
@@ -234,6 +234,14 @@ def _evaluation_reference(interview: Dict[str, Any], questions_asked: int) -> Li
     ]
 
 
+# Değerlendirme yapılamadığında (tüm modeller başarısız) mülakat 0 puanla kapatılmaz;
+# 'ongoing'e geri alınır, cevaplar kayıtlı kalır, istemci /finish ile tekrar dener.
+EVALUATION_FAILED = (
+    "Değerlendirme şu an yapılamadı. Cevaplarınız kaydedildi; birkaç dakika sonra "
+    "\"Değerlendirmeyi tekrar dene\" ile yeniden deneyebilirsiniz."
+)
+
+
 async def _owned_interview(interview_id: str, user_id: str) -> Dict[str, Any]:
     """
     Mülakatı getirir ve sahibinin istek yapan kullanıcı olduğunu doğrular.
@@ -455,6 +463,10 @@ async def chat_with_ai_stream(
 
                     await save_message(request.interview_id, role="model", content=full_text, token=token)
                     await finish_interview_and_evaluate(request.interview_id, evaluation_data, token=token)
+                except LLMUnavailable:
+                    await release_interview_finalization_claim(request.interview_id, token=token)
+                    yield _sse("error", {"detail": EVALUATION_FAILED, "partial_saved": False, "evaluation_failed": True})
+                    return
                 except Exception:
                     # Claim alındı ama değerlendirme/kayıt başarısız oldu —
                     # mülakatı 'ongoing'e geri al ki kullanıcı tekrar deneyebilsin.
@@ -619,6 +631,8 @@ async def finish_interview_early(
         )
     except HTTPException:
         raise
+    except LLMUnavailable:
+        raise HTTPException(status_code=503, detail=EVALUATION_FAILED)
     except RuntimeError as e:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:

@@ -74,7 +74,7 @@ export interface ChatStreamHandlers {
   /** Akış başarıyla tamamlandığında bir kez çağrılır. */
   onDone: (data: ChatStreamDoneData) => void;
   /** Akış hiç başlamadan ya da yarıda hata verirse çağrılır. */
-  onError: (detail: string, partialSaved: boolean) => void;
+  onError: (detail: string, partialSaved: boolean, evaluationFailed?: boolean) => void;
 }
 
 import { api } from "../lib/api";
@@ -108,10 +108,11 @@ export const chatService = {
       const response = await api.post(`/api/v1/interview/${interview_id}/finish`);
       return response.data;
     } catch (error: unknown) {
-      const e = error as { response?: { data?: { detail?: string } }, message?: string };
-      throw new Error(
-        e.response?.data?.detail ?? `API hatası: ${e.message}`
-      );
+      const e = error as { response?: { status?: number; data?: { detail?: string } }, message?: string };
+      // 503: değerlendirme yapılamadı (mülakat 0 puanla kapatılmadı); çağıran "tekrar dene" gösterir.
+      throw Object.assign(new Error(e.response?.data?.detail ?? `API hatası: ${e.message}`), {
+        status: e.response?.status,
+      });
     }
   },
 
@@ -197,8 +198,8 @@ export const chatService = {
         } else if (eventType === "done") {
           onDone(parsed as ChatStreamDoneData);
         } else if (eventType === "error") {
-          const err = parsed as { detail?: string; partial_saved?: boolean };
-          onError(err.detail ?? "Bilinmeyen bir hata oluştu.", !!err.partial_saved);
+          const err = parsed as { detail?: string; partial_saved?: boolean; evaluation_failed?: boolean };
+          onError(err.detail ?? "Bilinmeyen bir hata oluştu.", !!err.partial_saved, !!err.evaluation_failed);
         }
       }
     }

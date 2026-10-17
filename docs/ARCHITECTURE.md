@@ -11,7 +11,7 @@ flowchart LR
     end
     subgraph Backend[Backend · FastAPI]
         R[Route katmanı<br/>kimlik + rol + sahiplik]
-        S[Servisler<br/>mülakat · CV · ilan · gelişim · kurum · pilot · KVKK]
+        S[Servisler<br/>mülakat · CV · ilan · ön yazı · gelişim · kurum · bildirim · admin · pilot · KVKK]
         A[Analiz hattı<br/>Whisper · DeepFace · MediaPipe · librosa]
         E[Yerel modeller<br/>e5 embedding · EasyOCR]
     end
@@ -55,6 +55,13 @@ flowchart LR
 | 4B | Ödev atama | `assignment_service` | kurum paneli, `/assignments` |
 | 4C | Gruplar, toplu davet, rubrik, CSV dışa aktarma | `org_group_service`, `org_export_service` | kurum paneli |
 | 5 | Pilot çalışma, KVKK veri hakları, akademik ölçümler | `pilot_service`, `account_service`, `scripts/eval/` | `/pilot`, `/pilot/report`, Profil |
+| + | STAR koçluğu (davranışsal mülakat, kural tabanlı) | `star_service` | mülakat ekranları |
+| + | İngilizce mülakat modu (`interviews.language`) | `prompts/interview_v1`, `analytics` | mülakat kurulumu |
+| + | Bildirimler ve ödev hatırlatma | `notification_service` | zil (web), Bildirimler (mobil), kurum paneli |
+| + | Kurum PDF raporu, kurum yapay zekâ kullanımı/maliyeti | `org_report`, `org_usage_service` | kurum paneli |
+| + | Ön yazı üretici (kaydedilmez) | `cover_letter_service` | `/jobs` |
+| + | Zayıf konulara pratik seti | `practice_service` | `/progress`, mobil Raporlar |
+| + | Platform admin paneli: kullanım ve yapay zekâ envanteri | `admin_service` | `/admin` |
 
 ## Veri modeli (özet)
 
@@ -77,11 +84,16 @@ erDiagram
     interviews }o--o| job_postings : "job_id"
     interviews }o--o| assignments : "assignment_id"
     interviews }o--o| organizations : "org_id (kurum bağlamı)"
+    assignments ||--o{ notifications : "ödev bildirimleri"
+    interviews ||--o{ llm_usage : "interview_id"
+    organizations ||--o{ llm_usage : "org_id (kurum bağlamı)"
 ```
 
 Kullanıcıya ait tablolar (`interviews`, `cvs`, `job_postings`, `user_consents`,
-`survey_responses`, `memberships`) `user_id` ile Supabase Auth kullanıcısına bağlanır.
-Şema `backend/sql/001…015` migration'larıyla kurulur (Supabase SQL Editor ya da MCP
+`survey_responses`, `memberships`, `notifications`) `user_id` ile Supabase Auth kullanıcısına
+bağlanır. `llm_usage` her model denemesini (amaç, model, gecikme, token; içerik yok) tutar;
+yalnızca kurum bağlamındaki mülakat çağrıları `org_id` taşır.
+Şema `backend/sql/001…024` migration'larıyla kurulur (Supabase SQL Editor ya da MCP
 `apply_migration`); her dosyanın başında amacı ve çalıştırma notu vardır.
 
 ## Temel akışlar
@@ -107,7 +119,20 @@ sequenceDiagram
 ```
 
 Mülakat sonu sunucu tarafındaki soru sayacıyla belirlenir (LLM'in "bitirdim" demesine
-güvenilmez); nihai değerlendirme atomik "claim" ile tek kez yapılır.
+güvenilmez); nihai değerlendirme atomik "claim" ile tek kez yapılır. Tüm modeller başarısız
+olursa claim geri alınır, mülakat 0 puanla kapatılmaz; istemci `evaluation_failed` alır ve
+`/finish` ile tekrar dener. "Bu setle mülakat yap"ta (`question_ids`) havuz pratik setinin
+sorularından, verilen sırayla kurulur.
+
+### Dil modeli çağrıları
+
+Tüm çağrılar `llm_service` üzerinden: modeller sırayla denenir (`gpt-oss-20b` →
+`nemotron-3-super-120b-a12b`); üst üste hatada model başına devre kesici devreye girer.
+`gpt-oss-20b` JSON modunda boş yanıt döndüğü için ona JSON modu gönderilmez, JSON metinden
+ayıklanır. Deneme süresi genel 30 sn, yapılandırılmış çıktıda 60 sn, ön yazıda 110 sn. Her deneme
+`llm_usage`'a yazılır; istek bağlamı (`bind_usage_context`) mülakatı ve kurumu ekler. Hangi
+özelliğin hangi amaç (purpose) adıyla kayıt düştüğü `org_usage_service.PURPOSES`'ta tek yerde
+tutulur ve admin panelindeki envanter buradan üretilir.
 
 ### CV analizi
 
@@ -135,10 +160,16 @@ daraltılmış veriye ayrıca uygulanır.
   iş parçacıklarında bağlantıyı koparıyor; yalnızca CPU işleri (PDF, OCR, yerel embedding)
   `asyncio.to_thread` ile çalışır. Kimlik doğrulama dependency'si de bu yüzden `async`.
 - **Kota:** kurum bağlamındaki mülakatlar aylık kotaya tabidir (LLM maliyet kontrolü).
+- **Zamanlayıcısız bildirim:** son tarih hatırlatmaları kullanıcı bildirimlerini açtığında
+  üretilir; `(user_id, dedupe_key)` benzersizliği aynı bildirimin iki kez oluşmasını engeller.
+- **LLM çıktısına kodla sınır:** ön yazıda CV'de dayanağı olmayan sayı/beceri/kısaltmalar,
+  pratik setinde konu dışı ve zor sorular, kurum özetinde personel mülakatları kuralla elenir.
 
 ## Test ve ölçüm
 
-- `backend/tests/`: 306 birim/entegrasyon testi (Supabase ve LLM mock'lu), sahiplik ve
+- `backend/tests/`: ~480 birim/entegrasyon testi (Supabase ve LLM mock'lu), sahiplik ve
   tenant izolasyonu regresyon testleri dahil. `pytest tests -q`
-- `dashboard`: `npx tsc --noEmit`, `npx eslint src`
+- `e2e/`: ~100 Playwright testi (web paneli ve mobil uygulamanın web sürümü, backend taklitli);
+  GitHub Actions'ta her PR'da çalışır. Bkz. [e2e/README.md](../e2e/README.md)
+- `dashboard`: `npx tsc --noEmit`, `npx eslint src` · `mobile`: `npx tsc --noEmit`, `npx expo lint`
 - `backend/scripts/eval/`: akademik ölçümler, bkz. [evaluation/README.md](evaluation/README.md)

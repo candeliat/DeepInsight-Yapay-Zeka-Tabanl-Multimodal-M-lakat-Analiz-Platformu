@@ -165,6 +165,8 @@ export default function InterviewRoomScreen() {
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState<string | null>(null);
+  // Son cevaptan sonra değerlendirme yapılamadı: cevaplar kayıtlı, "tekrar dene" gösterilir.
+  const [evaluationFailed, setEvaluationFailed] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
   // AppState takibi — arka plana geçince kaydı durdur
@@ -229,6 +231,7 @@ export default function InterviewRoomScreen() {
     const answer = userAnswer;
     setUserAnswer('');
     setSendError(null);
+    setEvaluationFailed(false);
     try {
       const finished = await sendMessageStream(answer);
       if (finished) {
@@ -244,7 +247,13 @@ export default function InterviewRoomScreen() {
       } else {
         speakText(useInterviewStore.getState().currentQuestion);
       }
-    } catch {
+    } catch (err) {
+      if ((err as { evaluationFailed?: boolean }).evaluationFailed) {
+        // Cevap kaydedildi; kutuya geri konmaz, değerlendirme tekrar denenir.
+        setEvaluationFailed(true);
+        setSendError((err as Error).message);
+        return;
+      }
       // Alert web'de görünmez ve cevap kaybolurdu: metin kutuya geri konur, hata satır içinde.
       setUserAnswer(answer);
       setSendError('Yanıt gönderilemedi. Cevabınız kutuda duruyor; bağlantınızı kontrol edip tekrar gönderin.');
@@ -277,7 +286,15 @@ export default function InterviewRoomScreen() {
       }
     } catch (err) {
       // Mülakat kaybolmaz: yarıda kalan olarak kalır, Raporlar'dan devam edilebilir.
-      setEndError('Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.');
+      const e = err as { response?: { status?: number; data?: { detail?: string } } };
+      if (e.response?.status === 503 && e.response.data?.detail) {
+        // Değerlendirme yapılamadı (0 puanla kapatılmadı): satır içinde "tekrar dene".
+        setConfirmingEnd(false);
+        setEvaluationFailed(true);
+        setSendError(e.response.data.detail);
+      } else {
+        setEndError('Mülakat sonlandırılamadı. Bağlantınızı kontrol edip tekrar deneyin.');
+      }
     } finally {
       setEnding(false);
     }
@@ -490,6 +507,16 @@ export default function InterviewRoomScreen() {
         {sendError && (
           <Text style={styles.sendError} accessibilityRole="alert">{sendError}</Text>
         )}
+        {evaluationFailed && (
+          <TouchableOpacity
+            style={styles.retryEval}
+            onPress={() => { setSendError(null); setEvaluationFailed(false); confirmEndInterview(); }}
+            disabled={ending}
+            accessibilityRole="button"
+          >
+            <Text style={styles.retryEvalText}>{ending ? 'Değerlendiriliyor…' : 'Değerlendirmeyi tekrar dene'}</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Metin Girişi */}
         <View style={styles.inputContainer}>
@@ -663,6 +690,11 @@ const styles = StyleSheet.create({
   confirmEndText: { fontSize: 14, fontFamily: FontFamilies.sansBold, color: '#fff' },
   leaveLink: { marginTop: 14, alignItems: 'center', paddingVertical: 6 },
   leaveLinkText: { fontSize: 13, fontFamily: FontFamilies.sansSemibold, color: Colors.secondary, textAlign: 'center' },
+  retryEval: {
+    alignSelf: 'center', marginBottom: 8, paddingHorizontal: 16, paddingVertical: 8,
+    borderRadius: 12, borderWidth: 1.5, borderColor: '#fca5a5',
+  },
+  retryEvalText: { fontSize: 13, fontFamily: FontFamilies.sansBold, color: '#fca5a5' },
   sendError: {
     marginHorizontal: 16, marginBottom: 6, fontSize: 12, fontFamily: FontFamilies.sansSemibold,
     color: '#fca5a5', textAlign: 'center',

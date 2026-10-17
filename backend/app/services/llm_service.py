@@ -746,11 +746,11 @@ class LLMService:
                 attempt_timeout=settings.LLM_JSON_ATTEMPT_MAX_DURATION,
             )
         except LLMUnavailable as e:
-            logger.error(
-                "[LLMService] Nihai değerlendirme için tüm modeller başarısız oldu. Son hata: %s. "
-                "Güvenli varsayılan değerlendirme döndürülüyor.", e.last_error,
-            )
-            return InterviewEvaluation().model_dump()
+            # Eskiden 0 puanlık "güvenli varsayılan" dönülüyordu; mülakat 0 puanla tamamlanıp
+            # gelişim istatistiklerini bozuyordu. Artık çağıran claim'i geri alır ve kullanıcı
+            # değerlendirmeyi tekrar dener (bkz. routes/interview.py EVALUATION_FAILED).
+            logger.error("[LLMService] Nihai değerlendirme için tüm modeller başarısız oldu. Son hata: %s", e.last_error)
+            raise
 
     async def generate_json(
         self,

@@ -236,7 +236,10 @@ function streamOnce(interviewId: string, message: string, token: string | null, 
         } else if (eventType === 'error') {
           settled = true;
           set({ isThinking: false });
-          reject(new Error(parsed.detail || 'Yanıt üretimi sırasında bir hata oluştu.'));
+          // evaluation_failed: son cevap kaydedildi ama değerlendirme yapılamadı (mülakat açık kalır).
+          reject(Object.assign(new Error(parsed.detail || 'Yanıt üretimi sırasında bir hata oluştu.'), {
+            evaluationFailed: !!parsed.evaluation_failed,
+          }));
         }
       };
 

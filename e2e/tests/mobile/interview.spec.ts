@@ -1,5 +1,5 @@
 import { expect, test } from '../../fixtures/api';
-import { FIRST_QUESTION, NEXT_QUESTION, ONGOING_ID, sseBody } from '../../fixtures/data';
+import { FINISH_OK, FIRST_QUESTION, NEXT_QUESTION, ONGOING_ID, SSE_EVALUATION_FAILED, sseBody } from '../../fixtures/data';
 
 const STREAM = '/api/v1/interview/chat/stream';
 const ANSWER = 'Küçük uygulamada Context yeterli; sık güncellenen durumda Zustand seçerim.';
@@ -48,6 +48,21 @@ test.describe('yarıda kalan mülakat', () => {
     await page.getByText('Kaldığım yerden devam et').click();
     await expect(page).toHaveURL(/\/interview-room/);
     await expect(page.getByText(FIRST_QUESTION)).toBeVisible();
+  });
+
+  test('değerlendirme yapılamazsa tekrar dene ile sonuç ekranına geçilir', async ({ authedPage: page, api }) => {
+    const finish = `/api/v1/interview/${ONGOING_ID}/finish`;
+    api.on('POST', STREAM, { body: SSE_EVALUATION_FAILED, contentType: 'text/event-stream' });
+    const box = page.getByPlaceholder('Cevabınızı buraya yazın...');
+    await box.fill(ANSWER);
+    await page.getByRole('button', { name: 'Cevabı gönder' }).click();
+
+    await expect(page.getByText('Değerlendirme şu an yapılamadı', { exact: false })).toBeVisible();
+    await expect(box).toHaveValue('');
+    api.on('POST', finish, { json: FINISH_OK });
+    await page.getByRole('button', { name: 'Değerlendirmeyi tekrar dene' }).click();
+    await expect(page).toHaveURL(new RegExp(`/interview-result\\?id=${ONGOING_ID}`));
+    expect(api.callsTo('POST', finish)).toHaveLength(1);
   });
 
   test('gönderim başarısız olursa soru ve cevap kaybolmaz; tekrar gönderilebilir', async ({ authedPage: page, api }) => {

@@ -186,8 +186,8 @@ export const jobService = {
     call<JobMatch>(api.post(`/api/v1/jobs/${jobId}/match`, { cv_id: cvId }, { timeout: 90000 })),
   /** İlana ve CV'ye özel ön yazı taslağı (kaydedilmez). */
   coverLetter: (jobId: string, payload: { cv_id: string; language: 'tr' | 'en'; tone: 'resmi' | 'samimi'; note?: string }) =>
-    // İlk model zaman aşımına düşüp yedek modele geçerse ~2 dk sürebiliyor (canlı ölçüm 106 sn).
-    call<CoverLetter>(api.post(`/api/v1/jobs/${jobId}/cover-letter`, payload, { timeout: 150000 })),
+    // Model başına 110 sn deneme; ilk model düşüp yedeğe geçerse daha da uzayabilir.
+    call<CoverLetter>(api.post(`/api/v1/jobs/${jobId}/cover-letter`, payload, { timeout: 240000 })),
   getLatestMatch: (jobId: string, cvId: string) =>
     callOrNull<JobMatch>(api.get(`/api/v1/jobs/${jobId}/match`, { params: { cv_id: cvId } })),
 };

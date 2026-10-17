@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 LANGUAGES = {"tr", "en"}
 TONES = {"resmi", "samimi"}
 MAX_NOTE = 500
+# Uzun metin + reasoning: canlıda gpt-oss-20b 40-60 sn sürdü ve 60 sn'lik genel sınıra takıldı.
+ATTEMPT_TIMEOUT = 110
 
 _GREETING = {"tr": "Sayın İşe Alım Ekibi,", "en": "Dear Hiring Team,"}
 _CLOSING = {"tr": "Saygılarımla,", "en": "Kind regards,"}
@@ -32,6 +34,13 @@ _NUMBER_RE = re.compile(r"%?\d+(?:[.,]\d+)*%?")
 _THOUSANDS_RE = re.compile(r"^\d{1,3}(?:[.,]\d{3})+$")
 # "30 bin", "2,5 milyon", "30k": CV'de böyle yazılan sayı mektupta "30.000" olabilir.
 _SCALED_RE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(bin|k|milyon|million|m)\b", re.IGNORECASE)
+# Teknik kısaltmalar (WCAG, AWS, CI/CD): CV'de geçmiyorsa uydurulmuş yetkinlik olabilir.
+_ACRONYM_RE = re.compile(r"(?<![\w])[A-ZÇĞİÖŞÜ][A-Z0-9ÇĞİÖŞÜ/+#.-]*[A-Z0-9ÇĞİÖŞÜ+#](?![\w])")
+# Genel terimler: CV'de "REST" yazan adayın mektubunda "REST API", "UI" geçmesi uydurma sayılmaz
+# (canlıda gürültü uyarısı üretiyordu). Belirli standart/araç adları (WCAG, AWS) denetlenmeye devam eder.
+_ACRONYM_IGNORE = {"CV", "İK", "HR", "OK", "API", "UI", "UX", "IT"}
+# Cümle sonu; bu karakterlerden biriyle bitmeyen paragrafın son parçası yarım cümledir.
+_SENTENCE_END = ".!?…)\"'»”"
 _SCALE = {"bin": 1_000, "k": 1_000, "milyon": 1_000_000, "million": 1_000_000, "m": 1_000_000}
 
 
@@ -102,8 +111,30 @@ def _numbers(text: str) -> set:
     return found
 
 
-def honesty_warnings(letter: str, cv_text: str, profile: Dict[str, Any], missing: List[str]) -> List[str]:
-    """Mektupta CV'de dayanağı olmayan sayılar ve CV'de görünmeyen ilan becerileri."""
+def trim_dangling(paragraph: str) -> str:
+    """Model paragrafı yarım cümleyle bitirdiyse (canlıda görüldü) son yarım cümleyi atar."""
+    p = paragraph.rstrip()
+    if not p or p[-1] in _SENTENCE_END:
+        return p
+    cut = max(p.rfind(". "), p.rfind("! "), p.rfind("? "))
+    return p[:cut + 1] if cut > 0 else p
+
+
+def unknown_acronyms(letter: str, known_text: str, exempt: str = "") -> List[str]:
+    known = ats_service.fold(known_text + " " + exempt)
+    out: List[str] = []
+    for token in _ACRONYM_RE.findall(letter or ""):
+        token = token.rstrip(".-/")
+        if (sum(c.isupper() for c in token) < 2 or len(token) > 10 or token in _ACRONYM_IGNORE
+                or ats_service.fold(token) in known or token in out):
+            continue
+        out.append(token)
+    return out
+
+
+def honesty_warnings(letter: str, cv_text: str, profile: Dict[str, Any], missing: List[str], exempt: str = "") -> List[str]:
+    """Mektupta CV'de dayanağı olmayan sayılar, CV'de görünmeyen ilan becerileri ve kısaltmalar.
+    `exempt`: ilan başlığı/şirket gibi CV'de olmasa da mektupta geçmesi doğal metin."""
     warnings: List[str] = []
     known = _numbers(cv_text) | _numbers(build_cv_facts(profile))
     unknown = sorted(n for n in _numbers(letter) if n not in known)
@@ -120,6 +151,14 @@ def honesty_warnings(letter: str, cv_text: str, profile: Dict[str, Any], missing
         warnings.append(
             "CV'nizde görünmeyen şu beceriler mektupta geçiyor: " + ", ".join(mentioned[:6])
             + ". Deneyiminiz yoksa bunların yalnızca öğrenmeye açık olduğunuz şekilde anıldığını kontrol edin."
+        )
+    flagged = {skill_matching.skill_key(s) for s in mentioned}
+    acronyms = [a for a in unknown_acronyms(letter, cv_text + " " + build_cv_facts(profile), exempt)
+                if skill_matching.skill_key(a) not in flagged]
+    if acronyms:
+        warnings.append(
+            "CV'nizde geçmeyen ifadeler: " + ", ".join(acronyms[:6])
+            + ". Bu konularda deneyiminiz yoksa mektuptan çıkarın."
         )
     return warnings
 
@@ -160,8 +199,10 @@ async def generate(user_id: str, job_id: str, cv_id: str, language: str = "tr", 
         # finish_reason=length ile boş döndü.
         max_tokens=6000,
         temperature=0.5,
+        attempt_timeout=ATTEMPT_TIMEOUT,
     )
-    paragraphs = [ats_service.mask_contact(p) for p in _str_list(raw.get("paragraphs"), 5, max_len=1500)]
+    paragraphs = [trim_dangling(ats_service.mask_contact(p)) for p in _str_list(raw.get("paragraphs"), 5, max_len=1500)]
+    paragraphs = [p for p in paragraphs if p]
     if len(paragraphs) < 2:
         raise RuntimeError("Model geçerli bir ön yazı döndürmedi")
 
@@ -177,6 +218,7 @@ async def generate(user_id: str, job_id: str, cv_id: str, language: str = "tr", 
         "language": language,
         "tone": tone,
         "highlighted_skills": highlighted,
-        "warnings": honesty_warnings("\n".join(paragraphs), cv_text, profile, missing),
+        "warnings": honesty_warnings("\n".join(paragraphs), cv_text, profile, missing,
+                                     exempt=f"{job.get('title') or ''} {job.get('company') or ''}"),
         "word_count": len(body.split()),
     }

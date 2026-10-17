@@ -68,6 +68,7 @@ def test_prompt_gets_matched_and_missing_skills(monkeypatch):
     assert "React" in user_msg.split("<eslesen_beceriler>")[1].split("</eslesen_beceriler>")[0]
     assert "<aday_notu>Bilet projemi vurgula</aday_notu>" in user_msg
     assert gen.await_args.kwargs["purpose"] == "cover_letter"
+    assert gen.await_args.kwargs["attempt_timeout"] == cl.ATTEMPT_TIMEOUT
 
 
 # --- birleştirme ---
@@ -125,6 +126,32 @@ def test_invented_number_and_missing_skill_are_flagged():
 def test_same_number_in_other_format_is_not_flagged(cv, letter):
     # Canlıda: CV "30 bin", mektup "30,000" -> yanlış alarm veriyordu.
     assert cl.honesty_warnings(letter, cv, {}, []) == []
+
+
+def test_acronyms_not_in_cv_are_flagged():
+    # Canlıda: CV'de olmayan "WCAG yönergelerine uygun çözümler üretme deneyimim var" yakalanmıyordu.
+    letter = "React ile çalıştım; WCAG uyumlu arayüzler ve REST API entegrasyonu yaptım. Lumen UI ekibine katılmak isterim."
+    warnings = cl.honesty_warnings(letter, "React REST API Next.js", {}, [], exempt="Lumen UI Developer")
+    assert warnings == ["CV'nizde geçmeyen ifadeler: WCAG. Bu konularda deneyiminiz yoksa mektuptan çıkarın."]
+
+
+def test_generic_terms_are_not_flagged():
+    assert cl.honesty_warnings("REST API ve UI geliştirme, UX odaklı çalışma.", "React REST", {}, []) == []
+
+
+def test_missing_skill_is_not_reported_twice_as_acronym():
+    warnings = cl.honesty_warnings("AWS üzerinde çalıştım.", "", {}, ["AWS"])
+    assert len(warnings) == 1 and "AWS" in warnings[0]
+
+
+@pytest.mark.parametrize("text,expected", [
+    ("Birinci cümle. Özellikle kullanıcı deneyimini ön planda tutan projelerde", "Birinci cümle."),
+    ("Tam cümle.", "Tam cümle."),
+    ("Tek parça yarım cümle", "Tek parça yarım cümle"),  # kesecek yer yoksa olduğu gibi kalır
+    ("Görüşmek isterim!", "Görüşmek isterim!"),
+])
+def test_dangling_sentence_is_trimmed(text, expected):
+    assert cl.trim_dangling(text) == expected
 
 
 def test_short_missing_skill_is_found_as_word():

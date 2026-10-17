@@ -111,7 +111,7 @@ export function CoverLetterPanel({ jobId, cvId, jobTitle }: { jobId: string; cvI
       </Button>
 
       {busy && (
-        <p className="text-xs text-muted-foreground" aria-live="polite">Yapay zekâ ile hazırlanıyor; 1-2 dakika sürebilir.</p>
+        <p className="text-xs text-muted-foreground" aria-live="polite">Yapay zekâ ile hazırlanıyor; 1-3 dakika sürebilir.</p>
       )}
       {error && (
         <p role="alert" className="text-sm text-destructive">{error}</p>

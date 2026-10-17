@@ -30,11 +30,13 @@ Yalnızca aşağıdaki şemaya uyan TEK bir JSON nesnesi döndür, başka hiçbi
 Kurallar:
 - {lang_rule} {_TONES.get(tone, _TONES["resmi"])}
 - DÜRÜSTLÜK: Yalnızca <cv> içindeki deneyim, proje, beceri, eğitim ve sayıları kullan. CV'de olmayan bir
-  deneyim, şirket, sayı, yüzde, süre ya da sertifika UYDURMA.
+  deneyim, şirket, sayı, yüzde, süre, sertifika, standart ya da yöntem (ör. erişilebilirlik/WCAG, mikroservis,
+  çevik yönetim) UYDURMA; CV'de yazmayan bir yetkinliği "deneyimim var" diye ekleme.
 - <eksik_beceriler> listesindeki becerilere SAHİPMİŞ gibi yazma. İstersen öğrenmeye açık olduğunu tek cümleyle
   belirt.
 - İlk paragraf pozisyona ve şirkete ilgiyi, orta paragraflar CV'deki somut deneyimlerin ilanın gereksinimleriyle
   bağlantısını, son paragraf görüşme talebini anlatsın.
+- Her paragraf tam bir cümleyle bitsin; yarım cümle bırakma.
 - Hitap ("Sayın ...") ve kapanış/imza ("Saygılarımla", ad) YAZMA; bunlar ayrıca eklenecek.
 - İletişim bilgisi (e-posta, telefon, adres) YAZMA.
 - <aday_notu> varsa adayın vurgulamak istediği noktadır; CV ile çelişmiyorsa kullan."""

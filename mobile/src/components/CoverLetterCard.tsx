@@ -96,7 +96,7 @@ export function CoverLetterCard({ jobId, cvId }: { jobId: string; cvId: string }
           disabled={busy}
           style={{ marginTop: 12 }}
         />
-        {busy && <Text style={[typo.small, { marginTop: 8 }]}>Yapay zekâ ile hazırlanıyor; 1-2 dakika sürebilir…</Text>}
+        {busy && <Text style={[typo.small, { marginTop: 8 }]}>Yapay zekâ ile hazırlanıyor; 1-3 dakika sürebilir…</Text>}
       </Card>
 
       {error && <Banner>{error}</Banner>}

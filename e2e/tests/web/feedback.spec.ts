@@ -49,7 +49,7 @@ test.describe('admin: geri bildirimler', () => {
   test.beforeEach(({ api }) => {
     api.state.user.app_metadata = { ...api.state.user.app_metadata, role: 'admin' } as typeof api.state.user.app_metadata;
     api.on('GET', '/api/v1/admin/overview', { json: { month: '2026-10', users: 1 } });
-    api.on('GET', '/api/v1/admin/ai-usage', { json: { month: '2026-10', calls: 0, daily: [], by_feature: [], by_org: [], by_model: [], unpriced_models: [] } });
+    api.on('GET', '/api/v1/admin/ai-usage', { json: { month: '2026-10', calls: 0, daily: [], by_feature: [], by_org: [], by_model: [], unpriced_models: [], errors: [], last_success_at: null, last_failure_at: null } });
   });
 
   test('gönderen, ekran görüntüsü ve durum görünür; durum ve not kaydedilir; filtre çalışır', async ({ authedPage: page, api }) => {

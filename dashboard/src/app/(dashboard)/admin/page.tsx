@@ -38,8 +38,11 @@ function todayIso() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Günlük kırılım gibi zamanlar da tarayıcının saat diliminden bağımsız olarak Türkiye saatiyle.
 const fmtTime = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+  iso
+    ? new Date(iso).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" })
+    : "—";
 
 // llm_usage.error_type Python istisna adıdır; bilinenler okunur hâle getirilir.
 const ERROR_LABELS: Record<string, string> = {
@@ -234,13 +237,14 @@ function UsageTab() {
 
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <Card title="Başarısız çağrılar (hata türüne göre)" subtitle="Bir deneme başarısız olunca zincirdeki sonraki model denenir; burada her başarısız deneme sayılır">
-              {usage.errors.length === 0 ? (
+              {/* Eski backend yanıtında alan yoksa boş say (dağıtım sırasında sayfa çökmesin). */}
+              {(usage.errors ?? []).length === 0 ? (
                 <p className="text-sm text-muted-foreground">Bu dönemde başarısız çağrı yok.</p>
               ) : (
                 <Table
                   head={["Hata türü", "Adet", "Özellik", "Model"]}
                   numericFrom={1}
-                  rows={usage.errors.map((e) => [
+                  rows={(usage.errors ?? []).map((e) => [
                     <span key={e.error_type} title={e.error_type}>{errorLabel(e.error_type)}</span>,
                     fmt(e.count),
                     <span key="f" className="text-xs">{e.features.map((f) => `${f.feature} (${f.count})`).join(", ")}</span>,

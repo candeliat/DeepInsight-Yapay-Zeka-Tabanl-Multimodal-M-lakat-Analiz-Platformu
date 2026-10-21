@@ -50,7 +50,7 @@ jobs:
       # kullanıldıkları anda import edilirler ve testler bu yolları taklit eder; CI'da kurulmaz.
       - name: Bağımlılıklar (ağır ML paketleri hariç)
         run: |
-          grep -vE '^(deepface|mediapipe|openai-whisper|librosa|sentence-transformers|easyocr|soundfile|imageio-ffmpeg)\b' \
+          grep -vE '^(deepface|tensorflow|tf-keras|mtcnn|mediapipe|openai-whisper|librosa|sentence-transformers|easyocr|soundfile|imageio-ffmpeg)\b' \
             requirements.txt > "$RUNNER_TEMP/requirements-ci.txt"
           cat "$RUNNER_TEMP/requirements-ci.txt"
           python -m pip install --upgrade pip

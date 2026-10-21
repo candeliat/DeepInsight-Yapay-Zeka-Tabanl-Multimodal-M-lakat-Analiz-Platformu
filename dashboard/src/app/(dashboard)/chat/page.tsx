@@ -137,6 +137,8 @@ export default function InterviewRoomPage() {
   const [analytics, setAnalytics] = useState<any>(null);
   const [spokenWordIndex, setSpokenWordIndex] = useState(-1);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  // Video analizi başarısız olur ya da zamanında bitmezse sonuç ekranında söylenir (sessizce eksik kalmasın).
+  const [analysisNote, setAnalysisNote] = useState<string | null>(null);
   const [analyzingStatusText, setAnalyzingStatusText] = useState(
     "Yapay Zekamız mülakat performansını, göz temasını ve konuşma tonunu inceliyor. Lütfen ayrılmayın..."
   );
@@ -472,6 +474,7 @@ export default function InterviewRoomPage() {
       if (attempts > maxAttempts || polls > 720) {
         clearInterval(pollIntervalRef.current!);
         pollIntervalRef.current = null;
+        setAnalysisNote("Video analizi zamanında bitmedi. Tamamlanırsa Mülakatlarım'daki raporda görünür.");
         setEvaluation(initialEvaluation);
         setCurrentState("RESULTS");
         return;
@@ -507,7 +510,8 @@ export default function InterviewRoomPage() {
         } else if (status === "failed") {
           clearInterval(pollIntervalRef.current!);
           pollIntervalRef.current = null;
-          console.error("AI analizi başarısız oldu.");
+          console.warn("Video analizi başarısız oldu:", response.data.error_message);
+          setAnalysisNote("Video analizi tamamlanamadı; göz teması ve konuşma ölçümleri bu mülakatta yok. Skorlarınız cevaplarınıza göre hesaplandı.");
           setEvaluation(initialEvaluation);
           setCurrentState("RESULTS");
         }
@@ -941,9 +945,15 @@ export default function InterviewRoomPage() {
             </div>
             <h1 className="font-serif italic text-3xl text-foreground tracking-tight">Değerlendirmeniz hazır</h1>
             <p className="text-sm text-muted-foreground font-semibold mt-1">
-              Temel AI skorlarınız hesaplandı. Video/Ses analiz raporunuz başarıyla entegre edildi.
+              {analytics ? "Temel AI skorlarınız hesaplandı. Video/Ses analiz raporunuz başarıyla entegre edildi." : "Temel AI skorlarınız hesaplandı."}
             </p>
           </div>
+
+          {!analytics && analysisNote && (
+            <p role="status" className="mb-6 text-sm font-semibold text-warning bg-warning/10 border border-warning/20 rounded-2xl px-4 py-3">
+              {analysisNote}
+            </p>
+          )}
 
           {/* Skor Kartları */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">

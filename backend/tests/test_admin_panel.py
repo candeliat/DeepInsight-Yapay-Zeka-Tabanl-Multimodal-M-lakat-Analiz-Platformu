@@ -96,3 +96,54 @@ def test_ai_usage_endpoint_month_validation_and_503(as_role, monkeypatch):
 def test_overview_endpoint(as_role, monkeypatch):
     monkeypatch.setattr(admin_service, "overview", AsyncMock(return_value={"users": 18, "organizations": 1}))
     assert as_role("admin").get("/api/v1/admin/overview").json()["users"] == 18
+
+
+def test_summarize_platform_error_types_and_last_times():
+    rows = [
+        {**_row("evaluation"), "created_at": "2026-10-05T10:00:00+00:00"},
+        {**_row("evaluation", success=False), "error_type": "TimeoutError", "created_at": "2026-10-06T09:00:00+00:00"},
+        {**_row("cover_letter", model="m-b", success=False), "error_type": "TimeoutError", "created_at": "2026-10-04T08:00:00+00:00"},
+        {**_row("cv_profile", success=False), "error_type": None, "created_at": "2026-10-03T08:00:00+00:00"},
+    ]
+    out = admin_service.summarize_platform(rows, [], {}, {})
+    assert [(e["error_type"], e["count"]) for e in out["errors"]] == [("TimeoutError", 2), ("Bilinmeyen", 1)]
+    timeout = out["errors"][0]
+    assert {f["feature"] for f in timeout["features"]} == {"Mülakat sonu değerlendirme", "Ön yazı"}
+    assert {m["model"] for m in timeout["models"]} == {"m-a", "m-b"}
+    ev = next(f for f in out["by_feature"] if f["feature"] == "Mülakat sonu değerlendirme")
+    assert ev["last_success_at"] == "2026-10-05T10:00:00+00:00"
+    assert ev["last_failure_at"] == "2026-10-06T09:00:00+00:00" and ev["last_error_type"] == "TimeoutError"
+    assert out["last_success_at"] == "2026-10-05T10:00:00+00:00"
+    assert out["last_failure_at"] == "2026-10-06T09:00:00+00:00"
+
+
+def test_parse_range_inclusive_tr_days_and_validation():
+    lo, hi, label = admin_service.parse_range(None, "2026-10-01", "2026-10-21")
+    assert lo.isoformat() == "2026-09-30T21:00:00+00:00"  # TR gece yarısı
+    assert hi.isoformat() == "2026-10-21T21:00:00+00:00"  # bitiş günü dahil
+    assert label == "2026-10-01 – 2026-10-21"
+    assert admin_service.parse_range("2026-09", None, None)[2] == "2026-09"
+    for bad in (("2026-10-01", None), ("2026-10-21", "2026-10-01"), ("2025-01-01", "2026-10-01"), ("2026-02-30", "2026-03-01")):
+        with pytest.raises(ValueError):
+            admin_service.parse_range(None, *bad)
+
+
+def test_ai_usage_endpoint_passes_date_range(as_role, monkeypatch):
+    usage = AsyncMock(return_value={"month": "x"})
+    monkeypatch.setattr(admin_service, "ai_usage", usage)
+    c = as_role("admin")
+    assert c.get("/api/v1/admin/ai-usage?start=2026-10-01&end=2026-10-21").status_code == 200
+    assert usage.await_args.args == (None, "2026-10-01", "2026-10-21")
+    assert c.get("/api/v1/admin/ai-usage?start=1-10-2026&end=2026-10-21").status_code == 422
+    # Mantık hatası (bitiş < başlangıç) serviste ValueError -> 422
+    monkeypatch.setattr(admin_service, "ai_usage", AsyncMock(side_effect=ValueError("Bitiş tarihi başlangıçtan önce olamaz.")))
+    r = c.get("/api/v1/admin/ai-usage?start=2026-10-21&end=2026-10-01")
+    assert r.status_code == 422 and "Bitiş" in r.json()["detail"]
+
+
+def test_inventory_purposes_have_timeouts(as_role):
+    from app.core.config import settings
+    purposes = {p["purpose"]: p for p in as_role("admin").get("/api/v1/admin/ai-inventory").json()["llm"]["purposes"]}
+    assert purposes["cover_letter"]["timeout_s"] == 110
+    assert purposes["evaluation"]["timeout_s"] == settings.LLM_JSON_ATTEMPT_MAX_DURATION
+    assert purposes["question_stream"]["timeout_s"] == settings.LLM_ATTEMPT_MAX_DURATION

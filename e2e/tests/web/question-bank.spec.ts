@@ -78,3 +78,37 @@ test('sunucuya ulaşılamazsa İngilizce axios metni yerine Türkçe mesaj göst
   await expect(alert).toContainText('Sunucuya ulaşılamadı');
   await expect(alert).not.toContainText('Network Error');
 });
+
+test('arama, konu/zorluk/durum filtreleri ve sayfalama', async ({ authedPage: page, api }) => {
+  // 20 bağımsız Python sorusu + 1 pasif Docker sorusu: sayfa başına 15 kayıt.
+  const many = Array.from({ length: 20 }, (_, i) => ({
+    ...QUESTION, id: `q-${i}`, question_text: `Python sorusu numara ${i + 1} için yeterince uzun metin`,
+    difficulty: i % 2 ? 'ORTA' : 'JUNIOR',
+  }));
+  const docker = { ...QUESTION, id: 'q-docker', role: 'DevOps Mühendisi', topic: 'Docker', difficulty: 'UZMAN',
+    question_text: 'Multi-stage Docker build ne işe yarar?', is_active: false };
+  api.on('GET', '/api/v1/question-bank/questions', { json: [...many, docker] });
+  await page.goto('/question-bank');
+
+  await expect(page.getByText('21 soru', { exact: true })).toBeVisible();
+  await expect(page.getByText('Sayfa 1 / 2')).toBeVisible();
+  await page.getByRole('button', { name: /Sonraki/ }).click();
+  await expect(page.getByText('Sayfa 2 / 2')).toBeVisible();
+
+  // Filtre değişince ilk sayfaya döner
+  await page.getByLabel('Soru ara').fill('multi-STAGE');
+  await expect(page.getByText('1 / 21 soru eşleşti')).toBeVisible();
+  await expect(page.getByText('DevOps Mühendisi / Docker')).toBeVisible(); // bağımsız soruda rol/konu
+  await expect(page.getByRole('navigation', { name: 'Sayfalar' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Filtreleri temizle' }).click();
+  await page.getByLabel('Konuya göre filtrele').selectOption('Python');
+  await page.getByLabel('Zorluğa göre filtrele').selectOption('ORTA');
+  await expect(page.getByText('10 / 21 soru eşleşti')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Filtreleri temizle' }).click();
+  await page.getByLabel('Duruma göre filtrele').selectOption('passive');
+  await expect(page.getByText('1 / 21 soru eşleşti')).toBeVisible();
+  await page.getByLabel('Soru ara').fill('python');
+  await expect(page.getByText('Filtrelere uyan soru yok.')).toBeVisible();
+});

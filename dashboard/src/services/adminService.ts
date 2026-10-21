@@ -15,7 +15,13 @@ export interface AdminOverview {
 
 export interface AdminUsage extends OrgUsage {
   active_users: number;
-  by_feature: { feature: string; calls: number; failed: number; total_tokens: number; avg_latency_ms: number | null; purposes: string[] }[];
+  by_feature: {
+    feature: string; calls: number; failed: number; total_tokens: number; avg_latency_ms: number | null; purposes: string[];
+    last_success_at: string | null; last_failure_at: string | null; last_error_type: string | null;
+  }[];
+  errors: { error_type: string; count: number; features: { feature: string; count: number }[]; models: { model: string; count: number }[] }[];
+  last_success_at: string | null;
+  last_failure_at: string | null;
   by_org: { org_id: string | null; name: string; calls: number; total_tokens: number; users: number; estimated_cost_usd: number | null }[];
 }
 
@@ -33,7 +39,7 @@ export interface AiInventory {
     paid_fallback_enabled: boolean;
     attempt_timeout_s: number;
     json_attempt_timeout_s: number;
-    purposes: { purpose: string; feature: string; where: string }[];
+    purposes: { purpose: string; feature: string; where: string; timeout_s: number }[];
     prices_configured: boolean;
   };
   components: { id: string; name: string; model: string; runs: string; kind: string; used_for: string[]; loaded?: boolean }[];
@@ -42,6 +48,8 @@ export interface AiInventory {
 
 export const adminService = {
   overview: () => call<AdminOverview>(api.get("/api/v1/admin/overview")),
-  usage: (month?: string) => call<AdminUsage>(api.get("/api/v1/admin/ai-usage", { params: { month } })),
+  /** Ay ya da gün aralığı (start/end YYYY-AA-GG, iki uç dahil). */
+  usage: (period: { month?: string; start?: string; end?: string }) =>
+    call<AdminUsage>(api.get("/api/v1/admin/ai-usage", { params: period })),
   inventory: () => call<AiInventory>(api.get("/api/v1/admin/ai-inventory")),
 };

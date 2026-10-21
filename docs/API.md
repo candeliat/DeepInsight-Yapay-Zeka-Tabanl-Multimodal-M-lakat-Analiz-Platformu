@@ -153,7 +153,7 @@ kaynak sahipliği (ör. kendi mülakatın, kendi CV'n) ayrıca servis katmanınd
 | Yöntem | Yol | Yetki | Açıklama |
 |---|---|---|---|
 | GET | `/api/v1/admin/ai-inventory` | Platform admini | Hangi özellik hangi yapay zekâ modelini/aracını kullanıyor, nerede çalışıyor; LLM zincirinin canlı durumu. |
-| GET | `/api/v1/admin/ai-usage` | Platform admini | Ay bazında platform geneli yapay zekâ kullanımı: özellik, model ve kurum kırılımı, tahmini maliyet. |
+| GET | `/api/v1/admin/ai-usage` | Platform admini | Ay ya da gün aralığı (start/end, iki uç dahil) için platform geneli yapay zekâ kullanımı: |
 | GET | `/api/v1/admin/feedback` | Platform admini | Tüm geri bildirimler: gönderen (ad/e-posta), sayfa, platform, ekran görüntüsü (imzalı URL), durum. |
 | PATCH | `/api/v1/admin/feedback/{feedback_id}` | Platform admini | Durum (yeni/inceleniyor/planlandı/çözüldü/reddedildi) ve admin notu; denetim kaydına yazılır. |
 | GET | `/api/v1/admin/overview` | Platform admini | Platform geneli sayılar (kullanıcı, kurum, mülakat, CV, ilan). |

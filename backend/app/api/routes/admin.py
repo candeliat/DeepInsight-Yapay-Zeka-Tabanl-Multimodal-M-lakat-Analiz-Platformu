@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _MONTH = Query(default=None, pattern=r"^\d{4}-\d{2}$")
+# Query nesnesi parametreler arasında paylaşılmamalı (start ve end aynı değeri alıyordu).
+_DAY_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
 
 
 @router.get("/overview")
@@ -31,12 +33,15 @@ async def admin_overview(
 @router.get("/ai-usage")
 async def admin_ai_usage(
     month: Optional[str] = _MONTH,
+    start: Optional[str] = Query(default=None, pattern=_DAY_PATTERN),
+    end: Optional[str] = Query(default=None, pattern=_DAY_PATTERN),
     token: str = Depends(oauth2_scheme),
     current_user: UserProfile = Depends(require_admin),
 ):
-    """Ay bazında platform geneli yapay zekâ kullanımı: özellik, model ve kurum kırılımı, tahmini maliyet."""
+    """Ay ya da gün aralığı (start/end, iki uç dahil) için platform geneli yapay zekâ kullanımı:
+    özellik, model ve kurum kırılımı, hata türleri, son başarı/başarısızlık zamanı, tahmini maliyet."""
     try:
-        return await admin_service.ai_usage(month)
+        return await admin_service.ai_usage(month, start, end)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except Exception:

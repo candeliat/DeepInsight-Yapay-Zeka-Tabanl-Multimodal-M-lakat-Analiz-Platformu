@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { Plus, Trash2, Pencil, Check, X, XCircle, AlertTriangle, Layers, Loader2, Database, Sparkles, ThumbsUp, ThumbsDown } from "lucide-react";
+import { Plus, Trash2, Pencil, Check, X, XCircle, AlertTriangle, Layers, Loader2, Database, Sparkles, ThumbsUp, ThumbsDown, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   questionBankService,
   QuestionBankItem,
@@ -19,6 +19,9 @@ const DIFFICULTY_TONE: Record<string, string> = {
   ORTA: "text-warning bg-warning/10",
   UZMAN: "text-destructive bg-destructive/10",
 };
+// Sayfa başına aile/bağımsız soru sayısı.
+const PAGE_SIZE = 15;
+const SELECT_CLASS = "w-full h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground";
 
 export default function QuestionBankPage() {
   const [questions, setQuestions] = useState<QuestionBankItem[]>([]);
@@ -46,6 +49,13 @@ export default function QuestionBankPage() {
   // İşlem hataları alert() yerine sayfanın üstünde; silme onayı satır içinde (confirm() yerine).
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Liste: arama, filtre, sayfa
+  const [search, setSearch] = useState("");
+  const [filterTopic, setFilterTopic] = useState("");
+  const [filterDifficulty, setFilterDifficulty] = useState("");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "passive">("all");
+  const [page, setPage] = useState(1);
   const fail = (err: unknown, fallback: string) => setActionError(err instanceof Error ? err.message : fallback);
 
   const load = useCallback(async () => {
@@ -124,6 +134,31 @@ export default function QuestionBankPage() {
   for (const arr of families.values()) {
     arr.sort((a, b) => (DIFFICULTY_RANK[a.difficulty ?? ""] ?? 0) - (DIFFICULTY_RANK[b.difficulty ?? ""] ?? 0));
   }
+
+  // Liste filtreleri (aile seçicisi yukarıdaki tam listeyi kullanmaya devam eder).
+  const topics = [...new Set(questions.map((q) => q.topic))].sort((a, b) => a.localeCompare(b, "tr"));
+  const needle = search.trim().toLocaleLowerCase("tr-TR");
+  const matches = (q: QuestionBankItem) =>
+    (!needle || `${q.question_text} ${q.role} ${q.topic}`.toLocaleLowerCase("tr-TR").includes(needle)) &&
+    (!filterTopic || q.topic === filterTopic) &&
+    (!filterDifficulty || q.difficulty === filterDifficulty) &&
+    (filterStatus === "all" || (filterStatus === "active") === q.is_active);
+  // Sayfalama birimi: bir aile (yalnızca eşleşen üyeleriyle) ya da tek bir bağımsız soru.
+  const entries: ({ fid: string; members: QuestionBankItem[] } | QuestionBankItem)[] = [
+    ...[...families.entries()].map(([fid, members]) => ({ fid, members: members.filter(matches) })).filter((f) => f.members.length > 0),
+    ...standalone.filter(matches),
+  ];
+  const matchedCount = entries.reduce((n, e) => n + ("members" in e ? e.members.length : 1), 0);
+  const pageCount = Math.max(1, Math.ceil(entries.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount);
+  const pageEntries = entries.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const pageFamilies = pageEntries.filter((e): e is { fid: string; members: QuestionBankItem[] } => "members" in e);
+  const pageStandalone = pageEntries.filter((e): e is QuestionBankItem => !("members" in e));
+  const filtering = Boolean(needle || filterTopic || filterDifficulty || filterStatus !== "all");
+  const setFilter = <T,>(setter: (v: T) => void) => (v: T) => {
+    setter(v);
+    setPage(1);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,6 +258,7 @@ export default function QuestionBankPage() {
                     {q.difficulty}
                   </span>
                 )}
+                {!chained && <span className="text-[10px] text-muted-foreground font-medium">{q.role} / {q.topic}</span>}
                 <span className="text-[10px] text-muted-foreground font-medium">{q.times_served}x soruldu</span>
                 {!q.is_active && <span className="text-[10px] text-muted-foreground font-bold">(pasif)</span>}
               </div>
@@ -454,7 +490,66 @@ export default function QuestionBankPage() {
         <p className="text-sm text-muted-foreground text-center py-16">Henüz soru eklenmemiş.</p>
       ) : (
         <div className="space-y-6">
-          {[...families.entries()].map(([fid, members]) => (
+          <div className="bg-card border border-border rounded-2xl p-4 space-y-3" role="search" aria-label="Soru listesi filtreleri">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <div className="relative sm:col-span-2 lg:col-span-1">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden />
+                <Input
+                  type="search"
+                  aria-label="Soru ara"
+                  placeholder="Soru, rol ya da konu ara"
+                  value={search}
+                  onChange={(e) => setFilter(setSearch)(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <select aria-label="Konuya göre filtrele" value={filterTopic} onChange={(e) => setFilter(setFilterTopic)(e.target.value)} className={SELECT_CLASS}>
+                <option value="">Tüm konular</option>
+                {topics.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+              <select aria-label="Zorluğa göre filtrele" value={filterDifficulty} onChange={(e) => setFilter(setFilterDifficulty)(e.target.value)} className={SELECT_CLASS}>
+                <option value="">Tüm zorluklar</option>
+                {DIFFICULTIES.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <select
+                aria-label="Duruma göre filtrele"
+                value={filterStatus}
+                onChange={(e) => setFilter(setFilterStatus)(e.target.value as "all" | "active" | "passive")}
+                className={SELECT_CLASS}
+              >
+                <option value="all">Aktif ve pasif</option>
+                <option value="active">Yalnızca aktif</option>
+                <option value="passive">Yalnızca pasif</option>
+              </select>
+            </div>
+            <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-muted-foreground">
+              <p aria-live="polite">
+                {filtering ? `${matchedCount} / ${questions.length} soru eşleşti` : `${questions.length} soru`}
+              </p>
+              {filtering && (
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    setFilterTopic("");
+                    setFilterDifficulty("");
+                    setFilterStatus("all");
+                    setPage(1);
+                  }}
+                  className="font-semibold text-primary hover:underline"
+                >
+                  Filtreleri temizle
+                </button>
+              )}
+            </div>
+          </div>
+
+          {entries.length === 0 && <p className="text-sm text-muted-foreground text-center py-10">Filtrelere uyan soru yok.</p>}
+
+          {pageFamilies.map(({ fid, members }) => (
             <div key={fid} className="bg-card border border-border rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <Layers className="w-4 h-4 text-primary" />
@@ -466,13 +561,27 @@ export default function QuestionBankPage() {
             </div>
           ))}
 
-          {standalone.length > 0 && (
+          {pageStandalone.length > 0 && (
             <div className="bg-card border border-border rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Bağımsız Sorular</span>
               </div>
-              <div className="divide-y divide-border/60">{standalone.map((q) => renderRow(q, false))}</div>
+              <div className="divide-y divide-border/60">{pageStandalone.map((q) => renderRow(q, false))}</div>
             </div>
+          )}
+
+          {pageCount > 1 && (
+            <nav className="flex items-center justify-center gap-3" aria-label="Sayfalar">
+              <Button size="sm" variant="outline" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+                <ChevronLeft className="w-4 h-4" /> Önceki
+              </Button>
+              <span className="text-sm text-muted-foreground tabular-nums" aria-current="page">
+                Sayfa {currentPage} / {pageCount}
+              </span>
+              <Button size="sm" variant="outline" disabled={currentPage >= pageCount} onClick={() => setPage(currentPage + 1)}>
+                Sonraki <ChevronRight className="w-4 h-4" />
+              </Button>
+            </nav>
           )}
         </div>
       )}

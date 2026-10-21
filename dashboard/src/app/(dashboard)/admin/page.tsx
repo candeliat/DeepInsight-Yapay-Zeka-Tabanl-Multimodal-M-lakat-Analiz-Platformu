@@ -33,6 +33,27 @@ function recentMonths(count = 6) {
   });
 }
 
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+const fmtTime = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleString("tr-TR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+
+// llm_usage.error_type Python istisna adıdır; bilinenler okunur hâle getirilir.
+const ERROR_LABELS: Record<string, string> = {
+  TimeoutError: "Zaman aşımı",
+  ValueError: "Geçersiz çıktı (JSON okunamadı)",
+  RateLimitError: "Hız sınırı (429)",
+  APIConnectionError: "Bağlantı hatası",
+  APITimeoutError: "Sağlayıcı zaman aşımı",
+  InternalServerError: "Sağlayıcı hatası (5xx)",
+  NotFoundError: "Model bulunamadı",
+  Bilinmeyen: "Bilinmeyen",
+};
+const errorLabel = (t: string | null | undefined) => (t ? ERROR_LABELS[t] ?? t : "—");
+
 function Table({ head, rows, numericFrom = 1 }: { head: string[]; rows: React.ReactNode[][]; numericFrom?: number }) {
   return (
     <div className="overflow-x-auto">
@@ -68,34 +89,77 @@ function Card({ title, subtitle, children }: { title: string; subtitle?: string;
   );
 }
 
+type Period = { month: string } | { start: string; end: string };
+const CUSTOM = "custom";
+
 function UsageTab() {
   const months = recentMonths();
-  const [month, setMonth] = useState(months[0].value);
+  const [period, setPeriod] = useState<Period>({ month: months[0].value });
+  const [custom, setCustom] = useState(false);
+  const [draft, setDraft] = useState({ start: `${months[0].value}-01`, end: todayIso() });
   const [usage, setUsage] = useState<AdminUsage | null>(null);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const key = JSON.stringify(period);
+  const isRange = "start" in period;
 
   useEffect(() => {
     let active = true;
     adminService
-      .usage(month)
-      .then((u) => active && (setUsage(u), setError(null)))
-      .catch((e) => active && setError(e instanceof Error ? e.message : "Kullanım verisi yüklenemedi."));
+      .usage(period)
+      .then((u) => active && (setUsage(u), setLoadedKey(key), setError(null)))
+      .catch((e) => active && (setError(e instanceof Error ? e.message : "Kullanım verisi yüklenemedi."), setLoadedKey(key)));
     return () => {
       active = false;
     };
-  }, [month]);
+    // period anahtarla izlenir; nesne kimliği her çizimde değişebilir.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
-  const loading = !error && (!usage || usage.month !== month);
+  const loading = loadedKey !== key;
+  const rangeInvalid = !draft.start || !draft.end || draft.end < draft.start;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2">
-        <label htmlFor="admin-month" className="text-xs font-semibold text-muted-foreground">Ay</label>
-        <select id="admin-month" value={month} onChange={(e) => setMonth(e.target.value)} className="h-9 px-3 rounded-xl border border-border bg-background text-sm">
+      <div className="flex items-center gap-2 flex-wrap">
+        <label htmlFor="admin-month" className="text-xs font-semibold text-muted-foreground">Dönem</label>
+        <select
+          id="admin-month"
+          value={custom ? CUSTOM : "month" in period ? period.month : CUSTOM}
+          onChange={(e) => {
+            if (e.target.value === CUSTOM) return setCustom(true);
+            setCustom(false);
+            setPeriod({ month: e.target.value });
+          }}
+          className="h-9 px-3 rounded-xl border border-border bg-background text-sm"
+        >
           {months.map((m) => (
             <option key={m.value} value={m.value}>{m.label}</option>
           ))}
+          <option value={CUSTOM}>Tarih aralığı…</option>
         </select>
+        {custom && (
+          <form
+            className="flex items-center gap-2 flex-wrap"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!rangeInvalid) setPeriod({ ...draft });
+            }}
+          >
+            <label htmlFor="admin-start" className="sr-only">Başlangıç tarihi</label>
+            <input id="admin-start" type="date" value={draft.start} max={draft.end || undefined}
+              onChange={(e) => setDraft((d) => ({ ...d, start: e.target.value }))}
+              className="h-9 px-2 rounded-xl border border-border bg-background text-sm" />
+            <span className="text-xs text-muted-foreground" aria-hidden>–</span>
+            <label htmlFor="admin-end" className="sr-only">Bitiş tarihi</label>
+            <input id="admin-end" type="date" value={draft.end} min={draft.start || undefined}
+              onChange={(e) => setDraft((d) => ({ ...d, end: e.target.value }))}
+              className="h-9 px-2 rounded-xl border border-border bg-background text-sm" />
+            <button type="submit" disabled={rangeInvalid} className="h-9 px-3 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
+              Uygula
+            </button>
+          </form>
+        )}
         {loading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
       </div>
 
@@ -103,6 +167,11 @@ function UsageTab() {
         <p role="alert" className="text-sm text-destructive">{error}</p>
       ) : !usage || loading ? null : (
         <>
+          <p className="text-xs text-muted-foreground">
+            {isRange && <span className="font-semibold text-foreground">{usage.month} · </span>}
+            Son başarılı çağrı: <span className="font-semibold text-foreground">{fmtTime(usage.last_success_at)}</span> · Son başarısız çağrı:{" "}
+            <span className="font-semibold text-foreground">{fmtTime(usage.last_failure_at)}</span>
+          </p>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatTile label="Model çağrısı" value={fmt(usage.calls)}>
               <span className="text-xs text-muted-foreground">%{fmt(usage.success_rate, 1)} başarılı · {fmt(usage.failed_calls)} başarısız</span>
@@ -122,11 +191,12 @@ function UsageTab() {
 
           <Card title="Günlük model çağrısı" subtitle="Her deneme bir çağrı; başarısız denemeler dahil (Türkiye saati)">
             {usage.daily.length === 0 ? (
-              <p className="text-sm text-muted-foreground">Bu ay kayıt yok.</p>
+              <p className="text-sm text-muted-foreground">Bu dönemde kayıt yok.</p>
             ) : (
               <div className="h-56" role="img" aria-label={`Günlük model çağrısı, ${usage.daily.length} gün`}>
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={usage.daily.map((d) => ({ ...d, label: d.date.slice(8) }))} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
+                  {/* Aralık birden çok aya yayılabilir: gün.ay */}
+                  <BarChart data={usage.daily.map((d) => ({ ...d, label: isRange ? `${d.date.slice(8)}.${d.date.slice(5, 7)}` : d.date.slice(8) }))} margin={{ top: 8, right: 8, bottom: 0, left: -20 }}>
                     <CartesianGrid vertical={false} stroke={GRID} />
                     <XAxis dataKey="label" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
                     <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} />
@@ -147,18 +217,37 @@ function UsageTab() {
             )}
           </Card>
 
+          <Card title="Özelliğe göre" subtitle="Yapay zekânın platformda nerede kullanıldığı; son başarılı ve başarısız çağrının zamanı">
+            <Table
+              head={["Özellik", "Çağrı", "Başarısız", "Ort. süre", "Token", "Son başarılı", "Son hata"]}
+              rows={usage.by_feature.map((f) => [
+                f.feature,
+                fmt(f.calls),
+                fmt(f.failed),
+                f.avg_latency_ms == null ? "—" : `${fmt(f.avg_latency_ms / 1000, 1)} sn`,
+                fmt(f.total_tokens),
+                fmtTime(f.last_success_at),
+                f.last_failure_at ? `${fmtTime(f.last_failure_at)} · ${errorLabel(f.last_error_type)}` : "—",
+              ])}
+            />
+          </Card>
+
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <Card title="Özelliğe göre" subtitle="Yapay zekânın platformda nerede kullanıldığı">
-              <Table
-                head={["Özellik", "Çağrı", "Başarısız", "Ort. süre", "Token"]}
-                rows={usage.by_feature.map((f) => [
-                  f.feature,
-                  fmt(f.calls),
-                  fmt(f.failed),
-                  f.avg_latency_ms == null ? "—" : `${fmt(f.avg_latency_ms / 1000, 1)} sn`,
-                  fmt(f.total_tokens),
-                ])}
-              />
+            <Card title="Başarısız çağrılar (hata türüne göre)" subtitle="Bir deneme başarısız olunca zincirdeki sonraki model denenir; burada her başarısız deneme sayılır">
+              {usage.errors.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Bu dönemde başarısız çağrı yok.</p>
+              ) : (
+                <Table
+                  head={["Hata türü", "Adet", "Özellik", "Model"]}
+                  numericFrom={1}
+                  rows={usage.errors.map((e) => [
+                    <span key={e.error_type} title={e.error_type}>{errorLabel(e.error_type)}</span>,
+                    fmt(e.count),
+                    <span key="f" className="text-xs">{e.features.map((f) => `${f.feature} (${f.count})`).join(", ")}</span>,
+                    <span key="m" className="text-xs font-mono">{e.models.map((m) => `${m.model} (${m.count})`).join(", ")}</span>,
+                  ])}
+                />
+              )}
             </Card>
             <Card title="Kuruma göre" subtitle="Kurum bağlamı olmayan her şey (bireysel mülakat, CV, ilan, ön yazı) bireysel satırında">
               <Table
@@ -231,10 +320,11 @@ function InventoryTab() {
 
       <Card title="Dil modelinin kullanıldığı yerler" subtitle="Her satır kullanım kaydında ayrı bir amaç (purpose) olarak tutulur">
         <Table
-          head={["Özellik", "Ne yapıyor", "Kayıt adı"]}
+          head={["Özellik", "Ne yapıyor", "Kayıt adı", "Deneme sınırı"]}
           numericFrom={3}
-          rows={inv.llm.purposes.map((p) => [p.feature, p.where, <code key={p.purpose} className="text-xs">{p.purpose}</code>])}
+          rows={inv.llm.purposes.map((p) => [p.feature, p.where, <code key={p.purpose} className="text-xs">{p.purpose}</code>, `${fmt(p.timeout_s)} sn`])}
         />
+        <p className="text-xs text-muted-foreground mt-3">Deneme sınırı model başınadır; aşılırsa zincirdeki sonraki model denenir.</p>
       </Card>
 
       <Card title="Diğer yapay zekâ ve analiz bileşenleri">

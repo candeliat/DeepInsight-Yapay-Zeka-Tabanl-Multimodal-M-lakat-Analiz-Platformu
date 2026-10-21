@@ -8,20 +8,53 @@ Kurum kırılımı org_id'ye göredir; org_id'siz satırlar bireysel/kişisel ku
 öğrenci adı/e-postası dönmez, yalnızca sayılar.
 """
 import time
-from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from collections import Counter, defaultdict
+from datetime import date, datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 from app.core.config import settings
 from app.core.database import run, supabase
-from app.services import local_embedding_service, org_usage_service
-from app.services.org_usage_service import PURPOSES
+from app.services import cover_letter_service, local_embedding_service, org_usage_service
+from app.services.org_usage_service import PURPOSES, TR_TZ
 from app.services.llm_service import llm_service
 
 PERSONAL = "Bireysel / kişisel"
+MAX_RANGE_DAYS = 366
+# JSON çıktılı çağrılar (generate_json / değerlendirme) daha uzun deneme süresi kullanır.
+JSON_PURPOSES = {"evaluation", "cv_profile", "job_requirements", "job_roadmap"}
+
 
 def _feature(purpose: str) -> str:
     return PURPOSES.get(purpose, {}).get("feature", purpose or "Diğer")
+
+
+def purpose_timeout_s(purpose: str) -> float:
+    """Bir amacın model başına deneme süresi sınırı (çağrı yerlerindeki attempt_timeout ile aynı)."""
+    if purpose == "cover_letter":
+        return cover_letter_service.ATTEMPT_TIMEOUT
+    if purpose in JSON_PURPOSES:
+        return settings.LLM_JSON_ATTEMPT_MAX_DURATION
+    return settings.LLM_ATTEMPT_MAX_DURATION
+
+
+def parse_range(month: Optional[str], start: Optional[str], end: Optional[str]) -> Tuple[datetime, datetime, str]:
+    """Ay ya da gün aralığı (YYYY-AA-GG, iki uç dahil, TR saati) -> (başlangıç, bitiş) UTC ve etiket."""
+    if not start and not end:
+        return org_usage_service.parse_month(month)
+    if not (start and end):
+        raise ValueError("Tarih aralığı için başlangıç ve bitiş birlikte verilmeli.")
+    try:
+        d0, d1 = date.fromisoformat(start), date.fromisoformat(end)
+    except ValueError:
+        raise ValueError("Tarihler YYYY-AA-GG biçiminde olmalı (örn. 2026-10-01).")
+    if d1 < d0:
+        raise ValueError("Bitiş tarihi başlangıçtan önce olamaz.")
+    if (d1 - d0).days >= MAX_RANGE_DAYS:
+        raise ValueError(f"Tarih aralığı en fazla {MAX_RANGE_DAYS} gün olabilir.")
+    lo = datetime(d0.year, d0.month, d0.day, tzinfo=TR_TZ)
+    hi = datetime(d1.year, d1.month, d1.day, tzinfo=TR_TZ) + timedelta(days=1)
+    return lo.astimezone(timezone.utc), hi.astimezone(timezone.utc), f"{d0.isoformat()} – {d1.isoformat()}"
 
 
 async def _count(table: str, **filters: Any) -> Optional[int]:
@@ -64,16 +97,39 @@ def summarize_platform(rows: List[Dict[str, Any]], interviews: List[Dict[str, An
     prices = org_usage_service.prices() if price_table is None else price_table
     base = org_usage_service.summarize(rows, interviews, prices)
 
-    by_feature: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"calls": 0, "failed": 0, "total_tokens": 0, "latency": [], "purposes": set()})
+    by_feature: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
+        "calls": 0, "failed": 0, "total_tokens": 0, "latency": [], "purposes": set(),
+        "last_success_at": None, "last_failure_at": None, "last_error_type": None,
+    })
+    errors: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"count": 0, "features": Counter(), "models": Counter()})
+    last_success = last_failure = None
     by_org: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"calls": 0, "total_tokens": 0, "cost": 0.0, "priced": False, "users": set()})
     for r in rows:
-        f = by_feature[_feature(r.get("purpose") or "")]
+        feature = _feature(r.get("purpose") or "")
+        f = by_feature[feature]
         f["calls"] += 1
         f["failed"] += 0 if r.get("success") else 1
         f["total_tokens"] += r.get("total_tokens") or 0
         f["purposes"].add(r.get("purpose") or "")
         if r.get("success") and r.get("latency_ms") is not None:
             f["latency"].append(r["latency_ms"])
+        # ISO zaman damgaları aynı biçimde (UTC) olduğundan metin karşılaştırması sıralama verir.
+        at = r.get("created_at")
+        if r.get("success"):
+            if at and (f["last_success_at"] is None or at > f["last_success_at"]):
+                f["last_success_at"] = at
+            if at and (last_success is None or at > last_success):
+                last_success = at
+        else:
+            kind = r.get("error_type") or "Bilinmeyen"
+            e = errors[kind]
+            e["count"] += 1
+            e["features"][feature] += 1
+            e["models"][r.get("model") or "?"] += 1
+            if at and (f["last_failure_at"] is None or at > f["last_failure_at"]):
+                f["last_failure_at"], f["last_error_type"] = at, kind
+            if at and (last_failure is None or at > last_failure):
+                last_failure = at
 
         org_key = str(r["org_id"]) if r.get("org_id") else ""
         o = by_org[org_key]
@@ -89,9 +145,17 @@ def summarize_platform(rows: List[Dict[str, Any]], interviews: List[Dict[str, An
     base["by_feature"] = sorted((
         {"feature": name, "calls": f["calls"], "failed": f["failed"], "total_tokens": f["total_tokens"],
          "avg_latency_ms": round(sum(f["latency"]) / len(f["latency"])) if f["latency"] else None,
-         "purposes": sorted(f["purposes"])}
+         "purposes": sorted(f["purposes"]),
+         "last_success_at": f["last_success_at"], "last_failure_at": f["last_failure_at"], "last_error_type": f["last_error_type"]}
         for name, f in by_feature.items()
     ), key=lambda x: -x["total_tokens"])
+    base["errors"] = sorted((
+        {"error_type": kind, "count": e["count"],
+         "features": [{"feature": k, "count": v} for k, v in e["features"].most_common()],
+         "models": [{"model": k, "count": v} for k, v in e["models"].most_common()]}
+        for kind, e in errors.items()
+    ), key=lambda x: -x["count"])
+    base["last_success_at"], base["last_failure_at"] = last_success, last_failure
     base["by_org"] = sorted((
         {"org_id": key or None, "name": org_names.get(key, "Silinmiş kurum") if key else PERSONAL,
          "calls": o["calls"], "total_tokens": o["total_tokens"], "users": len(o["users"]),
@@ -102,13 +166,14 @@ def summarize_platform(rows: List[Dict[str, Any]], interviews: List[Dict[str, An
     return base
 
 
-async def ai_usage(month: Optional[str] = None) -> Dict[str, Any]:
+async def ai_usage(month: Optional[str] = None, start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
+    """Ay (varsayılan: bu ay) ya da gün aralığı için kullanım; aralık verilirse ay yok sayılır."""
+    start, end, label = parse_range(month, start_date, end_date)  # ValueError -> 422 (Supabase'den önce)
     if not supabase:
         raise RuntimeError("Supabase client is not initialized")
-    start, end, label = org_usage_service.parse_month(month)
     lo, hi = start.isoformat(), end.isoformat()
     rows = await org_usage_service._paged(lambda: supabase.table("llm_usage").select(
-        "purpose, model, success, latency_ms, prompt_tokens, completion_tokens, total_tokens, created_at, interview_id, org_id, user_id",
+        "purpose, model, success, error_type, latency_ms, prompt_tokens, completion_tokens, total_tokens, created_at, interview_id, org_id, user_id",
     ).gte("created_at", lo).lt("created_at", hi).order("created_at"))
     interviews = await org_usage_service._paged(lambda: supabase.table("interviews").select("id, user_id, status")
                                                 .gte("created_at", lo).lt("created_at", hi).order("created_at"))
@@ -136,7 +201,7 @@ def ai_inventory() -> Dict[str, Any]:
             "reopens_in_s": round(reopen - now) if reopen > now else None,
             "since_start": stats.get(model) or None,
         })
-    purposes = [{"purpose": p, **meta} for p, meta in PURPOSES.items()]
+    purposes = [{"purpose": p, **meta, "timeout_s": purpose_timeout_s(p)} for p, meta in PURPOSES.items()]
     return {
         "llm": {
             "provider": host,

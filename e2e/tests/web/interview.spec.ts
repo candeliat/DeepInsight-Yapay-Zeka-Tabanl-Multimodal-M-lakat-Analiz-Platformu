@@ -1,5 +1,5 @@
 import { expect, test } from '../../fixtures/api';
-import { EVALUATION_FAILED, FINISH_OK, FIRST_QUESTION, NEXT_QUESTION, ONGOING_ID, SSE_EVALUATION_FAILED, sseBody } from '../../fixtures/data';
+import { CV_ID, EVALUATION_FAILED, FINISH_OK, FIRST_QUESTION, NEXT_QUESTION, JOB_ID, ONGOING_ID, SSE_EVALUATION_FAILED, sseBody } from '../../fixtures/data';
 
 const STREAM = '/api/v1/interview/chat/stream';
 const ANSWER = 'Küçük uygulamada Context yeterli; sık güncellenen durumda Zustand seçerim.';
@@ -64,6 +64,24 @@ test('yazılı mülakat: hedef pozisyon rol alanını önceden doldurur', async 
 });
 
 test.describe('görüntülü mülakat', () => {
+  test('CV ve ilan seçilince rol/konu önerilir, bant gösterilir; mülakat cv_id ve job_id ile başlar', async ({ authedPage: page, api }) => {
+    api.seedCareer();
+    api.on('POST', '/api/v1/interview/start', { json: { interview_id: 'int-new', first_message: FIRST_QUESTION } });
+    await page.goto('/chat');
+
+    await page.getByLabel("CV'ye göre kişiselleştir").selectOption(CV_ID);
+    await page.getByLabel('İlana göre mülakat').selectOption(JOB_ID);
+    await expect(page.getByText('Bu ilana göre mülakat')).toBeVisible();
+    await expect(page.getByText("CV'nize göre kişiselleştirilecek")).toBeVisible();
+    await expect(page.getByLabel('Hedef Rol / Pozisyon')).toHaveValue('Frontend Developer');
+
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: 'Görüntülü mülakata başla' }).click();
+    await expect(page.getByText(FIRST_QUESTION)).toBeVisible();
+    const body = api.callsTo('POST', '/api/v1/interview/start')[0].body as Record<string, unknown>;
+    expect([body.cv_id, body.job_id]).toEqual([CV_ID, JOB_ID]);
+  });
+
   test('onam kutusu işaretlenmeden başlatılamaz', async ({ authedPage: page }) => {
     await page.goto('/chat');
     const start = page.getByRole('button', { name: 'Görüntülü mülakata başla' });

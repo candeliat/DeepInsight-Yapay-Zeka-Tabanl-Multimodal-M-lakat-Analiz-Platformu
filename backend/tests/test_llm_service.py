@@ -520,8 +520,12 @@ def _models_and_formats(svc):
     return [(c.kwargs["model"], c.kwargs.get("response_format")) for c in svc.client.chat.completions.create.call_args_list]
 
 
+JSON_FREE, JSON_OK = next(iter(LLMService.JSON_MODE_UNSUPPORTED)), "test/json-destekli-model"
+
+
 def test_json_mode_is_not_sent_to_models_that_return_empty_content():
     svc = _service_with_mock_client()
+    svc.FREE_MODELS = [JSON_FREE, JSON_OK]
     svc.client.chat.completions.create.side_effect = [
         _fake_response('{"technical_score": 80, "confidence_score": 70, "vocabulary_score": 75, "feedback": "iyi"}', _fake_usage()),
     ]
@@ -533,6 +537,7 @@ def test_json_mode_is_not_sent_to_models_that_return_empty_content():
 
 def test_json_mode_still_sent_to_other_models():
     svc = _service_with_mock_client()
+    svc.FREE_MODELS = [JSON_FREE, JSON_OK]
     svc.client.chat.completions.create.side_effect = [
         _fake_response(""),
         _fake_response('{"technical_score": 60, "feedback": "ok"}', _fake_usage()),

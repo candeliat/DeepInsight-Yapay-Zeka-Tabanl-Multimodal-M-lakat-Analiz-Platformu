@@ -265,8 +265,9 @@ const s = StyleSheet.create({
   sectionTitle: { fontSize: 12, fontFamily: FontFamilies.sansBold, color: Colors.onSurfaceVariant, letterSpacing: 0.8 },
   banner: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', padding: 12, borderRadius: 14, marginBottom: 12 },
   bannerText: { flex: 1, fontSize: 13, fontFamily: FontFamilies.sansSemibold, lineHeight: 19 },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start' },
-  chipText: { fontSize: 11, fontFamily: FontFamilies.sansBold },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, alignSelf: 'flex-start', maxWidth: '100%' },
+  // Uzun etiketler (ör. "mülakatta muhtemel konular") kırpılmadan alt satıra geçsin.
+  chipText: { fontSize: 11, fontFamily: FontFamilies.sansBold, flexShrink: 1 },
   loading: { paddingVertical: 60, alignItems: 'center' },
   emptyText: { fontSize: 14, fontFamily: FontFamilies.sansRegular, color: Colors.onSurfaceVariant, textAlign: 'center', marginTop: 10, marginBottom: 6 },
   ringValue: { fontSize: 30, fontFamily: FontFamilies.sansExtrabold, color: Colors.onSurface },

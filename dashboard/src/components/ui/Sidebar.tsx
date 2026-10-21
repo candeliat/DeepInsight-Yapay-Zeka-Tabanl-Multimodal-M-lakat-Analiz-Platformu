@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Video, User, MessageCircle, Database, ShieldCheck, MessageSquareText, FileText, Briefcase, TrendingUp, Building2, ClipboardList,
-  FlaskConical, History, LucideIcon,
+  FlaskConical, History, LucideIcon, X,
 } from "lucide-react";
+import { useEffect } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useNavStore } from "@/store/useNavStore";
 
 type NavLink = { href: string; label: string; icon: LucideIcon };
 
@@ -59,6 +61,18 @@ export default function Sidebar() {
   const pathname = usePathname();
   const isAdmin = user?.app_metadata?.role === "admin";
   const groups = isAdmin ? [...GROUPS, ADMIN_GROUP] : GROUPS;
+  const { open, setOpen } = useNavStore();
+
+  // Çekmece sayfa değişince kapanır; açıkken Escape ile de kapanır.
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname, setOpen]);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, setOpen]);
 
   const linkClass = (active: boolean) =>
     `flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
@@ -66,14 +80,24 @@ export default function Sidebar() {
     }`;
 
   return (
-    <aside className="w-64 bg-card border-r border-border h-screen flex flex-col">
-      <div className="p-6">
+    <>
+    {open && <div className="fixed inset-0 z-40 bg-black/40 lg:hidden" onClick={() => setOpen(false)} aria-hidden="true" />}
+    <aside
+      id="main-sidebar"
+      className={`w-64 bg-card border-r border-border h-screen flex flex-col fixed inset-y-0 left-0 z-50 transition-transform lg:static lg:translate-x-0 ${
+        open ? "translate-x-0 shadow-2xl" : "-translate-x-full invisible lg:visible"
+      }`}
+    >
+      <div className="p-6 flex items-center justify-between">
         <Link href="/dashboard" className="font-serif italic text-2xl text-primary flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl bg-primary text-primary-foreground flex items-center justify-center font-sans not-italic text-sm font-bold">
             DI
           </div>
           DeepInsight
         </Link>
+        <button onClick={() => setOpen(false)} className="lg:hidden p-2 rounded-xl hover:bg-muted" aria-label="Menüyü kapat">
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-4 pb-6 space-y-5" aria-label="Ana menü">
@@ -100,5 +124,6 @@ export default function Sidebar() {
         ))}
       </nav>
     </aside>
+    </>
   );
 }

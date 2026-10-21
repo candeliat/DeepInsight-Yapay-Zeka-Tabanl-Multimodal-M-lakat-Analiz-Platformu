@@ -18,6 +18,10 @@ export const CustomInput: React.FC<CustomInputProps> = ({
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [focused, setFocused] = useState(false);
+  // Görünen etiket büyük harfli; ekran okuyucu kısaltma gibi harf harf okumasın diye cümle düzeninde verilir.
+  const a11yLabel = label === label.toLocaleUpperCase('tr-TR')
+    ? label.charAt(0) + label.slice(1).toLocaleLowerCase('tr-TR')
+    : label;
 
   return (
     <View style={styles.wrapper}>
@@ -32,6 +36,7 @@ export const CustomInput: React.FC<CustomInputProps> = ({
           placeholderTextColor={Colors.outline}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
+          accessibilityLabel={a11yLabel}
           {...rest}
         />
         {isPassword && (

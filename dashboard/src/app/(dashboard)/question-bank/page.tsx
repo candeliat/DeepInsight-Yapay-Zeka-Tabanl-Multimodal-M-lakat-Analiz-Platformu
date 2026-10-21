@@ -289,12 +289,12 @@ export default function QuestionBankPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Rol</label>
-              <Input value={role} onChange={(e) => setRole(e.target.value)} placeholder="Örn: Backend Developer" />
+              <label htmlFor="qb-role" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Rol</label>
+              <Input id="qb-role" value={role} onChange={(e) => setRole(e.target.value)} placeholder="Örn: Backend Developer" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Konu</label>
-              <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Örn: Python" />
+              <label htmlFor="qb-topic" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Konu</label>
+              <Input id="qb-topic" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="Örn: Python" />
             </div>
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Zorluk (opsiyonel)</label>
@@ -316,8 +316,8 @@ export default function QuestionBankPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Soru Metni</label>
-            <Textarea
+            <label htmlFor="qb-text" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Soru Metni</label>
+            <Textarea id="qb-text"
               value={questionText}
               onChange={(e) => setQuestionText(e.target.value)}
               placeholder="Mülakat sorusunu buraya yazın..."
@@ -326,8 +326,8 @@ export default function QuestionBankPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Aile (opsiyonel)</label>
-            <select
+            <label htmlFor="qb-family" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Aile (opsiyonel)</label>
+            <select id="qb-family"
               value={familyChoice}
               onChange={(e) => setFamilyChoice(e.target.value)}
               className="w-full h-10 px-3 rounded-xl border border-border bg-background text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

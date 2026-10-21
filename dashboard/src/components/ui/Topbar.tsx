@@ -2,14 +2,16 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { UserCircle, LogOut } from "lucide-react";
+import { UserCircle, LogOut, Menu } from "lucide-react";
 import { useAuthStore } from "@/store/useAuthStore";
+import { useNavStore } from "@/store/useNavStore";
 import { useRouter } from "next/navigation";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 
 export default function Topbar() {
   const { user, initialize, logout } = useAuthStore();
   const router = useRouter();
+  const { open, setOpen } = useNavStore();
 
   useEffect(() => {
     initialize();
@@ -26,16 +28,29 @@ export default function Topbar() {
   };
 
   return (
-    <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
+    <header className="h-16 bg-card border-b border-border flex items-center justify-between gap-2 px-3 sm:px-6">
+      <button
+        onClick={() => setOpen(!open)}
+        className="lg:hidden p-2 rounded-xl hover:bg-muted"
+        aria-label="Menü"
+        aria-expanded={open}
+        aria-controls="main-sidebar"
+      >
+        <Menu className="w-6 h-6 text-foreground" />
+      </button>
       <div className="flex-1" />
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2 min-w-0">
         {user && <NotificationBell />}
-        <Link href="/profile" className="flex items-center gap-2 hover:bg-muted p-2 rounded-xl transition-colors" title="Profil">
-          <UserCircle className="w-6 h-6 text-foreground" />
+        <Link href="/profile" className="flex items-center gap-2 hover:bg-muted p-2 rounded-xl transition-colors min-w-0" title="Profil">
+          <UserCircle className="w-6 h-6 text-foreground shrink-0" />
+          {/* Dar ekranda ad gizlenir (üst çubuk taşmasın); bağlantının adı yine okunur. */}
           {displayName ? (
-            <span className="text-sm font-medium text-foreground">{displayName}</span>
+            <>
+              <span className="hidden sm:inline text-sm font-medium text-foreground truncate max-w-[16rem]">{displayName}</span>
+              <span className="sr-only sm:hidden">Profil</span>
+            </>
           ) : (
-            <span className="w-24 h-4 rounded bg-muted animate-pulse" aria-hidden />
+            <span className="w-24 h-4 rounded bg-muted animate-pulse hidden sm:block" aria-hidden />
           )}
         </Link>
         <button

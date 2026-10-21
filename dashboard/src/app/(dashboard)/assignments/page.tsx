@@ -6,13 +6,20 @@ import { ClipboardList, Loader2, XCircle, Play, CalendarClock, AlertTriangle, Ar
 import { assignmentService, MyAssignment } from "@/services/assignmentService";
 import { StatusBadge, formatDue } from "@/components/org/AssignmentsPanel";
 import { Button } from "@/components/ui/Button";
+import { MyOrganization, orgService } from "@/services/orgService";
 
 export default function AssignmentsPage() {
   const [items, setItems] = useState<MyAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Yönettiği kurumlar: personelin ödevleri burada değil kurum panelinde.
+  const [staffOrgs, setStaffOrgs] = useState<MyOrganization[]>([]);
 
   useEffect(() => {
+    orgService
+      .myOrganizations()
+      .then((orgs) => setStaffOrgs(orgs.filter((o) => o.role !== "candidate")))
+      .catch(() => {}); // yalnızca yönlendirme ipucu; başarısızlık sayfayı bozmaz
     assignmentService
       .mine()
       .then(setItems)
@@ -49,9 +56,20 @@ export default function AssignmentsPage() {
       ) : items.length === 0 ? (
         <div className="bg-card border border-border rounded-3xl shadow-sm p-10 text-center">
           <p className="text-sm text-muted-foreground">Size atanmış bir ödev yok.</p>
-          <Link href="/organizations" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
-            Bir kuruma davet koduyla katılın <ArrowRight className="w-4 h-4" />
-          </Link>
+          {staffOrgs.length > 0 ? (
+            <div className="mt-3 flex flex-col items-center gap-2">
+              <p className="text-sm text-muted-foreground">Atadığınız ödevleri kurum panelinde yönetirsiniz:</p>
+              {staffOrgs.map((o) => (
+                <Link key={o.id} href={`/organizations/${o.id}`} className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+                  <Building2 className="w-4 h-4" /> {o.name} <ArrowRight className="w-4 h-4" />
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <Link href="/organizations" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+              Bir kuruma davet koduyla katılın <ArrowRight className="w-4 h-4" />
+            </Link>
+          )}
         </div>
       ) : (
         <div className="space-y-8">

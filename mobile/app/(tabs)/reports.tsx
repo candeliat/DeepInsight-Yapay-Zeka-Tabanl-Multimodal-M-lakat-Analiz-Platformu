@@ -158,7 +158,7 @@ export default function ReportsScreen() {
         {/* Başlık */}
         <View style={styles.pageHeader}>
           <Text style={styles.pageLabel}>ADAY ANALİZİ</Text>
-          <Text style={styles.pageTitle}>Mülakat Geri Bildirimi</Text>
+          <Text style={styles.pageTitle}>Mülakat Raporlarım</Text>
           <Text style={styles.pageSubtitle}>
             Yapay zeka tarafından üretilen mülakat içgörülerinizin özeti.
           </Text>

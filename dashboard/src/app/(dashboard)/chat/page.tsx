@@ -17,8 +17,12 @@ import {
   Clock, 
   UserCheck, 
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  Briefcase,
+  FileText
 } from "lucide-react";
+import { cvService, CVDetail, CVItem } from "@/services/cvService";
+import { jobService, JobDetail, JobItem } from "@/services/jobService";
 import { chatService, EvaluationData, ChatStreamDoneData, StarAnalysis } from "@/services/chatService";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
@@ -77,7 +81,48 @@ export default function InterviewRoomPage() {
   useEffect(() => {
     if (target) setRole(target.slice(0, 80));
   }, [target]);
-  
+
+  // CV / ilana göre kişiselleştirme (yazılı mülakattakiyle aynı öneri mantığı; seçim sayfa durumunda).
+  const [myCvs, setMyCvs] = useState<CVItem[]>([]);
+  const [myJobs, setMyJobs] = useState<JobItem[]>([]);
+  const [cvId, setCvId] = useState("");
+  const [jobId, setJobId] = useState("");
+  const [cv, setCv] = useState<CVDetail | null>(null);
+  const [job, setJob] = useState<JobDetail | null>(null);
+
+  useEffect(() => {
+    cvService.listCvs().then(setMyCvs).catch(() => setMyCvs([]));
+    jobService.listJobs().then(setMyJobs).catch(() => setMyJobs([]));
+  }, []);
+
+  // Seçilen CV/ilan yüklenir; rol/konu/zorluk önerilir (kullanıcı değiştirebilir). İlan varsa öneri ilandan.
+  useEffect(() => {
+    if (!cvId && !jobId) {
+      setCv(null);
+      setJob(null);
+      return;
+    }
+    let cancelled = false;
+    Promise.all([cvId ? cvService.getCv(cvId) : null, jobId ? jobService.getJob(jobId) : null])
+      .then(([cvDetail, jobDetail]) => {
+        if (cancelled) return;
+        setCv(cvDetail);
+        setJob(jobDetail);
+        const profile = cvDetail?.profile;
+        const reqs = jobDetail?.requirements;
+        const suggestedRole = jobDetail?.title || profile?.target_roles[0];
+        const skills = reqs?.required_skills.length ? reqs.required_skills : profile?.skills ?? [];
+        const suggestedLevel = reqs?.seniority || profile?.seniority;
+        if (suggestedRole) setRole(suggestedRole);
+        if (skills.length > 0) setTopic(skills.slice(0, 2).join(" ve "));
+        if (suggestedLevel) setDifficulty(suggestedLevel);
+      })
+      .catch((e) => !cancelled && setStartError(e instanceof Error ? e.message : "CV veya ilan yüklenemedi."));
+    return () => {
+      cancelled = true;
+    };
+  }, [cvId, jobId]);
+
   // Mülakat State
   const [interviewId, setInterviewId] = useState("");
   const [currentQuestion, setCurrentQuestion] = useState("");
@@ -307,7 +352,7 @@ export default function InterviewRoomPage() {
       setWaitingCamera(false);
 
       // 2. Backend'e başlatma isteği
-      const data = await chatService.startInterview(role, topic, difficulty, { language });
+      const data = await chatService.startInterview(role, topic, difficulty, { language, cvId: cv?.id, jobId: job?.id });
       setInterviewId(data.interview_id);
       setCurrentQuestion(data.first_message);
       
@@ -492,6 +537,31 @@ export default function InterviewRoomPage() {
             </p>
           </div>
 
+          {job && (
+            <div className="mb-3 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+              <Briefcase className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="text-xs flex-1 min-w-0">
+                <p className="font-bold text-foreground">Bu ilana göre mülakat</p>
+                <p className="text-muted-foreground truncate">{[job.title, job.company].filter(Boolean).join(" · ")}</p>
+              </div>
+            </div>
+          )}
+
+          {cv && (
+            <div className="mb-6 flex items-start gap-3 bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3">
+              <FileText className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+              <div className="text-xs flex-1 min-w-0">
+                <p className="font-bold text-foreground">CV&apos;nize göre kişiselleştirilecek</p>
+                <p className="text-muted-foreground truncate">{cv.original_filename}</p>
+                {!cv.profile && (
+                  <p className="text-warning mt-1">
+                    Bu CV henüz analiz edilmemiş. <Link href="/cv" className="underline font-semibold">CV sayfasında analiz edin.</Link>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleStartInterview} className="space-y-6">
             <div className="space-y-2">
               <label htmlFor="setup-role" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
@@ -552,6 +622,41 @@ export default function InterviewRoomPage() {
               </div>
             </div>
 
+            {(myCvs.length > 0 || myJobs.length > 0) && (
+              <div className="space-y-2">
+                <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Kişiselleştir (opsiyonel)</span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {myCvs.length > 0 && (
+                    <select
+                      aria-label="CV'ye göre kişiselleştir"
+                      value={cvId}
+                      onChange={(e) => setCvId(e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                    >
+                      <option value="">CV kullanma</option>
+                      {myCvs.map((c) => (
+                        <option key={c.id} value={c.id}>CV: {c.original_filename}</option>
+                      ))}
+                    </select>
+                  )}
+                  {myJobs.length > 0 && (
+                    <select
+                      aria-label="İlana göre mülakat"
+                      value={jobId}
+                      onChange={(e) => setJobId(e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm text-foreground"
+                    >
+                      <option value="">İlan seçme</option>
+                      {myJobs.map((j) => (
+                        <option key={j.id} value={j.id}>İlan: {[j.title, j.company].filter(Boolean).join(" · ") || "Başlıksız"}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground ml-1">Seçerseniz sorular CV&apos;nize ve/veya ilanın gereksinimlerine göre uyarlanır.</p>
+              </div>
+            )}
+
             <div className="flex items-center gap-2 bg-muted border border-border p-4 rounded-xl text-xs text-muted-foreground font-semibold mb-2">
               <ShieldCheck className="w-5 h-5 text-success shrink-0" />
               <span>
@@ -574,7 +679,7 @@ export default function InterviewRoomPage() {
                 </label>
               )}
               <p>
-                Kamerasız ya da CV/ilana göre kişiselleştirilmiş mülakat için{" "}
+                Kamerasız mülakat için{" "}
                 <Link href="/chat/text" className="font-semibold text-primary hover:underline">Yazılı Mülakat</Link>.
               </p>
             </div>

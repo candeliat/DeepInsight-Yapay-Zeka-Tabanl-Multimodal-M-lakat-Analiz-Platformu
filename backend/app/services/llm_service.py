@@ -123,9 +123,13 @@ class InterviewEvaluation(BaseModel):
 class LLMUnavailable(RuntimeError):
     """Zincirdeki tüm modeller başarısız oldu."""
 
+    # Kullanıcıya gösterilir (route'lar str(e) döner): sağlayıcının ham hatası (hesap kimliği,
+    # iç fonksiyon kimliği) metne girmez; ayrıntı last_error'da ve loglarda kalır.
+    USER_MESSAGE = "Yapay zekâ servisine şu an ulaşılamıyor. Lütfen birkaç dakika sonra tekrar deneyin."
+
     def __init__(self, last_error: Exception | None):
         self.last_error = last_error
-        super().__init__(f"AI servisi ile iletişim kurulamadı. Tüm modeller meşgul. Son hata: {last_error}")
+        super().__init__(self.USER_MESSAGE)
 
 
 # İsteği yapan kullanıcı (auth dependency'si ayarlar); kullanım kaydına yazılır.
@@ -223,13 +227,17 @@ class LLMService:
     # NVIDIA build.nvidia.com API kataloğunda GERÇEK canlı istekle doğrulanmış
     # modeller (GET /v1/models listesindeki birçok model bu anahtarla 404
     # veriyor ya da 60sn+ timeout'a giriyor — sadece fiilen çalışanlar burada).
-    # Her ikisi de "reasoning" modeli: önce ayrı bir reasoning kanalında
-    # düşünüp sonra content üretiyorlar — max_tokens düşük olursa content
-    # boş/null dönebilir (bkz. get_next_question/get_final_evaluation'daki
-    # yüksek max_tokens değerleri ve finish_reason="length" logu).
+    # Reasoning modelleri önce ayrı bir reasoning kanalında düşünüp sonra content
+    # üretiyor — max_tokens düşük olursa content boş/null dönebilir (bkz.
+    # get_next_question/get_final_evaluation'daki yüksek max_tokens değerleri).
+    # 2026-10-21 yoklaması: nemotron-3-super-120b 404 (katalogdan kaldırıldı, zincirden
+    # çıkarıldı); ultra-550b JSON ~5 sn, akışta ilk parça ~3,5 sn; lightning-30b ~12 sn
+    # (yalnızca yüksek max_tokens ile içerik üretiyor); gpt-oss-20b o gün 45 sn+ zaman
+    # aşımındaydı ama daha önce kararlıydı, yedek olarak duruyor.
     FREE_MODELS = [
+        "nvidia/nemotron-3-ultra-550b-a55b",
         "openai/gpt-oss-20b",
-        "nvidia/nemotron-3-super-120b-a12b",
+        "nvidia/nemotron-3.5-lightning-30b-a3b",
     ]
     # Bu anahtarla denenen diğer modellerin büyük kısmı erişilemez olduğu için
     # şu an doğrulanmış ekstra bir model yok. Yeni bir model doğrulandığında

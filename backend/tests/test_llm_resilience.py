@@ -40,6 +40,8 @@ def _service(clock=None):
     svc.client.chat.completions.create = AsyncMock()
     svc._sleep_backoff = AsyncMock(return_value=None)
     svc._breaker = CircuitBreaker(threshold=2, cooldown=120, max_cooldown=900, clock=clock or Clock())
+    # Senaryolar iki modelli zincire göre yazıldı; üretim zinciri değişse de testler bozulmasın.
+    svc.FREE_MODELS = [FIRST, SECOND]
     return svc
 
 
@@ -196,3 +198,11 @@ def test_auth_dependency_records_the_user_for_usage(monkeypatch):
         return llm_module.current_user_id.get()
 
     assert asyncio.run(call()) == "u-9"
+
+
+def test_unavailable_message_does_not_leak_provider_error():
+    # Canlıda 404 gövdesi (hesap ve iç fonksiyon kimliği) kullanıcıya gösteriliyordu.
+    raw = RuntimeError("Error code: 404 - Function 'fn-ornek': Not found for account 'hesap-ornek'")
+    err = LLMUnavailable(raw)
+    assert str(err) == LLMUnavailable.USER_MESSAGE
+    assert "account" not in str(err) and err.last_error is raw

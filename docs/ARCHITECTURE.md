@@ -126,8 +126,10 @@ sorularından, verilen sırayla kurulur.
 
 ### Dil modeli çağrıları
 
-Tüm çağrılar `llm_service` üzerinden: modeller sırayla denenir (`gpt-oss-20b` →
-`nemotron-3-super-120b-a12b`); üst üste hatada model başına devre kesici devreye girer.
+Tüm çağrılar `llm_service` üzerinden: modeller sırayla denenir (`nemotron-3-ultra-550b-a55b` →
+`gpt-oss-20b` → `nemotron-3.5-lightning-30b-a3b`); üst üste hatada model başına devre kesici devreye girer.
+Zincir NVIDIA kataloğunda canlı istekle doğrulanan modellerden oluşur; katalogdan kaldırılan model 404 verir
+ve zincirden çıkarılmalıdır. Kullanıcıya sağlayıcının ham hatası değil, genel bir "servise ulaşılamıyor" mesajı döner.
 `gpt-oss-20b` JSON modunda boş yanıt döndüğü için ona JSON modu gönderilmez, JSON metinden
 ayıklanır. Deneme süresi genel 30 sn, yapılandırılmış çıktıda 60 sn, ön yazıda 110 sn. Her deneme
 `llm_usage`'a yazılır; istek bağlamı (`bind_usage_context`) mülakatı ve kurumu ekler. Hangi

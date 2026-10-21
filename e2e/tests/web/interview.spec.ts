@@ -148,6 +148,28 @@ test.describe('görüntülü mülakat', () => {
     expect(api.callsTo('GET', '/api/v1/analytics/results/int-new')).toHaveLength(1);
   });
 
+  test('video analizi başarısız olursa sonuç ekranı bunu söyler, "başarıyla entegre edildi" demez', async ({ authedPage: page, api }) => {
+    api.state.consentGranted = true;
+    api.on('POST', '/api/v1/interview/start', { json: { interview_id: 'int-new', first_message: FIRST_QUESTION } });
+    api.on('POST', '/api/v1/interview/int-new/finish', {
+      json: { response: '', interview_complete: true,
+        evaluation: { technical_score: 74, confidence_score: 60, vocabulary_score: 70, feedback: 'Hook kurallarını iyi açıkladınız.' } },
+    });
+    api.on('POST', '/api/v1/analytics/analyze/int-new', { json: { interview_id: 'int-new', status: 'queued', queue_position: 0 } });
+    api.on('GET', '/api/v1/analytics/status/int-new', { json: { interview_id: 'int-new', analysis_status: 'failed', error_message: 'ValueError: x' } });
+
+    await page.goto('/chat');
+    await page.getByRole('button', { name: 'Görüntülü mülakata başla' }).click();
+    await expect(page.getByText('Kaydediliyor')).toBeVisible();
+    await page.waitForTimeout(1500);
+    await page.getByRole('button', { name: 'Mülakatı Bitir' }).click();
+    await page.getByRole('button', { name: 'Bitir', exact: true }).click();
+
+    await expect(page.getByRole('status').filter({ hasText: 'Video analizi tamamlanamadı' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Hook kurallarını iyi açıkladınız.')).toBeVisible();
+    await expect(page.getByText('başarıyla entegre edildi')).toHaveCount(0);
+  });
+
   test('kamera izni reddedilirse mülakat analizsiz sürer ve "Kayıt yok" gösterilir', async ({ authedPage: page, api }) => {
     await page.addInitScript(() => {
       navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('denied', 'NotAllowedError'));

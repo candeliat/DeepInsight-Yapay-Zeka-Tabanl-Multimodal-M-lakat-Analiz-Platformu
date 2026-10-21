@@ -1,5 +1,14 @@
 import logging
 import os
+import sys
+
+# Windows'ta çıktı bir dosyaya/boruya yönlendiğinde kodlama sistem kod sayfası (cp1254) olur:
+# DeepFace içe aktarılırken bastığı "⚠️" uyarısı UnicodeEncodeError fırlatıp video analizini
+# düşürüyordu; Türkçe log satırları da bozuk yazılıyordu. Çıktı UTF-8'e alınır, kodlanamayan
+# karakter çökme yerine değiştirilir. Linux/Docker'da zaten UTF-8 olduğundan etkisizdir.
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
 
 # Uygulama logları (app.*) için yapılandırma; router import'larından ÖNCE olmalı ki modüller
 # yüklenirken yazılan loglar da görünsün. Önceden hiç yapılandırılmadığı için tüm

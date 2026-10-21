@@ -793,7 +793,7 @@ class LLMService:
         loop'u bloklamadan bir thread'e devreder.
         """
         try:
-            from app.services.whisper_service import get_whisper_model
+            from app.services.whisper_service import get_whisper_model, load_audio
 
             ext = ".m4a" if "m4a" in mime_type else ".wav"
             fd, temp_path = tempfile.mkstemp(suffix=ext)
@@ -802,9 +802,10 @@ class LLMService:
 
             try:
                 model = await asyncio.to_thread(get_whisper_model)
+                audio = await asyncio.to_thread(load_audio, temp_path)
                 result = await asyncio.to_thread(
                     model.transcribe,
-                    temp_path,
+                    audio,
                     language="en" if language == "en" else "tr",
                     initial_prompt=(
                         "Please transcribe this English job interview answer accurately."

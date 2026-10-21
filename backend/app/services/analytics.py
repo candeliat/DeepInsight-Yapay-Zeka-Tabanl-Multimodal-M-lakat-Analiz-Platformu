@@ -24,6 +24,12 @@ import cv2
 
 logger = logging.getLogger(__name__)
 
+# DeepFace'in varsayılan yüz bulucusu ("opencv") haarcascade XML'ine dayanır; OpenCV 5 paketleri bu
+# dosyaları artık getirmiyor ve her kare "opencv kurulu mu?" hatasıyla atlanıp duygu dağılımı boş
+# kalıyordu. mtcnn DeepFace bağımlılığıyla gelir, ağırlıkları pakette (indirme yok), ~0,3 sn/kare.
+# Yüz kırpılmadan ("skip") analiz yanıltıcı: nötr bir portre "korku" okunuyordu.
+EMOTION_FACE_DETECTOR = "mtcnn"
+
 # ---------------------------------------------------------------------------
 # Lazy imports — ağır kütüphaneler yalnızca ihtiyaç duyulduğunda yüklenir
 # ---------------------------------------------------------------------------
@@ -154,6 +160,7 @@ class VideoAnalyzer:
                     actions=["emotion"],
                     enforce_detection=False,
                     silent=True,
+                    detector_backend=EMOTION_FACE_DETECTOR,
                 )
                 # DeepFace bir liste döner
                 if isinstance(results, list):
@@ -411,11 +418,11 @@ class AudioAnalyzer:
                 "duration": 120.5
             }
         """
-        from app.services.whisper_service import get_whisper_model
+        from app.services.whisper_service import get_whisper_model, load_audio
         model = get_whisper_model()
 
         result = model.transcribe(
-            audio_path,
+            load_audio(audio_path),
             language="en" if language == "en" else "tr",
             # Whisper dolgu sözcüklerini atlama eğiliminde; örnekli başlangıç metni onları da yazdırır.
             initial_prompt=(

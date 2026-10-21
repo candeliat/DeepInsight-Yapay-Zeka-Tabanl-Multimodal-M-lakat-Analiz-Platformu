@@ -238,9 +238,10 @@ export default function OrganizationsPage() {
             <Plus className="w-4 h-4 text-primary" /> Yeni kurum (platform yöneticisi)
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Kurum adı" minLength={2} maxLength={120} required />
+            <Input aria-label="Kurum adı" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Kurum adı" minLength={2} maxLength={120} required />
             <Input
               type="email"
+              aria-label="Kurum yöneticisinin e-postası (opsiyonel)"
               value={newAdminEmail}
               onChange={(e) => setNewAdminEmail(e.target.value)}
               placeholder="Kurum yöneticisinin e-postası (opsiyonel)"

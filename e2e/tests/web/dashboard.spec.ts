@@ -26,3 +26,23 @@ test('mülakat listesi: skorlar yüzdesiz, bant etiketleri 60/80 eşiğiyle, yar
   await expect(ongoing).toHaveAttribute('href', `/chat/text?resume=${ONGOING_ID}`);
   await expect(ongoing).toContainText('Kaldığın yerden devam et');
 });
+
+test('dar ekranda menü çekmece olarak açılır, sayfa değişince kapanır; yatay taşma yok', async ({ authedPage: page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/dashboard');
+  const menu = page.getByRole('button', { name: 'Menü', exact: true });
+  const nav = page.getByRole('navigation', { name: 'Ana menü' });
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await expect(nav).toBeHidden();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+
+  await menu.click();
+  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  await nav.getByRole('link', { name: 'Mülakatlarım' }).click();
+  await expect(page).toHaveURL(/\/interviews$/);
+  await expect(nav).toBeHidden();
+
+  await menu.click();
+  await page.keyboard.press('Escape');
+  await expect(nav).toBeHidden();
+});

@@ -70,6 +70,10 @@ export default function PilotReportPage() {
 
   const deltas = (report?.rows ?? []).filter((r) => r.delta != null).sort((a, b) => (b.delta ?? 0) - (a.delta ?? 0));
   const fl = report?.first_last;
+  // Eksen hep 0'ı içerir; uçlara pay bırakılır ki değer etiketi katılımcı adının üstüne binmesin.
+  const values = deltas.map((r) => r.delta ?? 0);
+  const pad = Math.max(1, ...values.map(Math.abs)) * 0.2;
+  const domain: [number, number] = [Math.min(0, ...values) < 0 ? Math.min(...values) - pad : 0, Math.max(0, ...values) > 0 ? Math.max(...values) + pad : 0];
 
   return (
     <div className="max-w-6xl mx-auto pb-16 space-y-6">
@@ -110,7 +114,7 @@ export default function PilotReportPage() {
             </StatTile>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <div className="lg:col-span-2 bg-card border border-border rounded-3xl shadow-sm p-6">
               <div className="flex items-center justify-between gap-3 mb-1">
                 <h2 className="font-bold text-foreground text-sm">Katılımcı başına değişim (son − ilk mülakat)</h2>
@@ -158,7 +162,8 @@ export default function PilotReportPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={deltas} layout="vertical" margin={{ top: 4, right: 48, bottom: 4, left: 8 }}>
                       <CartesianGrid horizontal={false} stroke={GRID} />
-                      <XAxis type="number" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
+                      {/* Çubuk grafikte taban 0, yoksa değişim olduğundan küçük görünür. */}
+                      <XAxis type="number" domain={domain} tickFormatter={(v: number) => fmt(v)} tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} />
                       <YAxis type="category" dataKey="participant" tick={{ fontSize: 11, fill: AXIS }} tickLine={false} axisLine={false} width={40} />
                       <ReferenceLine x={0} stroke={AXIS} />
                       <Tooltip

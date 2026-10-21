@@ -225,7 +225,9 @@ export default function InterviewDetailPage() {
           <div className="flex items-center gap-4 bg-muted border border-border px-6 py-4 rounded-2xl">
             <div className="text-right">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Genel skor</p>
-              <div className="font-serif text-3xl text-foreground">%{avgScore}</div>
+              <div className="font-serif text-3xl text-foreground">
+                {avgScore}<span className="text-base text-muted-foreground"> / 100</span>
+              </div>
             </div>
             {band && <Badge variant={BAND_BADGE[band.tone]}>{band.label}</Badge>}
           </div>
@@ -304,7 +306,7 @@ export default function InterviewDetailPage() {
             <TrendingUp className="w-5 h-5 text-primary" />
             Bütünsel Performans Analizi
           </h2>
-          <div className="flex-1 min-h-[300px] flex items-center justify-center">
+          <div className="flex-1 min-h-[300px] flex items-center justify-center" aria-hidden="true">
             <ResponsiveContainer width="100%" height={300}>
               <RadarChart cx="50%" cy="50%" outerRadius="75%" data={analytics ? chartData : fallbackChartData}>
                 <PolarGrid stroke="var(--border)" />
@@ -321,6 +323,15 @@ export default function InterviewDetailPage() {
               </RadarChart>
             </ResponsiveContainer>
           </div>
+          {/* Radardan değer okumak zor ve ekran okuyucuya kapalı: puanlar sayıyla da yazılır. */}
+          <dl className="flex flex-wrap gap-2 mt-4">
+            {(analytics ? chartData : fallbackChartData).map((d) => (
+              <div key={d.subject} className="flex-1 min-w-[5.5rem] bg-muted rounded-xl px-3 py-2 text-center">
+                <dt className="text-[11px] font-semibold text-muted-foreground leading-tight">{d.subject}</dt>
+                <dd className="font-serif text-xl text-foreground">{Math.round(d.A)}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
 
         {/* Yapay Zeka Geri Bildirimi */}

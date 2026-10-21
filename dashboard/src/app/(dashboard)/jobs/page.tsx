@@ -200,8 +200,8 @@ export default function JobsPage() {
           <div className="space-y-4">
             <form onSubmit={handleCreate} className="bg-card border border-border rounded-3xl shadow-sm p-5 space-y-3">
               <h2 className="font-bold text-foreground text-sm">Yeni ilan</h2>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Pozisyon (opsiyonel)" maxLength={150} />
-              <Input value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Şirket (opsiyonel)" maxLength={150} />
+              <Input aria-label="Pozisyon (opsiyonel)" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Pozisyon (opsiyonel)" maxLength={150} />
+              <Input aria-label="Şirket (opsiyonel)" value={company} onChange={(e) => setCompany(e.target.value)} placeholder="Şirket (opsiyonel)" maxLength={150} />
               <Textarea
                 value={text}
                 onChange={(e) => setText(e.target.value)}

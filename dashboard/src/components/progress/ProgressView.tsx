@@ -88,7 +88,17 @@ function practiceHref(action: { role: string | null; topic: string | null; diffi
  */
 export function ProgressView({ progress, allowPractice = true }: { progress: Progress; allowPractice?: boolean }) {
   const [view, setView] = useState<"chart" | "table">("chart");
-  const chartData = progress.timeline.slice(-20).map((p) => ({ ...p, label: formatDate(p.date) }));
+  const points = progress.timeline.slice(-20);
+  // Aynı gün birden çok mülakat varsa x ekseninde ayırt edilsin diye saat de yazılır.
+  const dayCount = new Map<string, number>();
+  points.forEach((p) => dayCount.set(formatDate(p.date), (dayCount.get(formatDate(p.date)) ?? 0) + 1));
+  const chartData = points.map((p) => {
+    const day = formatDate(p.date);
+    const time = p.date && (dayCount.get(day) ?? 0) > 1
+      ? new Date(p.date).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })
+      : "";
+    return { ...p, label: time ? `${day} ${time}` : day };
+  });
 
   return (
     <div className="space-y-6">
@@ -164,7 +174,8 @@ export function ProgressView({ progress, allowPractice = true }: { progress: Pro
                 {SERIES.map((s) => (
                   <Line
                     key={s.key}
-                    type="monotone"
+                    // Ölçümler arasında olmayan iniş/çıkış çizilmesin: düz çizgi.
+                    type="linear"
                     dataKey={s.key}
                     name={s.label}
                     stroke={s.color}

@@ -478,7 +478,7 @@ export default function InterviewRoomPage() {
 
   if (currentState === "SETUP") {
     return (
-      <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex flex-col min-h-[calc(100vh-8rem)] items-center justify-center p-6 animate-in fade-in zoom-in-95 duration-500">
         <div className="max-w-md w-full bg-card border border-border rounded-3xl shadow-lg p-8 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-black via-[#00687a] to-[#57dffe]"></div>
           
@@ -494,8 +494,8 @@ export default function InterviewRoomPage() {
 
           <form onSubmit={handleStartInterview} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
-              <Input
+              <label htmlFor="setup-role" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
+              <Input id="setup-role"
                 type="text"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
@@ -505,8 +505,8 @@ export default function InterviewRoomPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Mülakat Konusu</label>
-              <Input
+              <label htmlFor="setup-topic" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Mülakat Konusu</label>
+              <Input id="setup-topic"
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}

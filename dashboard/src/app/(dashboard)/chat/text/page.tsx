@@ -366,8 +366,8 @@ function TextInterviewContent() {
 
           <form onSubmit={handleStartInterview} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
-              <Input
+              <label htmlFor="setup-role" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Hedef Rol / Pozisyon</label>
+              <Input id="setup-role"
                 type="text"
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
@@ -378,8 +378,8 @@ function TextInterviewContent() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Mülakat Konusu</label>
-              <Input
+              <label htmlFor="setup-topic" className="text-xs font-bold text-muted-foreground uppercase tracking-wider ml-1">Mülakat Konusu</label>
+              <Input id="setup-topic"
                 type="text"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}

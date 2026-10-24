@@ -61,7 +61,8 @@ flowchart LR
 | + | Kurum PDF raporu, kurum yapay zekâ kullanımı/maliyeti | `org_report`, `org_usage_service` | kurum paneli |
 | + | Ön yazı üretici (kaydedilmez) | `cover_letter_service` | `/jobs` |
 | + | Zayıf konulara pratik seti | `practice_service` | `/progress`, mobil Raporlar |
-| + | Platform admin paneli: kullanım ve yapay zekâ envanteri | `admin_service` | `/admin` |
+| + | Platform admin paneli: kullanım (ay/tarih aralığı, hata türleri), yapay zekâ envanteri | `admin_service` | `/admin` |
+| + | Geri bildirim: hata bildirimi ve özellik önerisi (ekran görüntüsü özel `feedback` deposunda, imzalı URL) | `feedback_service` | `/feedback`, mobil Geri Bildirim, `/admin` |
 
 ## Veri modeli (özet)
 
@@ -93,7 +94,7 @@ Kullanıcıya ait tablolar (`interviews`, `cvs`, `job_postings`, `user_consents`
 `survey_responses`, `memberships`, `notifications`) `user_id` ile Supabase Auth kullanıcısına
 bağlanır. `llm_usage` her model denemesini (amaç, model, gecikme, token; içerik yok) tutar;
 yalnızca kurum bağlamındaki mülakat çağrıları `org_id` taşır.
-Şema `backend/sql/001…024` migration'larıyla kurulur (Supabase SQL Editor ya da MCP
+Şema `backend/sql/000…025` migration'larıyla kurulur (Supabase SQL Editor ya da MCP
 `apply_migration`); her dosyanın başında amacı ve çalıştırma notu vardır.
 
 ## Temel akışlar
@@ -169,9 +170,9 @@ daraltılmış veriye ayrıca uygulanır.
 
 ## Test ve ölçüm
 
-- `backend/tests/`: ~480 birim/entegrasyon testi (Supabase ve LLM mock'lu), sahiplik ve
+- `backend/tests/`: ~510 birim/entegrasyon testi (Supabase ve LLM mock'lu), sahiplik ve
   tenant izolasyonu regresyon testleri dahil. `pytest tests -q`
-- `e2e/`: ~100 Playwright testi (web paneli ve mobil uygulamanın web sürümü, backend taklitli);
+- `e2e/`: ~115 Playwright testi (web paneli ve mobil uygulamanın web sürümü, backend taklitli);
   GitHub Actions'ta her PR'da çalışır. Bkz. [e2e/README.md](../e2e/README.md)
 - `dashboard`: `npx tsc --noEmit`, `npx eslint src` · `mobile`: `npx tsc --noEmit`, `npx expo lint`
 - `backend/scripts/eval/`: akademik ölçümler, bkz. [evaluation/README.md](evaluation/README.md)
